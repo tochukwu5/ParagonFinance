@@ -20,6 +20,7 @@ import TestnetHub from './pages/testnet/TestnetHub'
 import TestnetSend from './pages/testnet/TestnetSend'
 import { TestnetTransactions /*, TestnetLeaderboard */ } from './pages/testnet/TestnetPages'
 import AdminPage from './pages/AdminPage'
+import StatsPage from './pages/StatsPage'
 
 function PublicLayout({ children }) {
   return (
@@ -85,6 +86,7 @@ export default function App() {
 
             {/* Admin (password protected) */}
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/stats" element={<StatsPage />} />
 
             {/* 404 */}
             <Route path="*" element={

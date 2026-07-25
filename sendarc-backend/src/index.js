@@ -8,6 +8,7 @@ import dotenv from 'dotenv'
 
 import testnetRoutes from './routes/testnet.js'
 import adminRoutes from './routes/admin.js'
+import statsRoutes from './routes/stats.js'
 
 dotenv.config()
 
@@ -21,14 +22,10 @@ app.use(express.json({ limit: '10kb' }))
 
 // CORS — allow production + localhost for local dev always
 const PRODUCTION_ORIGINS = [
-    'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
   'https://sendarc1.vercel.app',
   'https://sendarc.xyz',
   'https://www.sendarc.xyz',
   'https://sendarc1-production.up.railway.app',
-  'https://sendarc1v2-production.up.railway.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean)
 
@@ -66,6 +63,7 @@ app.use('/api', rateLimit({
 // ─── Routes ───────────────────────────────────────────────────────────
 app.use('/api/testnet', testnetRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/stats', statsRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
