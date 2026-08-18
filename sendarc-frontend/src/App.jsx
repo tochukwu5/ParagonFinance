@@ -94,7 +94,7 @@ export default function App() {
                 <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
                   <p className="text-8xl font-bold text-[#1e2530] font-['Space_Grotesk'] mb-4">404</p>
                   <h1 className="text-2xl font-bold mb-3">Page not found</h1>
-                  <p className="text-[#8892a0] mb-8">This page doesn't exist on SendArc.</p>
+                  <p className="text-[#8892a0] mb-8">This page doesn't exist on Paragon Finance.</p>
                   <a href="/" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-all">
                     Back to Home →
                   </a>

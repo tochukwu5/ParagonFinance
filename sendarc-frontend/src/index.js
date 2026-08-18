@@ -79,7 +79,7 @@ app.use('/api/stats', statsRoutes)
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'Paragon Finance API',
+    service: 'SendArc API',
     network: 'Arc Testnet · Chain 5042002',
     timestamp: new Date().toISOString(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
@@ -89,9 +89,9 @@ app.get('/health', (req, res) => {
 // Root
 app.get('/', (req, res) => {
   res.json({
-    name: 'Paragon Finance Backend API',
+    name: 'SendArc Backend API',
     version: '1.0.0',
-    description: 'Node.js + MongoDB API for Paragon Finance testnet transaction recording',
+    description: 'Node.js + MongoDB API for SendArc testnet transaction recording',
     endpoints: {
       health: 'GET /health',
       registerWallet: 'POST /api/testnet/wallet/register',
@@ -137,7 +137,7 @@ async function connectDB() {
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`
-🚀 Paragon Finance Backend running on port ${PORT}
+🚀 SendArc Backend running on port ${PORT}
 🌐 Arc Testnet · Chain ID: 5042002
 📊 MongoDB: connected
 🔗 RPC: https://rpc.testnet.arc.network

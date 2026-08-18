@@ -54,7 +54,7 @@ function AdminLogin({ onSuccess }) {
             🔐
           </div>
           <h1 className="text-xl font-bold font-['Space_Grotesk'] text-white mb-1">Admin Access</h1>
-          <p className="text-xs text-[#8892a0]">SendArc Owner Dashboard</p>
+          <p className="text-xs text-[#8892a0]">ParagonFinance Owner Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -155,7 +155,7 @@ function AdminDashboard({ adminKey, onLogout }) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk'] text-white">Admin Dashboard</h1>
-            <p className="text-xs text-[#8892a0] mt-1">SendArc platform overview · Owner only</p>
+            <p className="text-xs text-[#8892a0] mt-1">ParagonFinance platform overview · Owner only</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="green">● Live Data</Badge>

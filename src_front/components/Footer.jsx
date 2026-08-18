@@ -8,9 +8,9 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <img src="/logo.jpg" alt="SendArc" className="h-9 w-9 rounded-lg object-contain" />
-              <span className="font-['Space_Grotesk'] text-xl font-bold text-white">Send</span>
-              <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Arc</span>
+              <img src="/logo.jpg" alt="ParagonFinance" className="h-9 w-9 rounded-lg object-contain" />
+              <span className="font-['Space_Grotesk'] text-xl font-bold text-white">Paragon</span>
+              <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Finance</span>
             </div>
             <p className="text-sm text-[#8892a0] leading-relaxed max-w-xs mb-4">
               More money should reach the family, not the middleman. Instant USDC remittances to the World — powered by Arc Network.
@@ -44,7 +44,7 @@ export default function Footer() {
               {[
                 { to: '/about', label: 'About' },
                 { to: '/docs', label: 'Documentation' },
-                { href: 'https://twitter.com/SendArc1', label: 'Twitter / X' },
+                { href: 'https://twitter.com/ParagonFinance', label: 'Twitter / X' },
                 { href: 'https://www.arc.network', label: 'Arc Network' },
                 { href: 'https://www.circle.com', label: 'Circle (USDC)' },
               ].map(l => (
@@ -58,7 +58,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-[#1e2530] pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-[#556]">© 2026 SendArc.</p>
+          <p className="text-xs text-[#556]">© 2026 ParagonFinance.</p>
           <div className="flex items-center gap-4">
             <span className="text-xs text-[#556]">$0.003 avg fee · &lt;1s settlement · 100% USDC backed</span>
           </div>

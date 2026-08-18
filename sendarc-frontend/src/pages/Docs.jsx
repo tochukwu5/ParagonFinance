@@ -48,10 +48,10 @@ export default function Docs() {
             </div>
             <Badge>WHITE PAPER v1.0</Badge>
             <h1 className="text-5xl font-bold font-['Space_Grotesk'] mt-5 mb-4">
-              SendArc <span className="gradient-text">Documentation</span>
+              Paragon Finance <span className="gradient-text">Documentation</span>
             </h1>
             <p className="text-[#8892a0] text-base leading-relaxed max-w-2xl mb-8">
-              Borderless money infrastructure built on Arc Network. This document covers the full architecture, use cases, security model, and roadmap of the SendArc protocol.
+              Borderless money infrastructure built on Arc Network. This document covers the full architecture, use cases, security model, and roadmap of the Paragon Finance protocol.
             </p>
             <div className="flex gap-3 flex-wrap">
               <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
@@ -72,10 +72,10 @@ export default function Docs() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
             <div>
               <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
-                SendArc is a stablecoin-powered cross-border payment and remittance infrastructure designed to transform how money moves globally built natively on Arc Network's stablecoin-native Layer-1 blockchain by Circle.
+                Paragon Finance is a stablecoin-powered cross-border payment and remittance infrastructure designed to transform how money moves globally built natively on Arc Network's stablecoin-native Layer-1 blockchain by Circle.
               </p>
               <p className="text-[#8892a0] leading-relaxed text-sm">
-                SendArc enables instant, low-cost, transparent, and secure financial transactions powered by programmable stablecoin rails  with sub-second settlement and fees as low as $0.003 per transfer.
+                Paragon Finance enables instant, low-cost, transparent, and secure financial transactions powered by programmable stablecoin rails  with sub-second settlement and fees as low as $0.003 per transfer.
               </p>
             </div>
             <Card glow className="p-6">
@@ -96,9 +96,9 @@ export default function Docs() {
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
             <SectionLabel>EXECUTIVE SUMMARY</SectionLabel>
-            <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">What SendArc is building</h2>
+            <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">What Paragon Finance is building</h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-              SendArc eliminates the inefficiencies of traditional remittance systems by leveraging Arc Network's purpose-built financial infrastructure  designed to support a broad range of financial activity across global markets.
+              Paragon Finance eliminates the inefficiencies of traditional remittance systems by leveraging Arc Network's purpose-built financial infrastructure  designed to support a broad range of financial activity across global markets.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {[
@@ -133,7 +133,7 @@ export default function Docs() {
           </div>
           <Card className="p-6">
             <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
-              SendArc is building the future financial operating system for borderless money movement — instant, stablecoin-powered, and accessible to all.
+              Paragon Finance is building the future financial operating system for borderless money movement — instant, stablecoin-powered, and accessible to all.
             </p>
           </Card>
         </div>
@@ -162,7 +162,7 @@ export default function Docs() {
               </div>
               <div className="divide-y divide-[#1e2530]">
                 {[
-                  { provider: 'SendArc (Arc Network)', fee: '$0.003', time: '0.78 seconds', best: true },
+                  { provider: 'Paragon Finance (Arc Network)', fee: '$0.003', time: '0.78 seconds', best: true },
                   { provider: 'Western Union', fee: '~$5.00', time: '1–5 business days', best: false },
                   { provider: 'Bank Wire', fee: '~$25.00', time: '2–5 business days', best: false },
                   { provider: 'PayPal', fee: '~$4.99', time: '3–5 days to withdraw', best: false },
@@ -185,14 +185,14 @@ export default function Docs() {
           <SectionLabel>WHY ARC NETWORK</SectionLabel>
           <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Built on the right infrastructure</h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            SendArc is built on Arc because Arc is purpose-built for real-world financial activity — not speculation or generalized computation. Arc focuses exclusively on stablecoin-native financial execution.
+            Paragon Finance is built on Arc because Arc is purpose-built for real-world financial activity — not speculation or generalized computation. Arc focuses exclusively on stablecoin-native financial execution.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
             {[
-              { icon: '💵', title: 'Stablecoin-Based Gas Fees', desc: 'Arc uses USDC as gas, eliminating volatile transaction fees. For SendArc, this means always $0.003 — reliable remittance pricing, never a surprise.' },
+              { icon: '💵', title: 'Stablecoin-Based Gas Fees', desc: 'Arc uses USDC as gas, eliminating volatile transaction fees. For Paragon Finance, this means always $0.003 — reliable remittance pricing, never a surprise.' },
               { icon: '⚡', title: 'Deterministic Finality', desc: 'Transactions on Arc finalize in under one second. No challenge period, no waiting — the settlement is final the moment it happens.' },
-              { icon: '🔗', title: 'EVM Compatibility', desc: 'Arc is fully EVM-compatible. SendArc deploys Solidity smart contracts and integrates existing Ethereum tooling via Circle CCTP.' },
-              { icon: '🌐', title: 'Crosschain Interoperability', desc: 'Arc integrates with Circle CCTP, enabling SendArc to accept USDC from Ethereum, Base, Arbitrum, and Solana — all settled on Arc.' },
+              { icon: '🔗', title: 'EVM Compatibility', desc: 'Arc is fully EVM-compatible. Paragon Finance deploys Solidity smart contracts and integrates existing Ethereum tooling via Circle CCTP.' },
+              { icon: '🌐', title: 'Crosschain Interoperability', desc: 'Arc integrates with Circle CCTP, enabling Paragon Finance to accept USDC from Ethereum, Base, Arbitrum, and Solana — all settled on Arc.' },
               { icon: '🏛️', title: 'Institutional Backing', desc: 'Arc is backed by Goldman Sachs, Mastercard, and Visa — the institutions behind global payments infrastructure.' },
               { icon: '✅', title: 'Compliance-Ready', desc: 'Enterprise-grade infrastructure enabling regulated payment flows, transparent auditing, and institutional-grade financial tooling.' },
             ].map(f => <InfoCard key={f.title} {...f} />)}
@@ -229,7 +229,7 @@ export default function Docs() {
             <SectionLabel>ARCHITECTURE</SectionLabel>
             <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">System Architecture</h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-              SendArc is designed as a modular, layered infrastructure stack each layer purpose-built for performance, security, and scalability.
+              Paragon Finance is designed as a modular, layered infrastructure stack each layer purpose-built for performance, security, and scalability.
             </p>
             <div className="space-y-4 mb-10">
               {[
@@ -263,11 +263,11 @@ export default function Docs() {
                   <span className="w-3 h-3 rounded-full bg-amber-500 opacity-60" />
                   <span className="w-3 h-3 rounded-full bg-green-500 opacity-60" />
                 </div>
-                <span className="text-[10px] text-[#556] font-mono ml-2">SendArc.sol — example transfer flow</span>
+                <span className="text-[10px] text-[#556] font-mono ml-2">Paragon Finance.sol — example transfer flow</span>
               </div>
               <div className="p-5">
                 <pre className="text-xs text-[#00D4FF] font-mono leading-relaxed overflow-x-auto">{`// User initiates transfer
-sendArc.transfer({
+paragonfinance.transfer({
   to: "0x8f2a...4e91",
   amount: 100_000000,   // 100 USDC (6 decimals)
   destinationChain: "arc-testnet",
@@ -287,29 +287,30 @@ sendArc.transfer({
           <SectionLabel>USE CASES</SectionLabel>
           <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Core Use Cases</h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            SendArc is designed to power a wide range of real-world financial activity across borders.
+            Paragon Finance is designed to power a wide range of real-world financial activity across borders.
           </p>
           <div className="space-y-4">
             {[
-              { num: '01', icon: '💸', title: 'Diaspora Remittances', desc: 'Send instant stablecoin-powered payments with lower fees, faster settlement, transparent exchange rates, and borderless accessibility. SendArc removes the friction that costs diaspora communities billions in unnecessary fees each year.' },
+              { num: '01', icon: '💸', title: 'Diaspora Remittances', desc: 'Send instant stablecoin-powered payments with lower fees, faster settlement, transparent exchange rates, and borderless accessibility. Paragon Finance removes the friction that costs diaspora communities billions in unnecessary fees each year.' },
               { num: '02', icon: '🏢', title: 'Cross-Border Business Payments', desc: 'Businesses can pay suppliers instantly, settle invoices globally, reduce banking friction, and access stable digital payment rails — enabling the commercial velocity that growing economies demand.' },
               { num: '03', icon: '👨‍💻', title: 'Freelance & Creator Payments', desc: 'Instant creator payouts, remote worker payments, and global freelance settlements. Stablecoin-powered payments preserve income value against local currency volatility, giving global talent fair and timely compensation.' },
-              { num: '04', icon: '🛒', title: 'Merchant Payments', desc: 'Merchants can accept stablecoin payments, settle instantly, reduce processing costs, and access global customers — all through SendArc\'s programmable payment infrastructure.' },
+              {
+                num: '04', icon: '🛒', title: 'Merchant Payments', desc: 'Merchants can accept stablecoin payments, settle instantly, reduce processing costs, and access global customers — all through Paragon Finance's programmable payment infrastructure.' },
               { num: '05', icon: '💱', title: 'Stablecoin FX Infrastructure', desc: 'Onchain FX conversion, multi-currency liquidity routing, real-time exchange infrastructure, and transparent pricing systems — the stablecoin FX layer that modern global commerce needs.' },
             ].map(u => (
-              <Card key={u.num} className="p-6 hover:border-[#00D4FF]/30 transition-all">
-                <div className="flex gap-5">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0a2030] border border-[#00D4FF]/30 flex items-center justify-center text-lg">{u.icon}</div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] text-[#556] font-['Space_Grotesk']">{u.num}</span>
-                      <p className="font-bold font-['Space_Grotesk'] text-white text-sm">{u.title}</p>
+                  <Card key={u.num} className="p-6 hover:border-[#00D4FF]/30 transition-all">
+                    <div className="flex gap-5">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0a2030] border border-[#00D4FF]/30 flex items-center justify-center text-lg">{u.icon}</div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] text-[#556] font-['Space_Grotesk']">{u.num}</span>
+                          <p className="font-bold font-['Space_Grotesk'] text-white text-sm">{u.title}</p>
+                        </div>
+                        <p className="text-sm text-[#8892a0] leading-relaxed">{u.desc}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-[#8892a0] leading-relaxed">{u.desc}</p>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                  </Card>
+                ))}
           </div>
         </div>
 
@@ -319,11 +320,11 @@ sendArc.transfer({
             <SectionLabel>SECURITY</SectionLabel>
             <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Security Framework</h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-              SendArc is built with a security-first mindset across every layer. We never hold user funds — all transfers are non-custodial and settled directly on Arc Network.
+              Paragon Finance is built with a security-first mindset across every layer. We never hold user funds — all transfers are non-custodial and settled directly on Arc Network.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
               {[
-                { icon: '🔐', title: 'Non-Custodial Architecture', desc: 'SendArc never holds user funds. All transfers are peer-to-peer via smart contracts. Your keys, your money.' },
+                { icon: '🔐', title: 'Non-Custodial Architecture', desc: 'Paragon Finance never holds user funds. All transfers are peer-to-peer via smart contracts. Your keys, your money.' },
                 { icon: '✅', title: 'Audited Smart Contracts', desc: 'Smart contracts are independently audited before mainnet deployment. All contract code is open-source and verifiable.' },
                 { icon: '🔑', title: 'Multi-Signature Treasury', desc: 'Protocol treasury is protected by multi-signature systems, requiring multiple approvals for any fund movement.' },
                 { icon: '👁️', title: 'Real-Time Monitoring', desc: 'On-chain transaction monitoring and fraud detection systems running continuously across all transfer activity.' },
@@ -368,7 +369,7 @@ sendArc.transfer({
 
           {/* Competitive advantage */}
           <SectionLabel>COMPETITIVE ADVANTAGE</SectionLabel>
-          <h2 className="text-2xl font-bold font-['Space_Grotesk'] mb-6">What sets SendArc apart</h2>
+          <h2 className="text-2xl font-bold font-['Space_Grotesk'] mb-6">What sets Paragon Finance apart</h2>
           <Card className="p-5">
             {[
               'Stablecoin-native infrastructure built on Arc Network',
@@ -389,7 +390,7 @@ sendArc.transfer({
             <SectionLabel>SUPPORTED DESTINATIONS</SectionLabel>
             <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Countries & Rates</h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-8 leading-relaxed">
-              SendArc currently supports 8 live destinations. All rates are updated every 60 seconds from live market data. Fees shown are fixed per transaction regardless of amount.
+              Paragon Finance currently supports 8 live destinations. All rates are updated every 60 seconds from live market data. Fees shown are fixed per transaction regardless of amount.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {[
@@ -428,11 +429,11 @@ sendArc.transfer({
           <SectionLabel>ROADMAP</SectionLabel>
           <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Development Roadmap</h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            SendArc's development is structured across four phases, each building on the last to deliver progressively greater capability and reach.
+            Paragon Finance's development is structured across four phases, each building on the last to deliver progressively greater capability and reach.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {[
-              { phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF', items: ['Frontend MVP — live at sendarc1.vercel.app', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect)', 'Live rate calculator and send flow', 'Transaction dashboard with history'] },
+              { phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF', items: ['Frontend MVP — live at paragonfinance.xyz', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect)', 'Live rate calculator and send flow', 'Transaction dashboard with history'] },
               { phase: 'Phase 2', title: 'Payments Expansion', status: 'Upcoming', color: '#00FFCC', items: ['Backend API — Node.js + MongoDB', 'Real USDC transfers on Arc Testnet', 'Email receipts via Resend', 'Cashout partner integrations', 'Crosschain support via Circle CCTP'] },
               { phase: 'Phase 3', title: 'Pan-Global Infrastructure', status: 'Planned', color: '#0080FF', items: ['Arc Mainnet launch', 'Merchant payment integration', 'Business settlement tooling', 'Embedded finance APIs', 'Expanded country coverage'] },
               { phase: 'Phase 4', title: 'Financial Ecosystem Layer', status: 'Future', color: '#8892a0', items: ['AI-powered financial tooling', 'Programmable payment automation', 'Developer APIs and SDK', 'Institutional integrations', 'Ecosystem expansion'] },
@@ -446,11 +447,10 @@ sendArc.transfer({
                     </span>
                     <p className="font-bold font-['Space_Grotesk'] text-white mt-1">{p.title}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-1 rounded-full font-semibold font-['Space_Grotesk'] ${
-                    p.status === 'In Progress' ? 'bg-green-900/20 border border-green-500 text-green-400' :
+                  <span className={`text-[10px] px-2 py-1 rounded-full font-semibold font-['Space_Grotesk'] ${p.status === 'In Progress' ? 'bg-green-900/20 border border-green-500 text-green-400' :
                     p.status === 'Upcoming' ? 'bg-[#0a2030] border border-[#00D4FF] text-[#00D4FF]' :
-                    'bg-[#13181f] border border-[#1e2530] text-[#8892a0]'
-                  }`}>{p.status}</span>
+                      'bg-[#13181f] border border-[#1e2530] text-[#8892a0]'
+                    }`}>{p.status}</span>
                 </div>
                 <div className="space-y-2">
                   {p.items.map(item => (
@@ -472,10 +472,10 @@ sendArc.transfer({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center mb-10">
               <div>
                 <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
-                  SendArc combines stablecoin infrastructure, Arc Network's enterprise-grade blockchain architecture, and financial innovation to redefine cross-border payments.
+                  Paragon Finance combines stablecoin infrastructure, Arc Network's enterprise-grade blockchain architecture, and financial innovation to redefine cross-border payments.
                 </p>
                 <p className="text-[#8892a0] leading-relaxed text-sm">
-                  SendArc is not just a remittance platform. It is building the financial infrastructure layer for the next generation of economic coordination — instant, borderless, stablecoin-powered, and globally accessible.
+                  Paragon Finance is not just a remittance platform. It is building the financial infrastructure layer for the next generation of economic coordination — instant, borderless, stablecoin-powered, and globally accessible.
                 </p>
               </div>
               <Card glow className="p-6">
@@ -487,7 +487,7 @@ sendArc.transfer({
                     Launch App →
                   </Link>
                   <Link to="/about" className="border border-[#1e2530] text-[#8892a0] text-sm px-5 py-2.5 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
-                    About SendArc
+                    About Paragon Finance
                   </Link>
                 </div>
               </Card>

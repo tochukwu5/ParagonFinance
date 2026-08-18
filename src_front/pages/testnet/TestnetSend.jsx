@@ -201,7 +201,7 @@ export default function TestnetSend() {
                 {!hasMetaMask ? (
                   <>
                     <h3 className="font-bold font-['Space_Grotesk'] mb-2">MetaMask Required</h3>
-                    <p className="text-[#8892a0] text-sm mb-4">Install MetaMask to use SendArc — it handles all chains automatically.</p>
+                    <p className="text-[#8892a0] text-sm mb-4">Install MetaMask to use ParagonFinance — it handles all chains automatically.</p>
                     <a href="https://metamask.io" target="_blank" rel="noreferrer"
                       className="bg-[#e8821a] text-white font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl hover:opacity-90 inline-block">
                       Install MetaMask ↗

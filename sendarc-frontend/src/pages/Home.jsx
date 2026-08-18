@@ -173,7 +173,7 @@ export default function Home() {
       {/* How it works */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <p className="section-label text-center mb-3">SIMPLE PROCESS</p>
-        <h2 className="text-center text-3xl font-bold mb-12">How SendArc Works</h2>
+        <h2 className="text-center text-3xl font-bold mb-12">How Paragon Finance Works</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
             { num: '01', icon: '👛', title: 'Connect Your Wallet', desc: 'Connect MetaMask or any EVM wallet. No bank account needed. Works with USDC on Arc, Ethereum, Base, or Arbitrum.' },
@@ -195,7 +195,7 @@ export default function Home() {
       <section className="bg-[#0f1822] border-t border-[#1e2530] py-16 px-6">
         <div className="max-w-7xl mx-auto">
           <p className="section-label text-center mb-3">FEE COMPARISON</p>
-          <h2 className="text-center text-3xl font-bold mb-3">SendArc vs The Old Way</h2>
+          <h2 className="text-center text-3xl font-bold mb-3">Paragon Finance vs The Old Way</h2>
           <p className="text-center text-[#8892a0] text-sm mb-10">Sending $100 internationally — all providers compared</p>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {COMPETITORS.map(c => (
@@ -220,7 +220,7 @@ export default function Home() {
             <p className="section-label mb-3">POWERED BY</p>
             <h2 className="text-3xl font-bold mb-3">Built on Arc Network<br />by Circle</h2>
             <p className="text-[#8892a0] text-sm leading-relaxed max-w-md">
-              SendArc runs on Arc, a stablecoin-native Layer-1 blockchain built by Circle,
+              Paragon Finance runs on Arc, a stablecoin-native Layer-1 blockchain built by Circle,
               the company behind USDC. Backed by Goldman Sachs, Mastercard, and Visa.
             </p>
           </div>
@@ -242,7 +242,7 @@ export default function Home() {
       {/* CTA */}
       <section className="text-center px-6 pb-20">
         <h2 className="text-3xl font-bold mb-4">Ready to send money globally?</h2>
-        <p className="text-[#8892a0] mb-8">Join the movement. Send smarter — anywhere in the world — with SendArc.</p>
+        <p className="text-[#8892a0] mb-8">Join the movement. Send smarter — anywhere in the world — with Paragon Finance.</p>
 
         {/* Mainnet CTA — disabled until Arc mainnet launches */}
         <button

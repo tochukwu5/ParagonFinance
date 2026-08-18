@@ -202,7 +202,7 @@ export async function sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUp
     }
   } catch (err) {
     if (err.message && err.message.includes('Cannot find module')) {
-      throw new Error('Circle App Kit not installed. Run in sendarc-frontend: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
+      throw new Error('Circle App Kit not installed. Run in paragonfinance-frontend: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
     }
     throw err
   }

@@ -44,9 +44,9 @@ function Sidebar({ active }) {
     <aside className="w-60 flex-shrink-0 bg-[#0D1117] border-r border-[#1e2530] min-h-screen flex flex-col">
       <div className="p-5 border-b border-[#1e2530]">
         <Link to="/" className="flex items-center gap-2">
-          <img src="/logo.jpg" alt="SendArc" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="font-['Space_Grotesk'] text-lg font-bold text-white">Send</span>
-          <span className="font-['Space_Grotesk'] text-lg font-bold text-[#00D4FF] -ml-1">Arc</span>
+          <img src="/logo.jpg" alt="ParagonFinance" className="h-8 w-8 rounded-lg object-contain" />
+          <span className="font-['Space_Grotesk'] text-lg font-bold text-white">Paragon</span>
+          <span className="font-['Space_Grotesk'] text-lg font-bold text-[#00D4FF] -ml-1">Finance</span>
         </Link>
       </div>
 
@@ -159,7 +159,7 @@ export default function Dashboard() {
               to="/testnet/send"
               className="border border-[#00D4FF] text-[#00D4FF] font-['Space_Grotesk'] font-bold px-4 py-2.5 rounded-xl hover:bg-[#0a2030] transition-all text-sm"
             >
-              ⚡ Testnet Send
+              ⚡ Testnet
             </Link>
             {/* Send Money button (mainnet) — disabled until Arc mainnet launches */}
             {/* <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all text-sm"> + Send Money </Link> */}

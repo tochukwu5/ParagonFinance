@@ -413,7 +413,7 @@ export function Settings() {
       <Sidebar active="settings" />
       <main className="flex-1 p-8 max-w-2xl">
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Settings</h1>
-        <p className="text-[#8892a0] text-sm mb-8">Manage your SendArc preferences</p>
+        <p className="text-[#8892a0] text-sm mb-8">Manage your Paragon Finance preferences</p>
 
         <Card className="p-5 mb-4">
           <p className="text-[10px] tracking-widests text-[#8892a0] mb-4">PREFERENCES</p>
@@ -461,7 +461,7 @@ export function Settings() {
         </Card>
 
         <Card className="p-5">
-          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">ABOUT SENDARC</p>
+          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">ABOUT ParagonFinance</p>
           <div className="space-y-2 text-sm">
             {[
               { l: 'Version', v: '1.0.0-beta' },

@@ -45,7 +45,7 @@ export default function TestnetHub() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
               <div>
                 <h1 className="text-5xl font-bold font-['Space_Grotesk'] mb-4 leading-tight">
-                  SendArc <span className="text-[#00D4FF]">Testnet</span>
+                  Paragon Finance <span className="text-[#00D4FF]">Testnet</span>
                 </h1>
                 <p className="text-[#8892a0] text-base leading-relaxed mb-6">
                   Send real USDC transactions on Arc Testnet. Every transfer is recorded on-chain, gas fees are tracked, and your activity builds your testnet profile. Get testnet USDC from the faucet and start transacting.

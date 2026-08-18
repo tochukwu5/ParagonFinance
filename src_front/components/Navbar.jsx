@@ -26,9 +26,9 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <img src="/logo.jpg" alt="SendArc" className="h-9 w-9 rounded-lg object-contain" />
-          <span className="font-['Space_Grotesk'] text-xl font-bold text-white">Send</span>
-          <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Arc</span>
+          <img src="/logo.jpg" alt="ParagonFinance" className="h-9 w-9 rounded-lg object-contain" />
+          <span className="font-['Space_Grotesk'] text-xl font-bold text-white">Paragon </span>
+          <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Finance</span>
         </Link>
 
         {/* Desktop links */}
@@ -42,14 +42,14 @@ export default function Navbar() {
 
           {/* Create USD Account — disabled, shows "Coming Soon" tooltip on hover.
               Not a real route, not clickable. Will be enabled once this feature ships. */}
-          <div className="relative group">
+          {/* <div className="relative group">
             <span className="text-sm text-[#556] cursor-not-allowed select-none">
               Create USD Account
             </span>
             <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg bg-[#1c232e] border border-[#2a3340] text-[10px] text-[#00D4FF] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 shadow-lg">
               🔒 Coming Soon
             </div>
-          </div>
+          </div> */}
 
           {/* Testnet badge — always visible */}
           <Link to="/testnet"
@@ -108,9 +108,9 @@ export default function Navbar() {
       {menuOpen && (
         <div className="md:hidden bg-[#0f1822] border-t border-[#1e2530] px-6 py-4 flex flex-col gap-4">
           <Link to="/" className="flex items-center gap-2.5 mb-2" onClick={() => setMenuOpen(false)}>
-            <img src="/logo.jpg" alt="SendArc" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="font-['Space_Grotesk'] text-lg font-bold text-white">Send</span>
-            <span className="font-['Space_Grotesk'] text-lg font-bold text-[#00D4FF] -ml-1.5">Arc</span>
+            <img src="/logo.jpg" alt="ParagonFinance" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="font-['Space_Grotesk'] text-lg font-bold text-white">Paragon</span>
+            <span className="font-['Space_Grotesk'] text-lg font-bold text-[#00D4FF] -ml-1.5">Finance</span>
           </Link>
           {links.map((l) => (
             <Link key={l.to} to={l.to} className="text-sm text-[#8892a0] hover:text-white" onClick={() => setMenuOpen(false)}>

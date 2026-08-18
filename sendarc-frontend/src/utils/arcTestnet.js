@@ -1,4 +1,4 @@
-// SendArc — Arc Network + Circle App Kit CCTP Integration
+// Paragon Finance — Arc Network + Circle App Kit CCTP Integration
 // Cross-chain transfers powered by Circle's official App Kit SDK
 
 export const SENDARC_ROUTER = {
@@ -411,7 +411,7 @@ export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, 
     }
   } catch (err) {
     if (err.message && err.message.includes('Cannot find module')) {
-      throw new Error('Circle App Kit not installed. Run in sendarc-frontend: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
+      throw new Error('Circle App Kit not installed. Run in paragon-frontend: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
     }
     throw err
   }
@@ -459,7 +459,7 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
 }
 
 // Routes the native Arc send through SendArcRouter.recordTransfer() first —
-// this is what makes Arc's block explorer attribute the volume to SendArc
+// this is what makes Arc's block explorer attribute the volume to Paragon Finance
 // instead of showing an anonymous wallet-to-wallet transfer.
 export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')

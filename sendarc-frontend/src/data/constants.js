@@ -1,5 +1,5 @@
 // ─── WORLDWIDE SUPPORTED DESTINATIONS ────────────────────────────────
-// SendArc supports global remittance — every continent represented
+// Paragon Finance supports global remittance — every continent represented
 export const COUNTRIES = [
 
   // Americas
@@ -63,7 +63,7 @@ export const WALLET_OPTIONS = [
 ]
 
 export const COMPETITORS = [
-  { name: 'SendArc (Arc Network)', fee: '$0.003', time: 'Under 1 second',      badge: 'best' },
+  { name: 'Paragon Finance (Arc Network)', fee: '$0.003', time: 'Under 1 second',      badge: 'best' },
   { name: 'Western Union',         fee: '~$5.00', time: '1–5 business days',   badge: 'bad' },
   { name: 'Bank Wire',             fee: '~$25.00',time: '2–5 business days',   badge: 'bad' },
   { name: 'PayPal',                fee: '~$4.99', time: '3–5 days to withdraw',badge: 'bad' },

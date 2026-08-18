@@ -82,10 +82,10 @@ export default function StatsPage() {
               <span className="text-[11px] tracking-widest text-[#00D4FF] font-semibold">LIVE NETWORK STATS</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold font-['Space_Grotesk'] mb-3">
-              SendArc Testnet
+              Paragon Finance Testnet
             </h1>
             <p className="text-[#8892a0] text-base max-w-xl">
-              Real-time on-chain activity from the SendArc testnet — powered by Arc Network and Circle USDC.
+              Real-time on-chain activity from the Paragon Finance testnet — powered by Arc Network and Circle USDC.
             </p>
             <div className="flex items-center gap-4 mt-5">
               <a

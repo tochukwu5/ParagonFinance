@@ -852,7 +852,7 @@ sendArc.transfer({
               {[
                 {
                   phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF',
-                  items: ['Frontend MVP — live at sendarc1.vercel.app', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect, Coinbase)', 'Live rate calculator and full send flow', 'Dashboard with transaction history', 'On-chain receipt generation']
+                  items: ['Frontend MVP — live at paragonfinance.xyz', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect, Coinbase)', 'Live rate calculator and full send flow', 'Dashboard with transaction history', 'On-chain receipt generation']
                 },
                 {
                   phase: 'Phase 2', title: 'Payments Expansion', status: 'Upcoming', color: '#00FFCC',

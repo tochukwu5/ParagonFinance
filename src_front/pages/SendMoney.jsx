@@ -47,7 +47,7 @@ export default function SendMoney() {
     const html = `
       <html>
         <head>
-          <title>SendArc Receipt</title>
+          <title>ParagonFinance Receipt</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #fff; color: #111; padding: 48px; }
@@ -81,7 +81,7 @@ export default function SendMoney() {
             <div class="meta">
               <div>Arc Network · Chain 5042002</div>
               <div>${date}</div>
-              <div>sendarc.xyz</div>
+              <div>paragonfinance.xyz</div>
             </div>
           </div>
           <div class="badge">✓ CONFIRMED · FINAL</div>
@@ -100,7 +100,7 @@ export default function SendMoney() {
             <tr><td>TX Hash</td><td class="hash">${MOCK_TX_HASH}</td></tr>
             <tr><td>Date</td><td>${date}</td></tr>
           </table>
-          <div class="footer">This is a testnet receipt · SendArc · Powered by Arc Network · Circle USDC</div>
+          <div class="footer">This is a testnet receipt · ParagonFinance · Powered by Arc Network · Circle USDC</div>
         </body>
       </html>
     `
@@ -116,13 +116,13 @@ export default function SendMoney() {
 
   const handleShareWhatsApp = () => {
     const msg =
-      '*Money Sent via SendArc!*\n\n' +
+      '*Money Sent via ParagonFinance!*\n\n' +
       'Sent: *' + amount + ' USDC*\n' +
       'Received: *' + selectedCountry.symbol + received + ' ' + selectedCountry.currency + '*\n' +
       'Fee: *$0.003 USDC*\n' +
       'Settled in under 1 second\n\n' +
       'TX: ' + MOCK_TX_HASH.slice(0, 20) + '...\n\n' +
-      'Powered by Arc Network - sendarc.xyz'
+      'Powered by Arc Network - paragonfinance.xyz'
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer')
   }
 
@@ -140,9 +140,9 @@ export default function SendMoney() {
         <div className="flex items-center gap-4">
           <button onClick={() => navigate(-1)} className="text-[#8892a0] hover:text-white text-sm transition-colors">← Back</button>
           <div className="flex items-center gap-2">
-            <img src="/logo.jpg" alt="SendArc" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="font-['Space_Grotesk'] font-bold text-lg text-white">Send</span>
-            <span className="font-['Space_Grotesk'] font-bold text-lg text-[#00D4FF] -ml-1">Arc</span>
+            <img src="/logo.jpg" alt="ParagonFinance" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="font-['Space_Grotesk'] font-bold text-lg text-white">Paragon</span>
+            <span className="font-['Space_Grotesk'] font-bold text-lg text-[#00D4FF] -ml-1">Finance</span>
           </div>
         </div>
         {wallet && (
@@ -405,7 +405,7 @@ export default function SendMoney() {
             <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">FEE COMPARISON</p>
             <div className="space-y-2 text-sm">
               {[
-                { name: 'SendArc (Arc Network)', fee: '~$0.003', sub: 'Under 1 second · 24/7', best: true },
+                { name: 'ParagonFinance (Arc Network)', fee: '~$0.003', sub: 'Under 1 second · 24/7', best: true },
                 { name: 'Western Union', fee: '~$5.00', sub: '1-5 business days' },
                 { name: 'Bank Wire', fee: '~$25.00', sub: '2-5 business days' },
                 { name: 'PayPal', fee: '~$4.99', sub: '3-5 days to withdraw' },
