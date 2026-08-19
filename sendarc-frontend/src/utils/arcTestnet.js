@@ -1,6 +1,39 @@
 // Paragon Finance — Arc Network + Circle App Kit CCTP Integration
 // Cross-chain transfers powered by Circle's official App Kit SDK
 
+// ─────────────────────────────────────────────────────────────────────────
+// ParagonFinance contract suite (PaymentRouter, BridgeRouter, FeeManager,
+// Treasury, BridgeRegistry) — replaces the old two-step SendArcRouter.
+//
+// Selectors below were computed locally with a from-scratch Keccak-256
+// implementation and cross-checked against the four selectors that were
+// already hard-coded elsewhere in this file (transfer(address,uint256) =
+// a9059cbb, balanceOf(address) = 70a08231, decimals() = 313ce567,
+// recordTransfer(address,uint256) = 73ac83ef) — all four matched exactly
+// before these new ones were trusted.
+// ─────────────────────────────────────────────────────────────────────────
+export const PARAGON_FINANCE_PAYMENT_ROUTER = {
+  address: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
+  // sendPayment(address)
+  sendPaymentSelector: '8a7644a8',
+}
+
+export const BRIDGE_ROUTER = {
+  address: import.meta.env.VITE_BRIDGE_ROUTER_ADDRESS || null,
+  // recordBridgeFee(uint256,string)
+  recordBridgeFeeSelector: '292c5e39',
+}
+
+export const FEE_MANAGER_ADDRESS = import.meta.env.VITE_FEE_MANAGER_ADDRESS || null
+export const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS || null
+export const BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
+
+// FeeManager.calculateBridgeFee(uint256) — used by getBridgeFeeQuote() below
+const CALCULATE_BRIDGE_FEE_SELECTOR = 'ade1af12'
+
+// Deprecated — kept ONLY so old transaction history / explorer links still
+// resolve to something. The frontend no longer routes new Sends through
+// this contract; sendUsdcOnChain() below now prefers PAYMENT_ROUTER.
 export const SENDARC_ROUTER = {
   address: import.meta.env.VITE_ROUTER_ADDRESS || null,
   // recordTransfer(address,uint256) — verified via `cast sig`
@@ -335,6 +368,27 @@ async function waitForReceipt(txHash, maxAttempts = 60, delayMs = 2000) {
   return null
 }
 
+// ─── Minimal ABI-encoding helpers ──────────────────────────────────────────
+// Used for calling PaymentRouter/BridgeRouter/FeeManager directly via
+// eth_sendTransaction / eth_call, same hand-rolled-calldata style already
+// used elsewhere in this file (e.g. the ERC-20 transfer() calls below),
+// extended to cover a dynamic `string` argument for recordBridgeFee().
+function encodeUint256(n) {
+  return BigInt(n).toString(16).padStart(64, '0')
+}
+
+function encodeAddress(addr) {
+  return addr.replace('0x', '').toLowerCase().padStart(64, '0')
+}
+
+function encodeDynamicString(str) {
+  const bytes = new TextEncoder().encode(str)
+  const lengthHex = encodeUint256(bytes.length)
+  let dataHex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+  while (dataHex.length % 64 !== 0) dataHex += '0' // right-pad to a multiple of 32 bytes
+  return lengthHex + dataHex
+}
+
 // Circle App Kit CCTP bridge — official SDK, handles approve/burn/attest/mint.
 // Generalized to any (fromChainKey -> toChainKey) pair, including Arc as a
 // source: Circle's own docs demonstrate `from: { chain: "Arc_Testnet" }` in
@@ -458,9 +512,68 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
   }
 }
 
-// Routes the native Arc send through SendArcRouter.recordTransfer() first —
-// this is what makes Arc's block explorer attribute the volume to Paragon Finance
-// instead of showing an anonymous wallet-to-wallet transfer.
+// Routes the native Arc send through PaymentRouter.sendPayment() — one
+// transaction that atomically splits ParagonFinance's fee to Treasury and
+// forwards the remainder to the recipient. Replaces the old two-step
+// SendArcRouter.recordTransfer() + separate transfer pattern below: that
+// approach existed only because a router couldn't safely take custody of
+// native USDC and split it — PaymentRouter can, so it does both in one call.
+export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
+  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!PARAGON_FINANCE_PAYMENT_ROUTER.address) throw new Error('PaymentRouter not deployed yet')
+
+  const start = Date.now()
+  const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
+  const amountHex = '0x' + rawAmount.toString(16)
+  const data = '0x' + PARAGON_FINANCE_PAYMENT_ROUTER.sendPaymentSelector + encodeAddress(to)
+
+  const txHash = await window.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: PARAGON_FINANCE_PAYMENT_ROUTER.address,
+      value: amountHex,
+      data,
+      // 200000 — covers fee-split accounting, the Treasury deposit call,
+      // and the payout to the recipient, all inside one transaction.
+      gas: '0x30D40',
+    }],
+  })
+
+  const receipt = await waitForReceipt(txHash, 30, 1000)
+  if (receipt && receipt.status === '0x0') {
+    throw new Error('Send failed. Check your balance, and that PaymentRouter is not paused.')
+  }
+
+  const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 150000
+  const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
+  const gasCostRaw = BigInt(gasUsed) * BigInt(parseInt(gasPrice, 16))
+
+  return {
+    hash: txHash,
+    from, to,
+    routerAddress: PARAGON_FINANCE_PAYMENT_ROUTER.address,
+    amount: parseFloat(amount),
+    gasCost: (Number(gasCostRaw) / 1e18).toFixed(9),
+    gasUsed,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    settlementTime: Date.now() - start,
+    status: 'confirmed',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
+    sourceChainKey: 'arc',
+    destinationChainKey: 'arc',
+    network: 'Arc Testnet (via ParagonFinance PaymentRouter)',
+    chainId: ARC_TESTNET.id,
+    cctpBridge: false,
+    routedThroughContract: true,
+    simulated: false,
+  }
+}
+
+// Deprecated — the old two-step SendArcRouter path. No longer called by
+// sendUsdcOnChain() below, kept only for historical reference / in case any
+// other file still imports it directly.
 export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   if (!SENDARC_ROUTER.address) throw new Error('SendArcRouter not deployed yet')
@@ -623,14 +736,67 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   if (!from) throw new Error('No account connected')
 
   if (chainKey === 'arc') {
-    if (SENDARC_ROUTER.address) {
-      onStatusUpdate('Routing through SendArcRouter...')
-      return sendUsdcViaSendArcRouter({ from, to, amount })
+    if (PARAGON_FINANCE_PAYMENT_ROUTER.address) {
+      onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
+      return sendUsdcViaPaymentRouter({ from, to, amount })
     }
     onStatusUpdate('Sending USDC on Arc Testnet...')
     return sendUsdcNativeArc({ from, to, amount })
   }
   return sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUpdate)
+}
+
+// ─── Bridge fee capture (BridgeRouter.recordBridgeFee) ─────────────────────
+// Circle's CCTP (via bridgeUsdcViaAppKit above) burns/mints USDC straight to
+// the user's wallet — it never hands custody to a ParagonFinance contract,
+// so there's nothing for an on-chain router to intercept. These two helpers
+// let the Bridge tab still capture and record revenue on that volume: quote
+// the fee from FeeManager, then pay exactly that amount to BridgeRouter
+// alongside the CCTP transfer.
+//
+// Not wired into bridgeUsdcViaAppKit()/sendUsdcViaCCTP() automatically —
+// call getBridgeFeeQuote() + recordBridgeFeeOnArc() from wherever the Bridge
+// tab component currently calls bridgeUsdcViaAppKit(), e.g.:
+//
+//   const { fee } = await getBridgeFeeQuote(amount)
+//   await recordBridgeFeeOnArc({ from, bridgeAmount: amount, destinationChain: toChain.name })
+//   await bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, amount }, onStatusUpdate)
+
+export async function getBridgeFeeQuote(bridgeAmount) {
+  if (!FEE_MANAGER_ADDRESS) throw new Error('FeeManager not deployed yet')
+  const rawAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
+  const data = '0x' + CALCULATE_BRIDGE_FEE_SELECTOR + encodeUint256(rawAmount)
+  const result = await readChain(EVM_CHAINS.arc, 'eth_call', [{ to: FEE_MANAGER_ADDRESS, data }, 'latest'])
+  if (!result || result === '0x') return { fee: 0n, netAmount: rawAmount }
+  const feeHex = result.slice(2, 66)
+  const netHex = result.slice(66, 130)
+  return { fee: BigInt('0x' + feeHex), netAmount: BigInt('0x' + netHex) }
+}
+
+export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChain }) {
+  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!BRIDGE_ROUTER.address) throw new Error('BridgeRouter not deployed yet')
+
+  const rawBridgeAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
+  const { fee: rawFee } = await getBridgeFeeQuote(bridgeAmount)
+  const feeHex = '0x' + rawFee.toString(16)
+
+  // head: [bridgeAmount][offset to string, always 0x40 for a 2-slot head] + tail: [len][utf8 bytes]
+  const data = '0x' + BRIDGE_ROUTER.recordBridgeFeeSelector
+    + encodeUint256(rawBridgeAmount) + encodeUint256(64)
+    + encodeDynamicString(destinationChain)
+
+  const txHash = await window.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{ from, to: BRIDGE_ROUTER.address, value: feeHex, data, gas: '0x30D40' }],
+  })
+
+  const receipt = await waitForReceipt(txHash, 30, 1000)
+  if (receipt && receipt.status === '0x0') {
+    throw new Error('Bridge fee recording failed.')
+  }
+
+  return { hash: txHash, fee: rawFee, receipt }
 }
 
 export function shortAddr(addr) { return !addr ? '—' : addr.slice(0, 6) + '...' + addr.slice(-4) }
