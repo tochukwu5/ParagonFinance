@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ARC_TESTNET, switchToArcTestnet } from '../utils/arcTestnet'
 
-const DISCONNECTED_KEY = 'sendarc_disconnected'
+const DISCONNECTED_KEY = 'paragonfinance_disconnected'
+
+// ParagonPaymentRouter contract address on Arc Testnet
+// routePayment(address) function selector
+const PAYMENT_ROUTER_ADDRESS = import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null
+const ROUTE_PAYMENT_SELECTOR = '0x8c0d4f68' // keccak256("routePayment(address)")[0:4]
 
 export function useArcTestnet() {
   const [account, setAccount] = useState(null)
@@ -32,7 +37,6 @@ export function useArcTestnet() {
       const json = await response.json()
       if (json.result && json.result !== '0x0' && json.result !== '0x') {
         const raw = BigInt(json.result)
-        // Arc Testnet uses 18 decimals (like ETH), not 6 (like USDC on mainnet)
         const formatted = (Number(raw) / 1e18).toFixed(6)
         setBalance(formatted)
       } else {
@@ -66,26 +70,18 @@ export function useArcTestnet() {
   }, [])
 
   // AUTO-RECONNECT on page load
-  // Only runs if user did NOT explicitly disconnect in this session
   useEffect(() => {
     const autoReconnect = async () => {
       if (!window.ethereum) {
         setIsAutoConnecting(false)
         return
       }
-
-      // If user explicitly disconnected, do not auto-reconnect
-      // They must click Connect again manually
       const userDisconnected = sessionStorage.getItem(DISCONNECTED_KEY)
       if (userDisconnected === 'true') {
-        console.log('User previously disconnected — skipping auto-reconnect')
         setIsAutoConnecting(false)
         return
       }
-
       try {
-        // eth_accounts does NOT prompt the user
-        // It only returns accounts if the site already has permission
         const accounts = await window.ethereum.request({ method: 'eth_accounts' })
         if (accounts && accounts.length > 0) {
           await setWalletState(accounts[0])
@@ -99,7 +95,7 @@ export function useArcTestnet() {
     autoReconnect()
   }, [setWalletState])
 
-  // Manual connect — always prompts MetaMask for authorization
+  // Manual connect
   const connect = useCallback(async () => {
     if (!hasMetaMask) {
       setError('MetaMask not found. Please install MetaMask to use the testnet.')
@@ -108,34 +104,25 @@ export function useArcTestnet() {
     setIsLoading(true)
     setError(null)
     try {
-      // First revoke any existing permissions so MetaMask
-      // always shows the account selection popup
       try {
         await window.ethereum.request({
           method: 'wallet_revokePermissions',
           params: [{ eth_accounts: {} }],
         })
       } catch {
-        // wallet_revokePermissions may not be supported on older MetaMask
-        // That is fine — we continue and request accounts anyway
+        // older MetaMask — continue anyway
       }
 
-      // eth_requestAccounts always prompts the user to select and approve
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       })
       if (!accounts.length) throw new Error('No accounts selected')
 
-      // Switch to Arc Testnet
       await switchToArcTestnet()
-
-      // Clear disconnected flag — user has now explicitly connected
       sessionStorage.removeItem(DISCONNECTED_KEY)
-
       await setWalletState(accounts[0])
       return accounts[0]
     } catch (err) {
-      // User rejected the connection prompt
       if (err.code === 4001) {
         setError('Connection rejected. Please approve the MetaMask prompt to continue.')
       } else {
@@ -147,10 +134,9 @@ export function useArcTestnet() {
     }
   }, [hasMetaMask, setWalletState])
 
-  // Disconnect — revokes MetaMask permissions and sets session flag
+  // Disconnect
   const disconnect = useCallback(async () => {
     try {
-      // Revoke MetaMask site permissions so it won't auto-connect next visit
       if (window.ethereum) {
         await window.ethereum.request({
           method: 'wallet_revokePermissions',
@@ -159,15 +145,14 @@ export function useArcTestnet() {
       }
     } catch (err) {
       console.warn('wallet_revokePermissions failed:', err.message)
-      // Continue with disconnect even if revoke fails
     } finally {
-      // Set session flag — prevents auto-reconnect until user manually connects
       sessionStorage.setItem(DISCONNECTED_KEY, 'true')
       clearWalletState()
     }
   }, [clearWalletState])
 
-  // Send USDC on Arc Testnet as native transfer
+  // Send USDC — routes through ParagonPaymentRouter
+  // Fee is automatically split: Treasury gets 0.30%, recipient gets 99.70%
   const sendUsdc = useCallback(async ({ to, amount }) => {
     if (!account || !isCorrectNetwork) throw new Error('Not connected to Arc Testnet')
     setIsLoading(true)
@@ -176,22 +161,54 @@ export function useArcTestnet() {
     try {
       const startTime = Date.now()
 
-      // Arc Testnet: 18 decimals
+      // Arc Testnet: 18 decimals for native USDC
       const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
       const amountHex = '0x' + rawAmount.toString(16)
 
       const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
 
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: account,
-          to: to,
-          value: amountHex,
-          gasPrice,
-          gas: '0x5208',
-        }],
-      })
+      let txHash
+
+      if (PAYMENT_ROUTER_ADDRESS) {
+        // ── Route through ParagonPaymentRouter ──────────────────────
+        // This makes fees go to Treasury and attributes volume to
+        // Paragon Finance on ArcScan
+        //
+        // Encode: routePayment(address recipient)
+        // selector: 0x8c0d4f68
+        // param:    recipient address padded to 32 bytes
+        const recipientPadded = to.slice(2).toLowerCase().padStart(64, '0')
+        const data = ROUTE_PAYMENT_SELECTOR + recipientPadded
+
+        console.log('Routing through ParagonPaymentRouter:', PAYMENT_ROUTER_ADDRESS)
+
+        txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: account,
+            to: PAYMENT_ROUTER_ADDRESS,   // → PaymentRouter contract
+            value: amountHex,             // gross amount — router splits fee
+            data: data,                   // routePayment(recipient)
+            gasPrice,
+            gas: '0x927C0',              // 600_000 gas — router does 3 transfers
+          }],
+        })
+      } else {
+        // ── Fallback: plain native transfer ─────────────────────────
+        // Used only if VITE_PAYMENT_ROUTER_ADDRESS is not set in Vercel
+        console.warn('PAYMENT_ROUTER_ADDRESS not set — using plain transfer (no fee collection)')
+
+        txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: account,
+            to: to,
+            value: amountHex,
+            gasPrice,
+            gas: '0x5208',
+          }],
+        })
+      }
 
       // Poll for receipt
       let receipt = null
@@ -217,7 +234,6 @@ export function useArcTestnet() {
 
       const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 21000
       const gasPriceNum = parseInt(gasPrice, 16)
-      // Gas cost in native Arc token (18 decimals)
       const gasCostRaw = BigInt(gasUsed) * BigInt(gasPriceNum)
       const gasCostUsdc = (Number(gasCostRaw) / 1e18).toFixed(9)
 
@@ -236,6 +252,7 @@ export function useArcTestnet() {
         timestamp: new Date().toISOString(),
         network: 'Arc Testnet',
         chainId: ARC_TESTNET.id,
+        routedVia: PAYMENT_ROUTER_ADDRESS ? 'ParagonPaymentRouter' : 'direct',
       }
     } catch (err) {
       setError(err.message || 'Transaction failed')
@@ -255,7 +272,6 @@ export function useArcTestnet() {
 
     const onAccountsChanged = async (accounts) => {
       if (accounts.length) {
-        // Only auto-update if user did not explicitly disconnect
         const userDisconnected = sessionStorage.getItem(DISCONNECTED_KEY)
         if (userDisconnected !== 'true') {
           await setWalletState(accounts[0])
