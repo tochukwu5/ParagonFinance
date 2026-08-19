@@ -2,15 +2,28 @@
 // Cross-chain transfers powered by Circle's official App Kit SDK
 
 // ─────────────────────────────────────────────────────────────────────────
-// ParagonFinance contract suite (PaymentRouter, BridgeRouter, FeeManager,
-// Treasury, BridgeRegistry) — replaces the old two-step SendArcRouter.
+// ParagonFinance contract suite (ParagonFinancePaymentRouter,
+// ParagonFinanceBridgeRouter, ParagonFinanceFeeManager,
+// ParagonFinanceTreasury, ParagonFinanceBridgeRegistry) — replaces the old
+// two-step SendArcRouter.
+//
+// IMPORTANT: the object/constant names below are for code readability only
+// — they have ZERO effect on what the block explorer displays. What arcscan
+// shows for a given address comes entirely from which Solidity source that
+// address was verified against on-chain (see the ParagonFinance contracts
+// repo's README, section "You already deployed — verify those addresses,
+// don't redeploy"). These addresses are already verified as
+// ParagonFinancePaymentRouter / ParagonFinanceTreasury / etc. — renaming a
+// JS constant here doesn't touch that.
 //
 // Selectors below were computed locally with a from-scratch Keccak-256
 // implementation and cross-checked against the four selectors that were
 // already hard-coded elsewhere in this file (transfer(address,uint256) =
 // a9059cbb, balanceOf(address) = 70a08231, decimals() = 313ce567,
 // recordTransfer(address,uint256) = 73ac83ef) — all four matched exactly
-// before these new ones were trusted.
+// before these new ones were trusted. Renaming the *contract* on-chain
+// (via re-verification) never changes a selector — a selector is derived
+// only from the function signature, never the enclosing contract's name.
 // ─────────────────────────────────────────────────────────────────────────
 export const PARAGON_FINANCE_PAYMENT_ROUTER = {
   address: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
@@ -18,22 +31,32 @@ export const PARAGON_FINANCE_PAYMENT_ROUTER = {
   sendPaymentSelector: '8a7644a8',
 }
 
-export const BRIDGE_ROUTER = {
+export const PARAGON_FINANCE_BRIDGE_ROUTER = {
   address: import.meta.env.VITE_BRIDGE_ROUTER_ADDRESS || null,
   // recordBridgeFee(uint256,string)
   recordBridgeFeeSelector: '292c5e39',
 }
 
-export const FEE_MANAGER_ADDRESS = import.meta.env.VITE_FEE_MANAGER_ADDRESS || null
-export const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS || null
-export const BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
+export const PARAGON_FINANCE_FEE_MANAGER_ADDRESS = import.meta.env.VITE_FEE_MANAGER_ADDRESS || null
+export const PARAGON_FINANCE_TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS || null
+export const PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
+
+// Old, unbranded names — kept as aliases only in case another file in the
+// app still imports these directly. Same objects, same addresses, nothing
+// behaves differently. Prefer the PARAGON_FINANCE_* names above in new code.
+export const BRIDGE_ROUTER = PARAGON_FINANCE_BRIDGE_ROUTER
+export const FEE_MANAGER_ADDRESS = PARAGON_FINANCE_FEE_MANAGER_ADDRESS
+export const TREASURY_ADDRESS = PARAGON_FINANCE_TREASURY_ADDRESS
+export const BRIDGE_REGISTRY_ADDRESS = PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS
 
 // FeeManager.calculateBridgeFee(uint256) — used by getBridgeFeeQuote() below
 const CALCULATE_BRIDGE_FEE_SELECTOR = 'ade1af12'
 
 // Deprecated — kept ONLY so old transaction history / explorer links still
 // resolve to something. The frontend no longer routes new Sends through
-// this contract; sendUsdcOnChain() below now prefers PAYMENT_ROUTER.
+// this contract; sendUsdcOnChain() below now always uses
+// PARAGON_FINANCE_PAYMENT_ROUTER and throws if it isn't configured, rather
+// than ever silently falling back to this or to a raw wallet transfer.
 export const SENDARC_ROUTER = {
   address: import.meta.env.VITE_ROUTER_ADDRESS || null,
   // recordTransfer(address,uint256) — verified via `cast sig`
@@ -512,15 +535,21 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
   }
 }
 
-// Routes the native Arc send through PaymentRouter.sendPayment() — one
-// transaction that atomically splits ParagonFinance's fee to Treasury and
-// forwards the remainder to the recipient. Replaces the old two-step
+// Routes the native Arc send through ParagonFinancePaymentRouter.sendPayment()
+// — one transaction that atomically splits ParagonFinance's fee to Treasury
+// and forwards the remainder to the recipient. Replaces the old two-step
 // SendArcRouter.recordTransfer() + separate transfer pattern below: that
 // approach existed only because a router couldn't safely take custody of
-// native USDC and split it — PaymentRouter can, so it does both in one call.
+// native USDC and split it — this router can, so it does both in one call.
 export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
-  if (!PARAGON_FINANCE_PAYMENT_ROUTER.address) throw new Error('PaymentRouter not deployed yet')
+  if (!PARAGON_FINANCE_PAYMENT_ROUTER.address) {
+    throw new Error(
+      'ParagonFinancePaymentRouter address is not configured (VITE_PAYMENT_ROUTER_ADDRESS is empty). ' +
+      'Refusing to send — sending natively instead would bypass the contract entirely and generate no ' +
+      'ParagonFinance volume or fee. Check your .env and restart the dev server.'
+    )
+  }
 
   const start = Date.now()
   const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
@@ -729,6 +758,16 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
   }
 }
 
+// Every Arc-network Send goes through ParagonFinancePaymentRouter — no
+// silent fallback to a raw wallet-to-wallet transfer. Earlier versions of
+// this function fell back to sendUsdcNativeArc() whenever the router
+// address was missing, which meant a stale build or an unset env var would
+// quietly downgrade every Send to a plain wallet-to-wallet transfer with no
+// error, no warning, and — critically — no ParagonFinance volume or fee.
+// That's almost certainly the cause if you've seen "wallet to wallet"
+// transactions on the explorer instead of a `sendPayment` contract call:
+// PARAGON_FINANCE_PAYMENT_ROUTER.address was empty at the moment this ran.
+// Now that case throws immediately instead of failing silently.
 export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate = () => {}) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   const accounts = await window.ethereum.request({ method: 'eth_accounts' })
@@ -736,12 +775,8 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   if (!from) throw new Error('No account connected')
 
   if (chainKey === 'arc') {
-    if (PARAGON_FINANCE_PAYMENT_ROUTER.address) {
-      onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
-      return sendUsdcViaPaymentRouter({ from, to, amount })
-    }
-    onStatusUpdate('Sending USDC on Arc Testnet...')
-    return sendUsdcNativeArc({ from, to, amount })
+    onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
+    return sendUsdcViaPaymentRouter({ from, to, amount })
   }
   return sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUpdate)
 }
@@ -763,10 +798,10 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
 //   await bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, amount }, onStatusUpdate)
 
 export async function getBridgeFeeQuote(bridgeAmount) {
-  if (!FEE_MANAGER_ADDRESS) throw new Error('FeeManager not deployed yet')
+  if (!PARAGON_FINANCE_FEE_MANAGER_ADDRESS) throw new Error('ParagonFinanceFeeManager address is not configured')
   const rawAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
   const data = '0x' + CALCULATE_BRIDGE_FEE_SELECTOR + encodeUint256(rawAmount)
-  const result = await readChain(EVM_CHAINS.arc, 'eth_call', [{ to: FEE_MANAGER_ADDRESS, data }, 'latest'])
+  const result = await readChain(EVM_CHAINS.arc, 'eth_call', [{ to: PARAGON_FINANCE_FEE_MANAGER_ADDRESS, data }, 'latest'])
   if (!result || result === '0x') return { fee: 0n, netAmount: rawAmount }
   const feeHex = result.slice(2, 66)
   const netHex = result.slice(66, 130)
@@ -775,20 +810,20 @@ export async function getBridgeFeeQuote(bridgeAmount) {
 
 export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChain }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
-  if (!BRIDGE_ROUTER.address) throw new Error('BridgeRouter not deployed yet')
+  if (!PARAGON_FINANCE_BRIDGE_ROUTER.address) throw new Error('ParagonFinanceBridgeRouter address is not configured')
 
   const rawBridgeAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
   const { fee: rawFee } = await getBridgeFeeQuote(bridgeAmount)
   const feeHex = '0x' + rawFee.toString(16)
 
   // head: [bridgeAmount][offset to string, always 0x40 for a 2-slot head] + tail: [len][utf8 bytes]
-  const data = '0x' + BRIDGE_ROUTER.recordBridgeFeeSelector
+  const data = '0x' + PARAGON_FINANCE_BRIDGE_ROUTER.recordBridgeFeeSelector
     + encodeUint256(rawBridgeAmount) + encodeUint256(64)
     + encodeDynamicString(destinationChain)
 
   const txHash = await window.ethereum.request({
     method: 'eth_sendTransaction',
-    params: [{ from, to: BRIDGE_ROUTER.address, value: feeHex, data, gas: '0x30D40' }],
+    params: [{ from, to: PARAGON_FINANCE_BRIDGE_ROUTER.address, value: feeHex, data, gas: '0x30D40' }],
   })
 
   const receipt = await waitForReceipt(txHash, 30, 1000)
