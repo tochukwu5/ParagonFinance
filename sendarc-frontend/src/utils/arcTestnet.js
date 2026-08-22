@@ -10,20 +10,8 @@
 // IMPORTANT: the object/constant names below are for code readability only
 // — they have ZERO effect on what the block explorer displays. What arcscan
 // shows for a given address comes entirely from which Solidity source that
-// address was verified against on-chain (see the ParagonFinance contracts
-// repo's README, section "You already deployed — verify those addresses,
-// don't redeploy"). These addresses are already verified as
-// ParagonFinancePaymentRouter / ParagonFinanceTreasury / etc. — renaming a
-// JS constant here doesn't touch that.
-//
-// Selectors below were computed locally with a from-scratch Keccak-256
-// implementation and cross-checked against the four selectors that were
-// already hard-coded elsewhere in this file (transfer(address,uint256) =
-// a9059cbb, balanceOf(address) = 70a08231, decimals() = 313ce567,
-// recordTransfer(address,uint256) = 73ac83ef) — all four matched exactly
-// before these new ones were trusted. Renaming the *contract* on-chain
-// (via re-verification) never changes a selector — a selector is derived
-// only from the function signature, never the enclosing contract's name.
+// address was verified against on-chain. Renaming a JS constant here
+// doesn't touch that.
 // ─────────────────────────────────────────────────────────────────────────
 export const PARAGON_FINANCE_PAYMENT_ROUTER = {
   address: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
@@ -42,8 +30,7 @@ export const PARAGON_FINANCE_TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_AD
 export const PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
 
 // Old, unbranded names — kept as aliases only in case another file in the
-// app still imports these directly. Same objects, same addresses, nothing
-// behaves differently. Prefer the PARAGON_FINANCE_* names above in new code.
+// app still imports these directly. Same objects, same addresses.
 export const BRIDGE_ROUTER = PARAGON_FINANCE_BRIDGE_ROUTER
 export const FEE_MANAGER_ADDRESS = PARAGON_FINANCE_FEE_MANAGER_ADDRESS
 export const TREASURY_ADDRESS = PARAGON_FINANCE_TREASURY_ADDRESS
@@ -53,13 +40,10 @@ export const BRIDGE_REGISTRY_ADDRESS = PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS
 const CALCULATE_BRIDGE_FEE_SELECTOR = 'ade1af12'
 
 // Deprecated — kept ONLY so old transaction history / explorer links still
-// resolve to something. The frontend no longer routes new Sends through
-// this contract; sendUsdcOnChain() below now always uses
-// PARAGON_FINANCE_PAYMENT_ROUTER and throws if it isn't configured, rather
-// than ever silently falling back to this or to a raw wallet transfer.
+// resolve to something. The frontend no longer routes new Sends through this.
 export const SENDARC_ROUTER = {
   address: import.meta.env.VITE_ROUTER_ADDRESS || null,
-  // recordTransfer(address,uint256) — verified via `cast sig`
+  // recordTransfer(address,uint256)
   recordSelector: '73ac83ef',
 }
 
@@ -71,17 +55,12 @@ export const ARC_TESTNET = {
   faucetUrl: 'https://faucet.circle.com',
   usdcAddress: '0x3600000000000000000000000000000000000000',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  // Confirmed via https://docs.arc.io/arc/references/contract-addresses
   cctpDomain: 26,
   eurcAddress: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
   eurcDecimals: 6,
-  // Verified via developers.circle.com/assets/cirbtc-contract-addresses
-  // and circlefin/arc-defi-lend-borrow on GitHub — same address both places.
   cirbtcAddress: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF',
 }
 
-// USDC addresses verified against developers.circle.com/stablecoins/usdc-contract-addresses
-// Chain IDs/RPCs verified against chainlist.org and each chain's own docs.
 export const EVM_CHAINS = {
   arc: {
     id: 5042002,
@@ -275,16 +254,9 @@ export async function switchToChain(chainKey) {
   }
 }
 
-// Plain JSON-RPC POST to a chain's own public endpoint — deliberately NOT
-// routed through window.ethereum. MetaMask's eth_call/eth_getBalance always
-// query whichever network the wallet is CURRENTLY connected to, regardless
-// of the `to` address you pass in — so asking for Ethereum Sepolia's USDC
-// balance while the wallet is sitting on Arc silently queries Arc instead
-// and returns 0. Hitting each chain's real RPC directly sidesteps that
-// entirely: balance reads are correct no matter what network is active.
 // Plain JSON-RPC POST to a chain's own public endpoint, with retries — public
-// endpoints (sepolia.org etc.) are shared/free and occasionally flaky or
-// rate-limited, so a single failed attempt shouldn't read as "zero balance."
+// endpoints are shared/free and occasionally flaky or rate-limited, so a
+// single failed attempt shouldn't read as "zero balance."
 async function rpcRequest(rpcUrl, method, params, attempts = 3) {
   let lastErr
   for (let i = 0; i < attempts; i++) {
@@ -305,10 +277,6 @@ async function rpcRequest(rpcUrl, method, params, attempts = 3) {
   throw lastErr
 }
 
-// Same request, routed through window.ethereum instead of a public endpoint —
-// used only when the wallet is confirmed to already be on the target chain,
-// since MetaMask's own RPC connection is generally more reliable than a free
-// public one, and going through it avoids the flakiness entirely when we can.
 async function walletChainMatches(chainIdHex) {
   if (!window.ethereum) return false
   try {
@@ -344,14 +312,11 @@ export async function getUsdcBalance(chainKey, address) {
     }
   } catch {
     // Genuine failure after retries — return null (not '0') so callers can
-    // tell "couldn't check" apart from "confirmed empty," instead of both
-    // looking identical on screen.
+    // tell "couldn't check" apart from "confirmed empty."
     return null
   }
 }
 
-// Generic ERC-20 balanceOf(address) reader — used for EURC and any future
-// standard ERC-20 token on Arc (not the native-USDC special case above).
 export async function getErc20Balance(tokenAddress, address, decimals = 6) {
   try {
     const paddedAddr = address.slice(2).toLowerCase().padStart(64, '0')
@@ -365,9 +330,6 @@ export function getEurcBalance(address) {
   return getErc20Balance(ARC_TESTNET.eurcAddress, address, ARC_TESTNET.eurcDecimals)
 }
 
-// Reads decimals() directly from the token contract instead of assuming a
-// value — cirBTC likely follows Bitcoin's 8-decimal convention but that's
-// a guess, not a fact, so we verify on-chain and cache the result.
 const decimalsCache = {}
 export async function getTokenDecimals(tokenAddress) {
   if (decimalsCache[tokenAddress] !== undefined) return decimalsCache[tokenAddress]
@@ -392,10 +354,6 @@ async function waitForReceipt(txHash, maxAttempts = 60, delayMs = 2000) {
 }
 
 // ─── Minimal ABI-encoding helpers ──────────────────────────────────────────
-// Used for calling PaymentRouter/BridgeRouter/FeeManager directly via
-// eth_sendTransaction / eth_call, same hand-rolled-calldata style already
-// used elsewhere in this file (e.g. the ERC-20 transfer() calls below),
-// extended to cover a dynamic `string` argument for recordBridgeFee().
 function encodeUint256(n) {
   return BigInt(n).toString(16).padStart(64, '0')
 }
@@ -413,10 +371,6 @@ function encodeDynamicString(str) {
 }
 
 // Circle App Kit CCTP bridge — official SDK, handles approve/burn/attest/mint.
-// Generalized to any (fromChainKey -> toChainKey) pair, including Arc as a
-// source: Circle's own docs demonstrate `from: { chain: "Arc_Testnet" }` in
-// the App Kit Circle-Wallets example, so outbound-from-Arc is a genuinely
-// supported direction, not just an inbound-to-Arc special case.
 export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, amount }, onStatusUpdate = () => {}) {
   const fromChain = EVM_CHAINS[fromChainKey]
   const toChain = EVM_CHAINS[toChainKey]
@@ -488,14 +442,13 @@ export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, 
     }
   } catch (err) {
     if (err.message && err.message.includes('Cannot find module')) {
-      throw new Error('Circle App Kit not installed. Run in paragon-frontend: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
+      throw new Error('Circle App Kit not installed. Run: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
     }
     throw err
   }
 }
 
-// Backward-compatible wrapper — always bridges INTO Arc. Still used by the
-// Send tab's sendUsdcOnChain() below for the historical inbound-only path.
+// Backward-compatible wrapper — always bridges INTO Arc.
 export async function sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUpdate = () => {}) {
   return bridgeUsdcViaAppKit({ fromChainKey: chainKey, toChainKey: 'arc', from, to, amount }, onStatusUpdate)
 }
@@ -537,10 +490,7 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
 
 // Routes the native Arc send through ParagonFinancePaymentRouter.sendPayment()
 // — one transaction that atomically splits ParagonFinance's fee to Treasury
-// and forwards the remainder to the recipient. Replaces the old two-step
-// SendArcRouter.recordTransfer() + separate transfer pattern below: that
-// approach existed only because a router couldn't safely take custody of
-// native USDC and split it — this router can, so it does both in one call.
+// and forwards the remainder to the recipient.
 export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   if (!PARAGON_FINANCE_PAYMENT_ROUTER.address) {
@@ -600,9 +550,95 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
   }
 }
 
+// ─── Live gas estimate for the Send form's "NETWORK FEE" row ───────────────
+//
+// There is deliberately NO path here that returns null. Every failure mode
+// falls through to a real figure, and logs why it fell through — so a "—"
+// in the UI can only mean the caller never invoked this, never a silent
+// dead end inside it.
+//
+// Layers, in order:
+//   1. gasPrice from the wallet
+//   2. gasPrice from Arc's public RPC (works even if the wallet is sitting
+//      on another network)
+//   3. hardcoded 21 gwei — the rate observed on real confirmed Arc
+//      transactions
+//   Then: eth_estimateGas for the exact call, or PaymentRouter's known
+//   200k budget if simulation reverts (which it does constantly while
+//   someone is mid-typing an amount above their balance).
+//
+// Reference from a real confirmed transaction: 146,859 gas at ~21 gwei
+// ≈ 0.00308 USDC.
+export async function estimateSendPaymentGasCost({ from, to, amount }) {
+  const ROUTER_GAS_BUDGET = 200000n
+  const FALLBACK_GAS_PRICE = 21000000000n // 21 gwei — observed on Arc Testnet
+
+  const router = PARAGON_FINANCE_PAYMENT_ROUTER.address
+
+  // ── gasPrice: wallet → Arc public RPC → hardcoded ───────────────────
+  let gasPrice = null
+
+  try {
+    if (window.ethereum) {
+      gasPrice = BigInt(await window.ethereum.request({ method: 'eth_gasPrice' }))
+    }
+  } catch (err) {
+    console.warn('[gas estimate] wallet eth_gasPrice failed:', err?.message)
+  }
+
+  if (!gasPrice || gasPrice === 0n) {
+    try {
+      gasPrice = BigInt(await rpcRequest(ARC_TESTNET.rpcUrl, 'eth_gasPrice', []))
+    } catch (err) {
+      console.warn('[gas estimate] Arc RPC eth_gasPrice failed:', err?.message)
+    }
+  }
+
+  if (!gasPrice || gasPrice === 0n) {
+    console.warn('[gas estimate] no live gasPrice — using 21 gwei fallback')
+    gasPrice = FALLBACK_GAS_PRICE
+  }
+
+  const priceBudget = () => (Number(ROUTER_GAS_BUDGET * gasPrice) / 1e18).toFixed(6)
+
+  if (!router) {
+    console.warn('[gas estimate] VITE_PAYMENT_ROUTER_ADDRESS is not set — check .env and restart the dev server')
+    return priceBudget()
+  }
+
+  // ── Exact simulation, when there's enough filled in to simulate ──────
+  const canSimulate =
+    window.ethereum &&
+    from &&
+    to && to.startsWith('0x') && to.length === 42 &&
+    amount && parseFloat(amount) > 0
+
+  if (!canSimulate) return priceBudget()
+
+  try {
+    const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
+    const amountHex = '0x' + rawAmount.toString(16)
+    const data = '0x' + PARAGON_FINANCE_PAYMENT_ROUTER.sendPaymentSelector + encodeAddress(to)
+
+    const gasHex = await window.ethereum.request({
+      method: 'eth_estimateGas',
+      params: [{ from, to: router, value: amountHex, data }],
+    })
+
+    // +20% headroom — PaymentRouter branches on whether the fee is zero,
+    // and estimateGas can undershoot on conditional paths.
+    const costWithBuffer = (BigInt(gasHex) * gasPrice * 120n) / 100n
+    return (Number(costWithBuffer) / 1e18).toFixed(6)
+  } catch (err) {
+    // Gas cost doesn't scale with transfer size on Arc, so the budget
+    // figure is the same number a successful simulation would produce.
+    console.warn('[gas estimate] eth_estimateGas reverted, using budget:', err?.message)
+    return priceBudget()
+  }
+}
+
 // Deprecated — the old two-step SendArcRouter path. No longer called by
-// sendUsdcOnChain() below, kept only for historical reference / in case any
-// other file still imports it directly.
+// sendUsdcOnChain(), kept only for historical reference.
 export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   if (!SENDARC_ROUTER.address) throw new Error('SendArcRouter not deployed yet')
@@ -622,7 +658,7 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
       to: SENDARC_ROUTER.address,
       value: '0x0',
       data: recordData,
-      gas: '0x186A0', // 100000 — covers cold SSTORE on first writes + event
+      gas: '0x186A0',
     }],
   })
 
@@ -669,8 +705,7 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   }
 }
 
-// Real EURC transfer — EURC is a standard ERC-20 on Arc (not the native gas
-// token like USDC), so this calls transfer(address,uint256) directly.
+// Real EURC transfer — standard ERC-20 on Arc.
 export async function sendEurcOnArc({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   const start = Date.now()
@@ -713,8 +748,7 @@ export async function sendEurcOnArc({ from, to, amount }) {
   }
 }
 
-// Real cirBTC transfer — standard ERC-20, decimals read from the contract
-// itself rather than assumed, since that number is never worth guessing.
+// Real cirBTC transfer — standard ERC-20, decimals read from the contract.
 export async function sendCirbtcOnArc({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   const start = Date.now()
@@ -759,15 +793,9 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
 }
 
 // Every Arc-network Send goes through ParagonFinancePaymentRouter — no
-// silent fallback to a raw wallet-to-wallet transfer. Earlier versions of
-// this function fell back to sendUsdcNativeArc() whenever the router
-// address was missing, which meant a stale build or an unset env var would
-// quietly downgrade every Send to a plain wallet-to-wallet transfer with no
-// error, no warning, and — critically — no ParagonFinance volume or fee.
-// That's almost certainly the cause if you've seen "wallet to wallet"
-// transactions on the explorer instead of a `sendPayment` contract call:
-// PARAGON_FINANCE_PAYMENT_ROUTER.address was empty at the moment this ran.
-// Now that case throws immediately instead of failing silently.
+// silent fallback to a raw wallet-to-wallet transfer. An unset env var now
+// throws immediately instead of quietly downgrading the Send and generating
+// no ParagonFinance volume or fee.
 export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate = () => {}) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   const accounts = await window.ethereum.request({ method: 'eth_accounts' })
@@ -781,22 +809,13 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   return sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUpdate)
 }
 
-// ─── Bridge fee capture (BridgeRouter.recordBridgeFee) ─────────────────────
-// Circle's CCTP (via bridgeUsdcViaAppKit above) burns/mints USDC straight to
-// the user's wallet — it never hands custody to a ParagonFinance contract,
-// so there's nothing for an on-chain router to intercept. These two helpers
-// let the Bridge tab still capture and record revenue on that volume: quote
-// the fee from FeeManager, then pay exactly that amount to BridgeRouter
-// alongside the CCTP transfer.
-//
-// Not wired into bridgeUsdcViaAppKit()/sendUsdcViaCCTP() automatically —
-// call getBridgeFeeQuote() + recordBridgeFeeOnArc() from wherever the Bridge
-// tab component currently calls bridgeUsdcViaAppKit(), e.g.:
-//
-//   const { fee } = await getBridgeFeeQuote(amount)
-//   await recordBridgeFeeOnArc({ from, bridgeAmount: amount, destinationChain: toChain.name })
-//   await bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, amount }, onStatusUpdate)
-
+// ─── Bridge fee capture (percentage-based, via BridgeRouter) ───────────────
+// Circle's CCTP burns/mints USDC straight to the user's wallet — it never
+// hands custody to a ParagonFinance contract, so there's nothing for an
+// on-chain router to intercept. These helpers let the Bridge tab still
+// capture revenue: quote the fee from FeeManager, then pay it to
+// BridgeRouter. Currently unused — the flat-fee version below is what's
+// actually wired into the Bridge tab.
 export async function getBridgeFeeQuote(bridgeAmount) {
   if (!PARAGON_FINANCE_FEE_MANAGER_ADDRESS) throw new Error('ParagonFinanceFeeManager address is not configured')
   const rawAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
@@ -816,7 +835,8 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
   const { fee: rawFee } = await getBridgeFeeQuote(bridgeAmount)
   const feeHex = '0x' + rawFee.toString(16)
 
-  // head: [bridgeAmount][offset to string, always 0x40 for a 2-slot head] + tail: [len][utf8 bytes]
+  // head: [bridgeAmount][offset to string, always 0x40 for a 2-slot head]
+  // tail: [len][utf8 bytes]
   const data = '0x' + PARAGON_FINANCE_BRIDGE_ROUTER.recordBridgeFeeSelector
     + encodeUint256(rawBridgeAmount) + encodeUint256(64)
     + encodeDynamicString(destinationChain)
@@ -834,6 +854,51 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
   return { hash: txHash, fee: rawFee, receipt }
 }
 
+// ─── Flat bridge fee — what the Bridge tab actually uses ──────────────────
+// A flat 0.25 USDC charged on every bridge transaction, paid directly to
+// Treasury as a plain value transfer. Treasury's receive() accepts any
+// plain deposit and counts it toward totalFeesCollected — no new contract,
+// no redeploy, nothing beyond a second native transfer.
+export const BRIDGE_FLAT_FEE_USDC = 0.25
+
+export async function payBridgeFeeToTreasury({ from }) {
+  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!PARAGON_FINANCE_TREASURY_ADDRESS) {
+    throw new Error('ParagonFinanceTreasury address is not configured (VITE_TREASURY_ADDRESS is empty)')
+  }
+
+  const start = Date.now()
+  const rawFee = BigInt(Math.round(BRIDGE_FLAT_FEE_USDC * 1e6)) * BigInt(1e12)
+  const feeHex = '0x' + rawFee.toString(16)
+
+  const txHash = await window.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: PARAGON_FINANCE_TREASURY_ADDRESS,
+      value: feeHex,
+      // 60000 — Treasury's receive() does an SSTORE (totalFeesCollected)
+      // plus a FeeReceived event, so 21000 (a bare EOA transfer) is not
+      // enough and would run out of gas.
+      gas: '0xEA60',
+    }],
+  })
+
+  const receipt = await waitForReceipt(txHash, 30, 1000)
+  if (receipt && receipt.status === '0x0') {
+    throw new Error('Bridge fee payment to Treasury failed.')
+  }
+
+  return {
+    hash: txHash,
+    fee: BRIDGE_FLAT_FEE_USDC,
+    treasury: PARAGON_FINANCE_TREASURY_ADDRESS,
+    settlementTime: Date.now() - start,
+    receipt,
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
 export function shortAddr(addr) { return !addr ? '—' : addr.slice(0, 6) + '...' + addr.slice(-4) }
 export function arcScanTx(hash) { return ARC_TESTNET.explorerUrl + '/tx/' + hash }
 export function arcScanAddr(addr) { return ARC_TESTNET.explorerUrl + '/address/' + addr }

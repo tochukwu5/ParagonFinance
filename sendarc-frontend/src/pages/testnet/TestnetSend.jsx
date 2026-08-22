@@ -6,7 +6,8 @@ import {
   ARC_TESTNET, EVM_CHAINS, shortAddr, arcScanTx,
   switchToChain, sendUsdcOnChain, getUsdcBalance,
   getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
-  bridgeUsdcViaAppKit
+  bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
+  payBridgeFeeToTreasury, BRIDGE_FLAT_FEE_USDC
 } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import Navbar from '../../components/Navbar'
@@ -76,6 +77,12 @@ export default function TestnetSend() {
   const [txResult, setTxResult] = useState(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
+
+  // Live pre-send gas estimate for the Send tab's "NETWORK FEE" row —
+  // replaces what used to be the static text "USDC gas" with a real
+  // eth_estimateGas-based number for this specific recipient/amount.
+  const [estimatedFee, setEstimatedFee] = useState(null)
+  const [estimatingFee, setEstimatingFee] = useState(false)
 
   // CCTP progress tracking
   const [cctpStatus, setCctpStatus] = useState('')
@@ -184,6 +191,27 @@ export default function TestnetSend() {
     }
   }, [activeTab, account, showWalletInput])
 
+ 
+    // Recompute the Send tab's gas estimate as the form changes, debounced.
+  // Fires as soon as the wallet is connected — recipient and amount only
+  // sharpen the figure from "what this call costs generally" to "what this
+  // exact call costs." Neither is required for a number to exist, which is
+  // why the row no longer blanks to "—" while the form is half-filled.
+  useEffect(() => {
+    if (activeTab !== 'send' || selectedToken !== 'USDC') { setEstimatedFee(null); return }
+    if (!account) { setEstimatedFee(null); return }
+
+    let cancelled = false
+    setEstimatingFee(true)
+    const timer = setTimeout(() => {
+      estimateSendPaymentGasCost({ from: account, to: recipient, amount })
+        .then(v => { if (!cancelled) setEstimatedFee(v) })
+        .finally(() => { if (!cancelled) setEstimatingFee(false) })
+    }, 400)
+
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [activeTab, selectedToken, account, recipient, amount])
+
   const handleStatusUpdate = (msg) => {
     setCctpStatus(msg)
     if (msg.includes('Approving')) { setCctpActiveStep(0); setCctpDoneSteps([]) }
@@ -213,6 +241,21 @@ export default function TestnetSend() {
           { fromChainKey: sourceChainKey, toChainKey: bridgeToKey, from: account, to: recipient, amount },
           handleStatusUpdate
         )
+        // Flat ParagonFinance bridge fee, charged only after the bridge
+        // itself succeeds — CCTP already involves several steps (approve,
+        // burn, attest, mint) that can each fail independently, and it
+        // wouldn't be right to charge a platform fee for a bridge that
+        // never completed. A failure here is logged but doesn't undo or
+        // hide the bridge's own success — the person already has their
+        // funds moving; this is ParagonFinance's separate revenue leg.
+        try {
+          const feeResult = await payBridgeFeeToTreasury({ from: account })
+          result.bridgeFeePaid = BRIDGE_FLAT_FEE_USDC
+          result.bridgeFeeTxHash = feeResult.hash
+        } catch (feeErr) {
+          console.error('ParagonFinance bridge fee payment failed:', feeErr)
+          result.bridgeFeePaid = null
+        }
       } else {
         // Send tab, USDC — always Arc, never sourceChainKey (that belongs
         // to the Bridge tab and could be any of the 10 chains).
@@ -515,7 +558,6 @@ export default function TestnetSend() {
                     className="w-full mt-2 bg-[#0D1117] border border-[#1e2530] rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-[#00D4FF] transition-colors"
                   />
                 )}
-
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#1e2530] text-center">
                   <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">RATE</p>
@@ -525,9 +567,15 @@ export default function TestnetSend() {
                     <p className="text-[9px] text-[#8892a0] mb-0.5">EST. TIME</p>
                     <p className="text-xs text-white font-semibold">&lt; 1 sec</p>
                   </div>
-                  <div>
+                                  <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">NETWORK FEE</p>
-                    <p className="text-xs text-white font-semibold">USDC gas</p>
+                    <p className="text-xs text-white font-semibold">
+                      {estimatingFee && !estimatedFee
+                        ? '…'
+                        : estimatedFee
+                          ? '~' + estimatedFee + ' USDC'
+                          : '—'}
+                    </p>
                   </div>
                 </div>
 
@@ -643,7 +691,9 @@ export default function TestnetSend() {
                   </div>
                   <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">NETWORK FEE</p>
-                    <p className="text-xs text-white font-semibold">Gas on {selectedChain?.name?.split(' ')[0]}</p>
+                    <p className="text-xs text-white font-semibold">
+                      Gas on {selectedChain?.name?.split(' ')[0]} + {BRIDGE_FLAT_FEE_USDC} USDC
+                    </p>
                   </div>
                 </div>
 
@@ -669,6 +719,7 @@ export default function TestnetSend() {
                     { l: 'From',    v: shortAddr(account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
                     { l: 'Amount',  v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
+                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
                     { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },
                   ].map(r => (
@@ -746,6 +797,12 @@ export default function TestnetSend() {
                   {[
                     { l: 'Amount', v: txResult.amount + ' ' + (txResult.token || 'USDC') },
                     { l: 'Gas Paid', v: txResult.gasCost },
+                    ...(txResult.cctpBridge && txResult.bridgeFeePaid
+                      ? [{ l: 'ParagonFinance Fee', v: txResult.bridgeFeePaid + ' USDC' }]
+                      : []),
+                    ...(txResult.cctpBridge && txResult.bridgeFeePaid === null
+                      ? [{ l: 'ParagonFinance Fee', v: 'Not collected (retry needed)' }]
+                      : []),
                     { l: 'Status', v: 'Confirmed', green: true },
                   ].map(r => (
                     <div key={r.l} className="flex justify-between border-b border-[#1e2530] pb-2 last:border-0 text-sm">
