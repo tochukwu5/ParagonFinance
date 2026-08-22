@@ -49,9 +49,7 @@ export default function TestnetSend() {
   // sourceChainKey / bridgeToKey belong to the BRIDGE tab only. The Send
   // tab always operates on Arc directly and uses `arcBalance` from the
   // hook — it never reads chainBalance, so swapping bridge direction can't
-  // affect what Send shows (this was the bug: Send used to share
-  // chainBalance with Bridge's "from" side, so it went to 0 whenever
-  // Bridge's source wasn't Arc).
+  // affect what Send shows.
   const [sourceChainKey, setSourceChainKey] = useState('ethereum')
   const [bridgeToKey, setBridgeToKey] = useState('arc')
   const [chainBalance, setChainBalance] = useState('0.000000')
@@ -78,9 +76,7 @@ export default function TestnetSend() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
 
-  // Live pre-send gas estimate for the Send tab's "NETWORK FEE" row —
-  // replaces what used to be the static text "USDC gas" with a real
-  // eth_estimateGas-based number for this specific recipient/amount.
+  // Live pre-send gas estimate for the Send tab's "NETWORK FEE" row.
   const [estimatedFee, setEstimatedFee] = useState(null)
   const [estimatingFee, setEstimatingFee] = useState(false)
 
@@ -91,14 +87,8 @@ export default function TestnetSend() {
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
   const destChain = EVM_CHAINS[bridgeToKey]
-  // Every Bridge-tab transfer goes through CCTP now, in either direction —
-  // the Send tab (Arc-native/EURC/cirBTC) is the only non-CCTP path.
   const isCCTP = activeTab === 'bridge'
   const tokenSupported = selectedToken === 'USDC' || selectedToken === 'EURC' || selectedToken === 'cirBTC'
-  // Send tab's USDC balance is arcUsdcBalance — a dedicated fetch this
-  // component owns and refreshes itself, not the wallet hook's `balance`
-  // field (which turned out not to refresh proactively on its own) and
-  // never chainBalance (which belongs to whatever chain Bridge has selected).
   const activeBalance = selectedToken === 'EURC' ? eurcBalance : selectedToken === 'cirBTC' ? cirbtcBalance : arcUsdcBalance
 
   const sendTokens = [
@@ -107,11 +97,14 @@ export default function TestnetSend() {
     { symbol: 'cirBTC', name: 'Circle Bitcoin', balance: cirbtcBalance, enabled: true },
   ]
 
-  // getUsdcBalance/getEurcBalance/getCirbtcBalance return null on a genuine
-  // fetch failure (after retries) rather than '0' — this keeps whatever
-  // balance was last successfully shown instead of flashing to zero, which
-  // was indistinguishable from an actually-empty wallet.
+  // Balance getters return null on a genuine fetch failure (after retries)
+  // rather than '0' — this keeps the last known good value on screen instead
+  // of flashing to zero, which is indistinguishable from an empty wallet.
   const applyBalance = (setter, value) => { if (value !== null && value !== undefined) setter(value) }
+
+  // The bridge fee is paid in USDC on Arc, so an Arc balance below the fee
+  // blocks the bridge no matter how much USDC sits on the source chain.
+  const hasArcFeeBalance = parseFloat(arcUsdcBalance || '0') >= BRIDGE_FLAT_FEE_USDC
 
   const handleChainSelect = async (chainKey) => {
     if (chainKey === sourceChainKey) return
@@ -129,9 +122,6 @@ export default function TestnetSend() {
     }
   }
 
-  // Real swap: the wallet's active network switches to whatever becomes the
-  // new source, and source/destination genuinely swap — both directions are
-  // supported (Circle's App Kit docs show Arc_Testnet as a valid `from`).
   const handleSwapDirection = () => {
     const oldFrom = sourceChainKey
     const oldTo = bridgeToKey
@@ -140,11 +130,8 @@ export default function TestnetSend() {
   }
 
   // Keep the wallet network in sync with the active tab. This only ever
-  // switches the WALLET's network — it never touches sourceChainKey/
-  // bridgeToKey (those are Bridge-tab-only state), so Bridge's chosen
-  // chains survive a trip to the Send tab and back. Also refetches Arc's
-  // USDC balance directly here, so landing on Send always shows a current
-  // number instead of whatever it last happened to be.
+  // switches the WALLET's network — never sourceChainKey/bridgeToKey, so
+  // Bridge's chosen chains survive a trip to the Send tab and back.
   useEffect(() => {
     if (!isConnected) return
     if (activeTab === 'send') {
@@ -157,15 +144,13 @@ export default function TestnetSend() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected])
 
-  // Dedicated Arc USDC balance fetch — fires as soon as an account is
-  // connected, independent of the wallet hook's own refresh timing and
-  // independent of anything happening on the Bridge tab.
+  // Arc USDC balance — needed by the Send tab for the amount, and by the
+  // Bridge tab to check the fee is affordable before starting.
   useEffect(() => {
     if (!account) return
     getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
   }, [account])
 
-  // Bridge tab's "from" balance — only fetched/used when on the Bridge tab.
   useEffect(() => {
     if (!account) return
     getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v))
@@ -183,7 +168,7 @@ export default function TestnetSend() {
   }, [account, arcBalance])
 
   // Default the recipient to the connected wallet until the person expands
-  // "Add receiving wallet" and picks someone else — mirrors the reference flow.
+  // "Add receiving wallet" and picks someone else.
   useEffect(() => {
     if (activeTab === 'bridge' && account && !showWalletInput) {
       setRecipient(account)
@@ -191,12 +176,10 @@ export default function TestnetSend() {
     }
   }, [activeTab, account, showWalletInput])
 
- 
-    // Recompute the Send tab's gas estimate as the form changes, debounced.
+  // Recompute the Send tab's gas estimate as the form changes, debounced.
   // Fires as soon as the wallet is connected — recipient and amount only
   // sharpen the figure from "what this call costs generally" to "what this
-  // exact call costs." Neither is required for a number to exist, which is
-  // why the row no longer blanks to "—" while the form is half-filled.
+  // exact call costs." Neither is required for a number to exist.
   useEffect(() => {
     if (activeTab !== 'send' || selectedToken !== 'USDC') { setEstimatedFee(null); return }
     if (!account) { setEstimatedFee(null); return }
@@ -234,50 +217,66 @@ export default function TestnetSend() {
       let result
       if (activeTab === 'send' && selectedToken === 'EURC') {
         result = await sendEurcOnArc({ from: account, to: recipient, amount })
+
       } else if (activeTab === 'send' && selectedToken === 'cirBTC') {
         result = await sendCirbtcOnArc({ from: account, to: recipient, amount })
+
       } else if (activeTab === 'bridge') {
+        // ── Fee FIRST, on Arc, before anything is bridged ──────────────
+        // A completed CCTP bridge cannot be reverted. Charging afterwards
+        // means a failed fee leaves a finished bridge with no revenue and
+        // nothing to undo — which is what produced the old "Not collected
+        // (retry needed)" line on an otherwise successful transfer.
+        // Taking the fee first makes failure clean: this throws, the catch
+        // below surfaces the reason, and no funds move anywhere.
+        //
+        // payBridgeFeeToTreasury forces the wallet onto Arc before sending,
+        // because `value` is always denominated in the ACTIVE chain's
+        // native token — on Ethereum Sepolia the same call would spend ETH.
+        handleStatusUpdate('Collecting ParagonFinance fee on Arc Testnet...')
+        const feeResult = await payBridgeFeeToTreasury({ from: account })
+
+        // The fee left the wallet on Arc. Return it to the bridge's source
+        // chain before handing off to App Kit.
+        if (sourceChainKey !== 'arc') {
+          handleStatusUpdate('Switching to ' + selectedChain?.name + '...')
+          await switchToChain(sourceChainKey)
+        }
+
         result = await bridgeUsdcViaAppKit(
           { fromChainKey: sourceChainKey, toChainKey: bridgeToKey, from: account, to: recipient, amount },
           handleStatusUpdate
         )
-        // Flat ParagonFinance bridge fee, charged only after the bridge
-        // itself succeeds — CCTP already involves several steps (approve,
-        // burn, attest, mint) that can each fail independently, and it
-        // wouldn't be right to charge a platform fee for a bridge that
-        // never completed. A failure here is logged but doesn't undo or
-        // hide the bridge's own success — the person already has their
-        // funds moving; this is ParagonFinance's separate revenue leg.
-        try {
-          const feeResult = await payBridgeFeeToTreasury({ from: account })
-          result.bridgeFeePaid = BRIDGE_FLAT_FEE_USDC
-          result.bridgeFeeTxHash = feeResult.hash
-        } catch (feeErr) {
-          console.error('ParagonFinance bridge fee payment failed:', feeErr)
-          result.bridgeFeePaid = null
-        }
+
+        result.bridgeFeePaid = BRIDGE_FLAT_FEE_USDC
+        result.bridgeFeeTxHash = feeResult.hash
+        result.gasCost = feeResult.gasCost
+
       } else {
         // Send tab, USDC — always Arc, never sourceChainKey (that belongs
         // to the Bridge tab and could be any of the 10 chains).
         result = await sendUsdcOnChain('arc', { to: recipient, amount }, handleStatusUpdate)
       }
+
       await recordTransaction(result, account)
       await loadTransactions(account)
-      if (selectedToken === 'EURC') applyBalance(setEurcBalance, await getEurcBalance(account))
-      else if (selectedToken === 'cirBTC') applyBalance(setCirbtcBalance, await getCirbtcBalance(account))
-      else if (activeTab === 'bridge') {
+
+      if (selectedToken === 'EURC') {
+        applyBalance(setEurcBalance, await getEurcBalance(account))
+      } else if (selectedToken === 'cirBTC') {
+        applyBalance(setCirbtcBalance, await getCirbtcBalance(account))
+      } else if (activeTab === 'bridge') {
         applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, account))
         applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, account))
-        if (bridgeToKey === 'arc' || sourceChainKey === 'arc') {
-          refreshBalance()
-          applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
-        }
-      }
-      else {
-        // Send tab USDC — always Arc
+        // Arc balance always changed — the fee came out of it — regardless
+        // of whether Arc was either side of the bridge itself.
+        refreshBalance()
+        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
+      } else {
         refreshBalance()
         applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
       }
+
       setTxResult(result)
       setView('success')
     } catch (err) {
@@ -307,14 +306,13 @@ export default function TestnetSend() {
   const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
   const isValidAmount = amount && parseFloat(amount) > 0 && parseFloat(amount) <= parseFloat(validationBalance)
   const sameChainPicked = activeTab === 'bridge' && sourceChainKey === bridgeToKey
-  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked
+  const canReview =
+    isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked &&
+    (activeTab !== 'bridge' || hasArcFeeBalance)
 
   // Reads the chain off the transaction result itself (sourceChainKey was
   // stamped on it at creation time in arcTestnet.js) — never off live UI
-  // state. That's deliberate: sourceChainKey in this component belongs to
-  // the Bridge tab and keeps changing as you use it, so a Send-tab result
-  // must never depend on it or its explorer link would silently drift to
-  // whatever chain Bridge happens to have selected later.
+  // state, which keeps changing as the Bridge tab is used.
   const explorerTxUrl = (hash, result) => {
     const key = result?.sourceChainKey || 'arc'
     const chain = EVM_CHAINS[key]
@@ -558,6 +556,7 @@ export default function TestnetSend() {
                     className="w-full mt-2 bg-[#0D1117] border border-[#1e2530] rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-[#00D4FF] transition-colors"
                   />
                 )}
+
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#1e2530] text-center">
                   <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">RATE</p>
@@ -567,7 +566,7 @@ export default function TestnetSend() {
                     <p className="text-[9px] text-[#8892a0] mb-0.5">EST. TIME</p>
                     <p className="text-xs text-white font-semibold">&lt; 1 sec</p>
                   </div>
-                                  <div>
+                  <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">NETWORK FEE</p>
                     <p className="text-xs text-white font-semibold">
                       {estimatingFee && !estimatedFee
@@ -609,6 +608,7 @@ export default function TestnetSend() {
                     onClick={() => account && Promise.all([
                       getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v)),
                       getUsdcBalance(bridgeToKey, account).then(v => applyBalance(setDestBalance, v)),
+                      getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v)),
                     ])}
                     className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
                     🔄
@@ -636,6 +636,21 @@ export default function TestnetSend() {
                   <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
                     <span className="text-sm">🚧</span>
                     <p className="text-xs text-[#e8c374]">Source and destination can't be the same chain.</p>
+                  </div>
+                )}
+
+                {/* The fee is charged in USDC on Arc, so Arc needs the
+                    balance regardless of which chains are being bridged. */}
+                {!hasArcFeeBalance && (
+                  <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
+                    <span className="text-sm">⚠️</span>
+                    <p className="text-xs text-[#e8c374]">
+                      You need at least {BRIDGE_FLAT_FEE_USDC} USDC on Arc Testnet for the ParagonFinance fee.
+                      You have {arcUsdcBalance}.{' '}
+                      <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer" className="underline">
+                        Get some from the faucet →
+                      </a>
+                    </p>
                   </div>
                 )}
 
@@ -690,10 +705,11 @@ export default function TestnetSend() {
                     <p className="text-xs text-white font-semibold">~2–5 min</p>
                   </div>
                   <div>
-                    <p className="text-[9px] text-[#8892a0] mb-0.5">NETWORK FEE</p>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">PARAGON FEE</p>
                     <p className="text-xs text-white font-semibold">
-                      Gas on {selectedChain?.name?.split(' ')[0]} + {BRIDGE_FLAT_FEE_USDC} USDC
+                      {BRIDGE_FLAT_FEE_USDC} USDC
                     </p>
+                    <p className="text-[8px] text-[#556] mt-0.5">on Arc</p>
                   </div>
                 </div>
 
@@ -719,10 +735,11 @@ export default function TestnetSend() {
                     { l: 'From',    v: shortAddr(account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
                     { l: 'Amount',  v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
-                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
+                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC (on Arc)' }] : []),
+                    { l: 'Recipient gets', v: isCCTP ? amount + ' USDC (full amount)' : undefined },
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
-                    { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },
-                  ].map(r => (
+                    { l: 'Prompts', v: isCCTP ? '4 (fee, approve, burn, mint)' : '1 (sign)' },
+                  ].filter(r => r.v !== undefined).map(r => (
                     <div key={r.l} className="flex justify-between items-center border-b border-[#1e2530] pb-2.5 last:border-0 text-sm">
                       <span className="text-[#8892a0]">{r.l}</span>
                       <span className={'font-semibold ' + (r.accent ? 'text-[#00D4FF]' : 'text-white') + (r.mono ? ' font-mono text-xs' : '')}>
@@ -737,6 +754,15 @@ export default function TestnetSend() {
                     </div>
                   )}
                 </div>
+
+                {isCCTP && (
+                  <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl px-3 py-2.5 mb-4">
+                    <p className="text-[11px] text-[#8892a0] leading-relaxed">
+                      The {BRIDGE_FLAT_FEE_USDC} USDC fee is collected on Arc Testnet first.
+                      If you decline it, nothing is bridged and no funds move.
+                    </p>
+                  </div>
+                )}
 
                 {isCCTP && (
                   <div className="flex items-center justify-between mb-5 bg-[#0D1117] border border-[#1e2530] rounded-xl px-3 py-3">
@@ -796,12 +822,9 @@ export default function TestnetSend() {
                 <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-left mb-5 space-y-2.5">
                   {[
                     { l: 'Amount', v: txResult.amount + ' ' + (txResult.token || 'USDC') },
-                    { l: 'Gas Paid', v: txResult.gasCost },
-                    ...(txResult.cctpBridge && txResult.bridgeFeePaid
+                    { l: 'Gas Paid', v: (txResult.gasCost || '0') + ' USDC' },
+                    ...(txResult.bridgeFeePaid
                       ? [{ l: 'ParagonFinance Fee', v: txResult.bridgeFeePaid + ' USDC' }]
-                      : []),
-                    ...(txResult.cctpBridge && txResult.bridgeFeePaid === null
-                      ? [{ l: 'ParagonFinance Fee', v: 'Not collected (retry needed)' }]
                       : []),
                     { l: 'Status', v: 'Confirmed', green: true },
                   ].map(r => (
@@ -823,6 +846,15 @@ export default function TestnetSend() {
                       <a href={explorerTxUrl(txResult.mintTxHash, { sourceChainKey: txResult.destinationChainKey })} target="_blank" rel="noreferrer"
                         className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
                         {txResult.mintTxHash}
+                      </a>
+                    </div>
+                  )}
+                  {txResult.bridgeFeeTxHash && (
+                    <div>
+                      <p className="text-[10px] text-[#8892a0] mb-1">PARAGONFINANCE FEE TX (ARC TESTNET)</p>
+                      <a href={arcScanTx(txResult.bridgeFeeTxHash)} target="_blank" rel="noreferrer"
+                        className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
+                        {txResult.bridgeFeeTxHash}
                       </a>
                     </div>
                   )}

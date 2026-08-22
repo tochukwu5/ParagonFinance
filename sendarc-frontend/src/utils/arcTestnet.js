@@ -855,11 +855,35 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
 }
 
 // ─── Flat bridge fee — what the Bridge tab actually uses ──────────────────
-// A flat 0.25 USDC charged on every bridge transaction, paid directly to
-// Treasury as a plain value transfer. Treasury's receive() accepts any
-// plain deposit and counts it toward totalFeesCollected — no new contract,
-// no redeploy, nothing beyond a second native transfer.
+// A flat 0.25 USDC per bridge, paid to Treasury on Arc as a native value
+// transfer. Treasury's receive() accepts the deposit and counts it toward
+// totalFeesCollected.
 export const BRIDGE_FLAT_FEE_USDC = 0.25
+
+// Guarantees the wallet is on Arc Testnet before a value transfer.
+//
+// This is not optional for the fee: `value` in eth_sendTransaction is always
+// denominated in whatever the ACTIVE chain's native token is. USDC is native
+// only on Arc — on Ethereum Sepolia the same call spends ETH, on Avalanche
+// AVAX, and so on. CCTP leaves the wallet on the bridge's destination chain
+// when it finishes, so without this check a bridge to Sepolia would charge
+// 0.25 ETH to an address that doesn't hold the Treasury contract at all.
+async function ensureWalletOnArc() {
+  if (!window.ethereum) throw new Error('MetaMask not found')
+
+  const arcHex = EVM_CHAINS.arc.chainIdHex
+  const current = await window.ethereum.request({ method: 'eth_chainId' })
+  if (current?.toLowerCase() === arcHex.toLowerCase()) return
+
+  await switchToChain('arc')
+
+  // Verify rather than trust — a rejected or silently-ignored switch would
+  // otherwise send the fee on the wrong chain in the wrong token.
+  const after = await window.ethereum.request({ method: 'eth_chainId' })
+  if (after?.toLowerCase() !== arcHex.toLowerCase()) {
+    throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee. Please switch networks and try again.')
+  }
+}
 
 export async function payBridgeFeeToTreasury({ from }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
@@ -868,7 +892,33 @@ export async function payBridgeFeeToTreasury({ from }) {
   }
 
   const start = Date.now()
+
+  // Arc first — see ensureWalletOnArc above for why this is load-bearing.
+  await ensureWalletOnArc()
+
+  // Arc's native USDC carries 18 decimals in the value field, same
+  // conversion every other send in this file uses.
   const rawFee = BigInt(Math.round(BRIDGE_FLAT_FEE_USDC * 1e6)) * BigInt(1e12)
+
+  // Check the balance up front so an underfunded wallet gets a clear message
+  // instead of an opaque MetaMask rejection.
+  let balance
+  try {
+    balance = BigInt(await window.ethereum.request({
+      method: 'eth_getBalance',
+      params: [from, 'latest'],
+    }))
+  } catch {
+    balance = null
+  }
+  if (balance !== null && balance < rawFee) {
+    const have = (Number(balance) / 1e18).toFixed(6)
+    throw new Error(
+      'Not enough USDC on Arc Testnet for the ' + BRIDGE_FLAT_FEE_USDC +
+      ' USDC ParagonFinance fee (you have ' + have + '). Top up from faucet.circle.com and try again.'
+    )
+  }
+
   const feeHex = '0x' + rawFee.toString(16)
 
   const txHash = await window.ethereum.request({
@@ -878,21 +928,30 @@ export async function payBridgeFeeToTreasury({ from }) {
       to: PARAGON_FINANCE_TREASURY_ADDRESS,
       value: feeHex,
       // 60000 — Treasury's receive() does an SSTORE (totalFeesCollected)
-      // plus a FeeReceived event, so 21000 (a bare EOA transfer) is not
-      // enough and would run out of gas.
+      // plus a FeeReceived event, so 21000 (a bare EOA transfer) runs out.
       gas: '0xEA60',
     }],
   })
 
   const receipt = await waitForReceipt(txHash, 30, 1000)
   if (receipt && receipt.status === '0x0') {
-    throw new Error('Bridge fee payment to Treasury failed.')
+    throw new Error('ParagonFinance fee transaction reverted. Nothing was bridged.')
   }
+
+  const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 45000
+  let gasCost = '0'
+  try {
+    const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
+    gasCost = (Number(BigInt(gasUsed) * BigInt(gasPrice)) / 1e18).toFixed(9)
+  } catch { /* cosmetic only */ }
 
   return {
     hash: txHash,
     fee: BRIDGE_FLAT_FEE_USDC,
     treasury: PARAGON_FINANCE_TREASURY_ADDRESS,
+    gasUsed,
+    gasCost,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     receipt,
   }
