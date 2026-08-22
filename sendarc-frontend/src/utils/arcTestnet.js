@@ -2,16 +2,9 @@
 // Cross-chain transfers powered by Circle's official App Kit SDK
 
 // ─────────────────────────────────────────────────────────────────────────
-// ParagonFinance contract suite (ParagonFinancePaymentRouter,
-// ParagonFinanceBridgeRouter, ParagonFinanceFeeManager,
-// ParagonFinanceTreasury, ParagonFinanceBridgeRegistry) — replaces the old
-// two-step SendArcRouter.
-//
-// IMPORTANT: the object/constant names below are for code readability only
-// — they have ZERO effect on what the block explorer displays. What arcscan
-// shows for a given address comes entirely from which Solidity source that
-// address was verified against on-chain. Renaming a JS constant here
-// doesn't touch that.
+// ParagonFinance contract suite. The constant names below are for code
+// readability only — what arcscan displays for an address comes entirely
+// from which Solidity source that address was verified against on-chain.
 // ─────────────────────────────────────────────────────────────────────────
 export const PARAGON_FINANCE_PAYMENT_ROUTER = {
   address: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
@@ -29,21 +22,17 @@ export const PARAGON_FINANCE_FEE_MANAGER_ADDRESS = import.meta.env.VITE_FEE_MANA
 export const PARAGON_FINANCE_TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS || null
 export const PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
 
-// Old, unbranded names — kept as aliases only in case another file in the
-// app still imports these directly. Same objects, same addresses.
+// Aliases kept in case another file imports the older names.
 export const BRIDGE_ROUTER = PARAGON_FINANCE_BRIDGE_ROUTER
 export const FEE_MANAGER_ADDRESS = PARAGON_FINANCE_FEE_MANAGER_ADDRESS
 export const TREASURY_ADDRESS = PARAGON_FINANCE_TREASURY_ADDRESS
 export const BRIDGE_REGISTRY_ADDRESS = PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS
 
-// FeeManager.calculateBridgeFee(uint256) — used by getBridgeFeeQuote() below
 const CALCULATE_BRIDGE_FEE_SELECTOR = 'ade1af12'
 
-// Deprecated — kept ONLY so old transaction history / explorer links still
-// resolve to something. The frontend no longer routes new Sends through this.
+// Deprecated — kept only so old explorer links still resolve.
 export const SENDARC_ROUTER = {
   address: import.meta.env.VITE_ROUTER_ADDRESS || null,
-  // recordTransfer(address,uint256)
   recordSelector: '73ac83ef',
 }
 
@@ -61,6 +50,14 @@ export const ARC_TESTNET = {
   cirbtcAddress: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF',
 }
 
+// Each chain carries a LIST of RPC endpoints, not one.
+//
+// Balance reads for the bridge DESTINATION can never go through the wallet
+// — the wallet is on the source chain by definition — so they always hit a
+// public endpoint. Several of the "official" testnet endpoints (rpc.sepolia.org
+// especially) are shared and aggressively rate-limited, and a single failed
+// read is what made a funded chain display 0.000000 the moment it became the
+// destination. Ordering here puts the more reliable provider first.
 export const EVM_CHAINS = {
   arc: {
     id: 5042002,
@@ -69,6 +66,7 @@ export const EVM_CHAINS = {
     appKitChain: 'Arc_Testnet',
     symbol: 'ARC',
     rpcUrl: 'https://rpc.testnet.arc.network',
+    rpcUrls: ['https://rpc.testnet.arc.network'],
     explorerUrl: 'https://testnet.arcscan.app',
     usdcAddress: '0x3600000000000000000000000000000000000000',
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
@@ -85,7 +83,12 @@ export const EVM_CHAINS = {
     name: 'Ethereum Sepolia',
     appKitChain: 'Ethereum_Sepolia',
     symbol: 'ETH',
-    rpcUrl: 'https://rpc.sepolia.org',
+    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    rpcUrls: [
+      'https://ethereum-sepolia-rpc.publicnode.com',
+      'https://sepolia.drpc.org',
+      'https://rpc.sepolia.org',
+    ],
     explorerUrl: 'https://sepolia.etherscan.io',
     usdcAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
@@ -103,6 +106,10 @@ export const EVM_CHAINS = {
     appKitChain: 'Base_Sepolia',
     symbol: 'ETH',
     rpcUrl: 'https://sepolia.base.org',
+    rpcUrls: [
+      'https://sepolia.base.org',
+      'https://base-sepolia-rpc.publicnode.com',
+    ],
     explorerUrl: 'https://sepolia.basescan.org',
     usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
@@ -120,6 +127,10 @@ export const EVM_CHAINS = {
     appKitChain: 'Arbitrum_Sepolia',
     symbol: 'ETH',
     rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    rpcUrls: [
+      'https://sepolia-rollup.arbitrum.io/rpc',
+      'https://arbitrum-sepolia-rpc.publicnode.com',
+    ],
     explorerUrl: 'https://sepolia.arbiscan.io',
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
@@ -137,6 +148,10 @@ export const EVM_CHAINS = {
     appKitChain: 'Optimism_Sepolia',
     symbol: 'ETH',
     rpcUrl: 'https://sepolia.optimism.io',
+    rpcUrls: [
+      'https://sepolia.optimism.io',
+      'https://optimism-sepolia-rpc.publicnode.com',
+    ],
     explorerUrl: 'https://sepolia-optimism.etherscan.io',
     usdcAddress: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
@@ -154,6 +169,10 @@ export const EVM_CHAINS = {
     appKitChain: 'Avalanche_Fuji',
     symbol: 'AVAX',
     rpcUrl: 'https://api.avax-test.network/ext/bc/C/rpc',
+    rpcUrls: [
+      'https://api.avax-test.network/ext/bc/C/rpc',
+      'https://avalanche-fuji-c-chain-rpc.publicnode.com',
+    ],
     explorerUrl: 'https://testnet.snowtrace.io',
     usdcAddress: '0x5425890298aed601595a70AB815c96711a31Bc65',
     nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
@@ -171,6 +190,7 @@ export const EVM_CHAINS = {
     appKitChain: 'Linea_Sepolia',
     symbol: 'ETH',
     rpcUrl: 'https://rpc.sepolia.linea.build',
+    rpcUrls: ['https://rpc.sepolia.linea.build'],
     explorerUrl: 'https://sepolia.lineascan.build',
     usdcAddress: '0xFEce4462D57bD51A6A552365A011b95f0E16d9B7',
     nativeCurrency: { name: 'Linea Ether', symbol: 'ETH', decimals: 18 },
@@ -188,6 +208,10 @@ export const EVM_CHAINS = {
     appKitChain: 'Polygon_Amoy_Testnet',
     symbol: 'POL',
     rpcUrl: 'https://rpc-amoy.polygon.technology',
+    rpcUrls: [
+      'https://rpc-amoy.polygon.technology',
+      'https://polygon-amoy-bor-rpc.publicnode.com',
+    ],
     explorerUrl: 'https://amoy.polygonscan.com',
     usdcAddress: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
     nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
@@ -205,6 +229,7 @@ export const EVM_CHAINS = {
     appKitChain: 'Sonic_Testnet',
     symbol: 'S',
     rpcUrl: 'https://rpc.testnet.soniclabs.com',
+    rpcUrls: ['https://rpc.testnet.soniclabs.com'],
     explorerUrl: 'https://testnet.sonicscan.org',
     usdcAddress: '0x0BA304580ee7c9a980CF72e55f5Ed2E9fd30Bc51',
     nativeCurrency: { name: 'Sonic', symbol: 'S', decimals: 18 },
@@ -222,6 +247,7 @@ export const EVM_CHAINS = {
     appKitChain: 'Unichain_Sepolia',
     symbol: 'ETH',
     rpcUrl: 'https://sepolia.unichain.org',
+    rpcUrls: ['https://sepolia.unichain.org'],
     explorerUrl: 'https://sepolia.uniscan.xyz',
     usdcAddress: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
@@ -241,7 +267,13 @@ export async function switchToChain(chainKey) {
   try {
     await window.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [{ chainId: chain.chainIdHex, chainName: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: [chain.rpcUrl], blockExplorerUrls: [chain.explorerUrl] }],
+      params: [{
+        chainId: chain.chainIdHex,
+        chainName: chain.name,
+        nativeCurrency: chain.nativeCurrency,
+        rpcUrls: chain.rpcUrls || [chain.rpcUrl],
+        blockExplorerUrls: [chain.explorerUrl],
+      }],
     })
   } catch (addErr) {
     if (addErr.code === 4001) throw new Error('User rejected adding the network.')
@@ -254,24 +286,27 @@ export async function switchToChain(chainKey) {
   }
 }
 
-// Plain JSON-RPC POST to a chain's own public endpoint, with retries — public
-// endpoints are shared/free and occasionally flaky or rate-limited, so a
-// single failed attempt shouldn't read as "zero balance."
-async function rpcRequest(rpcUrl, method, params, attempts = 3) {
+// Tries every endpoint for a chain, with retries per endpoint, before giving
+// up. One dead or rate-limited provider no longer reads as "zero balance."
+async function rpcRequest(rpcUrls, method, params, attemptsPerUrl = 2) {
+  const urls = Array.isArray(rpcUrls) ? rpcUrls : [rpcUrls]
   let lastErr
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-      })
-      const json = await res.json()
-      if (json.error) throw new Error(json.error.message || 'RPC error')
-      return json.result
-    } catch (err) {
-      lastErr = err
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)))
+
+  for (const url of urls) {
+    for (let i = 0; i < attemptsPerUrl; i++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        })
+        const json = await res.json()
+        if (json.error) throw new Error(json.error.message || 'RPC error')
+        return json.result
+      } catch (err) {
+        lastErr = err
+        if (i < attemptsPerUrl - 1) await new Promise(r => setTimeout(r, 300 * (i + 1)))
+      }
     }
   }
   throw lastErr
@@ -290,29 +325,30 @@ async function readChain(chain, method, params) {
     try {
       return await window.ethereum.request({ method, params })
     } catch {
-      // Wallet call failed even though it's on the right chain (rare) —
-      // fall through to the public RPC instead of giving up.
+      // On the right chain but the wallet call failed — fall through.
     }
   }
-  return rpcRequest(chain.rpcUrl, method, params)
+  return rpcRequest(chain.rpcUrls || [chain.rpcUrl], method, params)
 }
 
+// Returns a decimal string on success, or null when the balance genuinely
+// couldn't be read. Callers must distinguish the two — rendering null as
+// "0.000000" is what made a funded destination chain look empty.
 export async function getUsdcBalance(chainKey, address) {
   const chain = EVM_CHAINS[chainKey]
-  if (!chain) return '0'
+  if (!chain || !address) return null
   try {
     if (chainKey === 'arc') {
       const raw = await readChain(chain, 'eth_getBalance', [address, 'latest'])
-      return (parseInt(raw, 16) / 1e18).toFixed(6)
-    } else {
-      const paddedAddr = address.slice(2).toLowerCase().padStart(64, '0')
-      const result = await readChain(chain, 'eth_call', [{ to: chain.usdcAddress, data: '0x70a08231' + paddedAddr }, 'latest'])
-      if (!result || result === '0x') return '0.000000'
-      return (parseInt(result, 16) / 1_000_000).toFixed(6)
+      if (!raw) return null
+      return (Number(BigInt(raw)) / 1e18).toFixed(6)
     }
-  } catch {
-    // Genuine failure after retries — return null (not '0') so callers can
-    // tell "couldn't check" apart from "confirmed empty."
+    const paddedAddr = address.slice(2).toLowerCase().padStart(64, '0')
+    const result = await readChain(chain, 'eth_call', [{ to: chain.usdcAddress, data: '0x70a08231' + paddedAddr }, 'latest'])
+    if (!result || result === '0x') return '0.000000'
+    return (Number(BigInt(result)) / 1_000_000).toFixed(6)
+  } catch (err) {
+    console.warn('[balance] ' + chainKey + ' read failed:', err?.message)
     return null
   }
 }
@@ -322,7 +358,7 @@ export async function getErc20Balance(tokenAddress, address, decimals = 6) {
     const paddedAddr = address.slice(2).toLowerCase().padStart(64, '0')
     const result = await readChain(EVM_CHAINS.arc, 'eth_call', [{ to: tokenAddress, data: '0x70a08231' + paddedAddr }, 'latest'])
     if (!result || result === '0x') return '0.000000'
-    return (parseInt(result, 16) / Math.pow(10, decimals)).toFixed(6)
+    return (Number(BigInt(result)) / Math.pow(10, decimals)).toFixed(6)
   } catch { return null }
 }
 
@@ -366,17 +402,58 @@ function encodeDynamicString(str) {
   const bytes = new TextEncoder().encode(str)
   const lengthHex = encodeUint256(bytes.length)
   let dataHex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-  while (dataHex.length % 64 !== 0) dataHex += '0' // right-pad to a multiple of 32 bytes
+  while (dataHex.length % 64 !== 0) dataHex += '0'
   return lengthHex + dataHex
 }
 
-// Circle App Kit CCTP bridge — official SDK, handles approve/burn/attest/mint.
-export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, amount }, onStatusUpdate = () => {}) {
+// ─── ParagonFinance bridge fee ─────────────────────────────────────────────
+// Collected through App Kit's own customFee parameter rather than as a
+// separate transfer. That matters for three reasons:
+//
+//   1. It's denominated in USDC on the SOURCE chain. The old approach sent
+//      `value` on whatever chain the wallet happened to be on, which meant
+//      a bridge ending on Sepolia charged 0.25 ETH instead of 0.25 USDC.
+//   2. It's atomic with the bridge. Either both happen or neither does —
+//      no more "bridge confirmed, fee not collected (retry needed)."
+//   3. Arc routes it to the recipient address on-chain, so it's verifiable
+//      on the explorer.
+//
+// Per Arc's docs, Arc retains 10% of any custom fee, so 0.25 collected
+// nets ParagonFinance 0.225.
+// https://docs.arc.io/app-kit/tutorials/bridge/collect-bridge-fee
+export const BRIDGE_FLAT_FEE_USDC = 0.25
+
+// Where the fee lands. Treasury by default; VITE_BRIDGE_FEE_RECIPIENT can
+// override it without redeploying anything.
+export const BRIDGE_FEE_RECIPIENT =
+  import.meta.env.VITE_BRIDGE_FEE_RECIPIENT ||
+  PARAGON_FINANCE_TREASURY_ADDRESS ||
+  null
+
+// Circle App Kit CCTP bridge — handles approve/burn/attest/mint, plus the
+// ParagonFinance fee when a recipient is configured.
+export async function bridgeUsdcViaAppKit(
+  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient },
+  onStatusUpdate = () => {}
+) {
   const fromChain = EVM_CHAINS[fromChainKey]
   const toChain = EVM_CHAINS[toChainKey]
   if (!fromChain) throw new Error('Unknown source chain: ' + fromChainKey)
   if (!toChain) throw new Error('Unknown destination chain: ' + toChainKey)
   if (fromChainKey === toChainKey) throw new Error('Source and destination can\'t be the same chain.')
+
+  const fee = feeUsdc !== undefined ? Number(feeUsdc) : BRIDGE_FLAT_FEE_USDC
+  const recipient = feeRecipient || BRIDGE_FEE_RECIPIENT
+  const collectFee = fee > 0 && !!recipient
+
+  if (fee > 0 && !recipient) {
+    console.warn('[bridge] no fee recipient configured (VITE_TREASURY_ADDRESS / VITE_BRIDGE_FEE_RECIPIENT) — bridging without a ParagonFinance fee')
+  }
+
+  // The fee is taken OUT of the bridged amount, so to have the recipient
+  // receive the full amount they asked for, the fee is added on top of it.
+  const netAmount = parseFloat(amount)
+  const grossAmount = collectFee ? netAmount + fee : netAmount
 
   try {
     const { AppKit } = await import('@circle-fin/app-kit')
@@ -400,11 +477,22 @@ export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, 
     const adapter = await createViemAdapterFromProvider({ provider: window.ethereum })
     onStatusUpdate('Starting Circle CCTP bridge...')
 
-    let result = await kit.bridge({
+    const bridgeParams = {
       from: { adapter, chain: fromChain.appKitChain },
       to: { adapter, chain: toChain.appKitChain },
-      amount: parseFloat(amount).toFixed(2),
-    })
+      amount: grossAmount.toFixed(2),
+    }
+
+    if (collectFee) {
+      bridgeParams.config = {
+        customFee: {
+          value: fee.toFixed(2),
+          recipientAddress: recipient,
+        },
+      }
+    }
+
+    let result = await kit.bridge(bridgeParams)
 
     if (result.state === 'error') {
       onStatusUpdate('Retrying bridge...')
@@ -424,7 +512,10 @@ export async function bridgeUsdcViaAppKit({ fromChainKey, toChainKey, from, to, 
       approvalHash: approveStep?.txHash || '',
       from,
       to,
-      amount: parseFloat(amount),
+      amount: netAmount,
+      grossAmount,
+      bridgeFeePaid: collectFee ? fee : null,
+      bridgeFeeRecipient: collectFee ? recipient : null,
       gasCost: '0',
       gasUsed: 0,
       blockNumber: mintStep?.data?.blockNumber ? Number(mintStep.data.blockNumber) : 0,
@@ -489,8 +580,8 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
 }
 
 // Routes the native Arc send through ParagonFinancePaymentRouter.sendPayment()
-// — one transaction that atomically splits ParagonFinance's fee to Treasury
-// and forwards the remainder to the recipient.
+// — one transaction that atomically splits the fee to Treasury and forwards
+// the remainder to the recipient.
 export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   if (!PARAGON_FINANCE_PAYMENT_ROUTER.address) {
@@ -513,8 +604,8 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
       to: PARAGON_FINANCE_PAYMENT_ROUTER.address,
       value: amountHex,
       data,
-      // 200000 — covers fee-split accounting, the Treasury deposit call,
-      // and the payout to the recipient, all inside one transaction.
+      // 200000 — fee-split accounting, the Treasury deposit, and the payout
+      // to the recipient, all inside one transaction.
       gas: '0x30D40',
     }],
   })
@@ -551,33 +642,18 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
 }
 
 // ─── Live gas estimate for the Send form's "NETWORK FEE" row ───────────────
+// No path here returns null. Every failure falls through to a real figure
+// and logs why, so a "—" in the UI can only mean the caller never invoked
+// this — never a silent dead end inside it.
 //
-// There is deliberately NO path here that returns null. Every failure mode
-// falls through to a real figure, and logs why it fell through — so a "—"
-// in the UI can only mean the caller never invoked this, never a silent
-// dead end inside it.
-//
-// Layers, in order:
-//   1. gasPrice from the wallet
-//   2. gasPrice from Arc's public RPC (works even if the wallet is sitting
-//      on another network)
-//   3. hardcoded 21 gwei — the rate observed on real confirmed Arc
-//      transactions
-//   Then: eth_estimateGas for the exact call, or PaymentRouter's known
-//   200k budget if simulation reverts (which it does constantly while
-//   someone is mid-typing an amount above their balance).
-//
-// Reference from a real confirmed transaction: 146,859 gas at ~21 gwei
-// ≈ 0.00308 USDC.
+// Reference from a confirmed transaction: 146,859 gas at ~21 gwei ≈ 0.00308 USDC.
 export async function estimateSendPaymentGasCost({ from, to, amount }) {
   const ROUTER_GAS_BUDGET = 200000n
   const FALLBACK_GAS_PRICE = 21000000000n // 21 gwei — observed on Arc Testnet
 
   const router = PARAGON_FINANCE_PAYMENT_ROUTER.address
 
-  // ── gasPrice: wallet → Arc public RPC → hardcoded ───────────────────
   let gasPrice = null
-
   try {
     if (window.ethereum) {
       gasPrice = BigInt(await window.ethereum.request({ method: 'eth_gasPrice' }))
@@ -588,7 +664,7 @@ export async function estimateSendPaymentGasCost({ from, to, amount }) {
 
   if (!gasPrice || gasPrice === 0n) {
     try {
-      gasPrice = BigInt(await rpcRequest(ARC_TESTNET.rpcUrl, 'eth_gasPrice', []))
+      gasPrice = BigInt(await rpcRequest(EVM_CHAINS.arc.rpcUrls, 'eth_gasPrice', []))
     } catch (err) {
       console.warn('[gas estimate] Arc RPC eth_gasPrice failed:', err?.message)
     }
@@ -606,7 +682,6 @@ export async function estimateSendPaymentGasCost({ from, to, amount }) {
     return priceBudget()
   }
 
-  // ── Exact simulation, when there's enough filled in to simulate ──────
   const canSimulate =
     window.ethereum &&
     from &&
@@ -630,15 +705,12 @@ export async function estimateSendPaymentGasCost({ from, to, amount }) {
     const costWithBuffer = (BigInt(gasHex) * gasPrice * 120n) / 100n
     return (Number(costWithBuffer) / 1e18).toFixed(6)
   } catch (err) {
-    // Gas cost doesn't scale with transfer size on Arc, so the budget
-    // figure is the same number a successful simulation would produce.
     console.warn('[gas estimate] eth_estimateGas reverted, using budget:', err?.message)
     return priceBudget()
   }
 }
 
-// Deprecated — the old two-step SendArcRouter path. No longer called by
-// sendUsdcOnChain(), kept only for historical reference.
+// Deprecated — the old two-step SendArcRouter path, kept for reference.
 export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   if (!SENDARC_ROUTER.address) throw new Error('SendArcRouter not deployed yet')
@@ -653,13 +725,7 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
 
   const recordTxHash = await window.ethereum.request({
     method: 'eth_sendTransaction',
-    params: [{
-      from,
-      to: SENDARC_ROUTER.address,
-      value: '0x0',
-      data: recordData,
-      gas: '0x186A0',
-    }],
+    params: [{ from, to: SENDARC_ROUTER.address, value: '0x0', data: recordData, gas: '0x186A0' }],
   })
 
   const recordReceipt = await waitForReceipt(recordTxHash, 30, 1000)
@@ -792,10 +858,9 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
   }
 }
 
-// Every Arc-network Send goes through ParagonFinancePaymentRouter — no
-// silent fallback to a raw wallet-to-wallet transfer. An unset env var now
-// throws immediately instead of quietly downgrading the Send and generating
-// no ParagonFinance volume or fee.
+// Every Arc-network Send goes through ParagonFinancePaymentRouter — an unset
+// env var throws immediately rather than quietly downgrading to a raw
+// wallet-to-wallet transfer that generates no volume or fee.
 export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate = () => {}) {
   if (!window.ethereum) throw new Error('MetaMask not found')
   const accounts = await window.ethereum.request({ method: 'eth_accounts' })
@@ -809,13 +874,15 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   return sendUsdcViaCCTP(chainKey, { from, to, amount }, onStatusUpdate)
 }
 
-// ─── Bridge fee capture (percentage-based, via BridgeRouter) ───────────────
-// Circle's CCTP burns/mints USDC straight to the user's wallet — it never
-// hands custody to a ParagonFinance contract, so there's nothing for an
-// on-chain router to intercept. These helpers let the Bridge tab still
-// capture revenue: quote the fee from FeeManager, then pay it to
-// BridgeRouter. Currently unused — the flat-fee version below is what's
-// actually wired into the Bridge tab.
+// ─── Legacy bridge-fee helpers ─────────────────────────────────────────────
+// Superseded by App Kit's customFee (see bridgeUsdcViaAppKit above). Kept so
+// nothing that still imports them breaks, but the Bridge tab no longer calls
+// either one.
+//
+// payBridgeFeeToTreasury in particular is the source of an earlier bug worth
+// remembering: `value` in eth_sendTransaction is denominated in the ACTIVE
+// chain's native token, and CCTP leaves the wallet on the DESTINATION chain,
+// so a bridge ending on Sepolia charged 0.25 ETH rather than 0.25 USDC.
 export async function getBridgeFeeQuote(bridgeAmount) {
   if (!PARAGON_FINANCE_FEE_MANAGER_ADDRESS) throw new Error('ParagonFinanceFeeManager address is not configured')
   const rawAmount = BigInt(Math.round(parseFloat(bridgeAmount) * 1e6)) * BigInt(1e12)
@@ -835,8 +902,6 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
   const { fee: rawFee } = await getBridgeFeeQuote(bridgeAmount)
   const feeHex = '0x' + rawFee.toString(16)
 
-  // head: [bridgeAmount][offset to string, always 0x40 for a 2-slot head]
-  // tail: [len][utf8 bytes]
   const data = '0x' + PARAGON_FINANCE_BRIDGE_ROUTER.recordBridgeFeeSelector
     + encodeUint256(rawBridgeAmount) + encodeUint256(64)
     + encodeDynamicString(destinationChain)
@@ -847,42 +912,9 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
   })
 
   const receipt = await waitForReceipt(txHash, 30, 1000)
-  if (receipt && receipt.status === '0x0') {
-    throw new Error('Bridge fee recording failed.')
-  }
+  if (receipt && receipt.status === '0x0') throw new Error('Bridge fee recording failed.')
 
   return { hash: txHash, fee: rawFee, receipt }
-}
-
-// ─── Flat bridge fee — what the Bridge tab actually uses ──────────────────
-// A flat 0.25 USDC per bridge, paid to Treasury on Arc as a native value
-// transfer. Treasury's receive() accepts the deposit and counts it toward
-// totalFeesCollected.
-export const BRIDGE_FLAT_FEE_USDC = 0.25
-
-// Guarantees the wallet is on Arc Testnet before a value transfer.
-//
-// This is not optional for the fee: `value` in eth_sendTransaction is always
-// denominated in whatever the ACTIVE chain's native token is. USDC is native
-// only on Arc — on Ethereum Sepolia the same call spends ETH, on Avalanche
-// AVAX, and so on. CCTP leaves the wallet on the bridge's destination chain
-// when it finishes, so without this check a bridge to Sepolia would charge
-// 0.25 ETH to an address that doesn't hold the Treasury contract at all.
-async function ensureWalletOnArc() {
-  if (!window.ethereum) throw new Error('MetaMask not found')
-
-  const arcHex = EVM_CHAINS.arc.chainIdHex
-  const current = await window.ethereum.request({ method: 'eth_chainId' })
-  if (current?.toLowerCase() === arcHex.toLowerCase()) return
-
-  await switchToChain('arc')
-
-  // Verify rather than trust — a rejected or silently-ignored switch would
-  // otherwise send the fee on the wrong chain in the wrong token.
-  const after = await window.ethereum.request({ method: 'eth_chainId' })
-  if (after?.toLowerCase() !== arcHex.toLowerCase()) {
-    throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee. Please switch networks and try again.')
-  }
 }
 
 export async function payBridgeFeeToTreasury({ from }) {
@@ -891,34 +923,18 @@ export async function payBridgeFeeToTreasury({ from }) {
     throw new Error('ParagonFinanceTreasury address is not configured (VITE_TREASURY_ADDRESS is empty)')
   }
 
+  const arcHex = EVM_CHAINS.arc.chainIdHex
+  const current = await window.ethereum.request({ method: 'eth_chainId' })
+  if (current?.toLowerCase() !== arcHex.toLowerCase()) {
+    await switchToChain('arc')
+    const after = await window.ethereum.request({ method: 'eth_chainId' })
+    if (after?.toLowerCase() !== arcHex.toLowerCase()) {
+      throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee.')
+    }
+  }
+
   const start = Date.now()
-
-  // Arc first — see ensureWalletOnArc above for why this is load-bearing.
-  await ensureWalletOnArc()
-
-  // Arc's native USDC carries 18 decimals in the value field, same
-  // conversion every other send in this file uses.
   const rawFee = BigInt(Math.round(BRIDGE_FLAT_FEE_USDC * 1e6)) * BigInt(1e12)
-
-  // Check the balance up front so an underfunded wallet gets a clear message
-  // instead of an opaque MetaMask rejection.
-  let balance
-  try {
-    balance = BigInt(await window.ethereum.request({
-      method: 'eth_getBalance',
-      params: [from, 'latest'],
-    }))
-  } catch {
-    balance = null
-  }
-  if (balance !== null && balance < rawFee) {
-    const have = (Number(balance) / 1e18).toFixed(6)
-    throw new Error(
-      'Not enough USDC on Arc Testnet for the ' + BRIDGE_FLAT_FEE_USDC +
-      ' USDC ParagonFinance fee (you have ' + have + '). Top up from faucet.circle.com and try again.'
-    )
-  }
-
   const feeHex = '0x' + rawFee.toString(16)
 
   const txHash = await window.ethereum.request({
@@ -927,31 +943,19 @@ export async function payBridgeFeeToTreasury({ from }) {
       from,
       to: PARAGON_FINANCE_TREASURY_ADDRESS,
       value: feeHex,
-      // 60000 — Treasury's receive() does an SSTORE (totalFeesCollected)
-      // plus a FeeReceived event, so 21000 (a bare EOA transfer) runs out.
+      // 60000 — Treasury's receive() runs an SSTORE plus an event, so the
+      // 21000 of a bare EOA transfer isn't enough.
       gas: '0xEA60',
     }],
   })
 
   const receipt = await waitForReceipt(txHash, 30, 1000)
-  if (receipt && receipt.status === '0x0') {
-    throw new Error('ParagonFinance fee transaction reverted. Nothing was bridged.')
-  }
-
-  const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 45000
-  let gasCost = '0'
-  try {
-    const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
-    gasCost = (Number(BigInt(gasUsed) * BigInt(gasPrice)) / 1e18).toFixed(9)
-  } catch { /* cosmetic only */ }
+  if (receipt && receipt.status === '0x0') throw new Error('ParagonFinance fee transaction reverted.')
 
   return {
     hash: txHash,
     fee: BRIDGE_FLAT_FEE_USDC,
     treasury: PARAGON_FINANCE_TREASURY_ADDRESS,
-    gasUsed,
-    gasCost,
-    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     receipt,
   }
