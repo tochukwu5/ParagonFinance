@@ -1,7 +1,42 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ARC_TESTNET, switchToArcTestnet } from '../utils/arcTestnet'
 
-const DISCONNECTED_KEY = 'sendarc_disconnected'
+// ─── Session policy ────────────────────────────────────────────────────────
+// Two independent limits, both enforced:
+//
+//   IDLE_TIMEOUT — no interaction for this long and the wallet disconnects.
+//     15 minutes matches what retail banks use. Long enough that filling in
+//     a transfer or reading the docs page won't drop you; short enough that
+//     an unattended machine isn't left holding an open session.
+//
+//   MAX_SESSION — hard ceiling from the moment of connect, activity or not.
+//     Without this, someone who keeps a tab open indefinitely never
+//     re-authenticates at all.
+//
+// Both live in localStorage rather than sessionStorage on purpose.
+// sessionStorage is wiped when the tab closes — but MetaMask's site
+// permission is NOT, so eth_accounts silently restores the session on the
+// next visit with no timer to stop it. That is exactly the gap you hit:
+// close the page, come back, still connected. localStorage keeps the clock
+// running across tab closes and browser restarts.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000   // 15 minutes
+const MAX_SESSION_MS   = 12 * 60 * 60 * 1000 // 12 hours
+const WARN_BEFORE_MS   = 60 * 1000       // warn 60s before idle expiry
+
+const DISCONNECTED_KEY  = 'paragonfinance_disconnected'
+const LAST_ACTIVITY_KEY = 'paragonfinance_last_activity'
+const SESSION_START_KEY = 'paragonfinance_session_start'
+
+// Writing on every mousemove would hammer localStorage; once every 30s of
+// continuous activity is plenty of resolution for a 15-minute timeout.
+const ACTIVITY_WRITE_THROTTLE_MS = 30 * 1000
+
+const now = () => Date.now()
+const readTs = (key) => {
+  const v = localStorage.getItem(key)
+  const n = v ? parseInt(v, 10) : NaN
+  return Number.isFinite(n) ? n : null
+}
 
 export function useArcTestnet() {
   const [account, setAccount] = useState(null)
@@ -13,9 +48,20 @@ export function useArcTestnet() {
   const [isAutoConnecting, setIsAutoConnecting] = useState(true)
   const [error, setError] = useState(null)
 
+  // Session state the UI can surface: why the last disconnect happened, and
+  // how long until the next one.
+  const [sessionExpiredReason, setSessionExpiredReason] = useState(null) // 'idle' | 'max' | null
+  const [secondsUntilTimeout, setSecondsUntilTimeout] = useState(null)
+
   const hasMetaMask = typeof window !== 'undefined' && !!window.ethereum
 
-  // Fetch native USDC balance from Arc Testnet RPC
+  // Read inside interval callbacks without making them dependencies.
+  const isConnectedRef = useRef(false)
+  useEffect(() => { isConnectedRef.current = isConnected }, [isConnected])
+
+  const lastWriteRef = useRef(0)
+
+  // ── Balance ──────────────────────────────────────────────────────────
   const fetchBalance = useCallback(async (address) => {
     if (!address) return
     try {
@@ -31,10 +77,7 @@ export function useArcTestnet() {
       })
       const json = await response.json()
       if (json.result && json.result !== '0x0' && json.result !== '0x') {
-        const raw = BigInt(json.result)
-        // Arc Testnet uses 18 decimals (like ETH), not 6 (like USDC on mainnet)
-        const formatted = (Number(raw) / 1e18).toFixed(6)
-        setBalance(formatted)
+        setBalance((Number(BigInt(json.result)) / 1e18).toFixed(6))
       } else {
         setBalance('0.000000')
       }
@@ -44,7 +87,6 @@ export function useArcTestnet() {
     }
   }, [])
 
-  // Internal function to set all wallet state at once
   const setWalletState = useCallback(async (address) => {
     const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' })
     const chainId = parseInt(chainIdHex, 16)
@@ -55,7 +97,6 @@ export function useArcTestnet() {
     await fetchBalance(address)
   }, [fetchBalance])
 
-  // Clear all wallet state
   const clearWalletState = useCallback(() => {
     setAccount(null)
     setIsConnected(false)
@@ -63,10 +104,71 @@ export function useArcTestnet() {
     setBalance('0.000000')
     setNetwork(null)
     setError(null)
+    setSecondsUntilTimeout(null)
   }, [])
 
-  // AUTO-RECONNECT on page load
-  // Only runs if user did NOT explicitly disconnect in this session
+  // ── Session bookkeeping ──────────────────────────────────────────────
+  const startSession = useCallback(() => {
+    const t = now()
+    localStorage.setItem(SESSION_START_KEY, String(t))
+    localStorage.setItem(LAST_ACTIVITY_KEY, String(t))
+    lastWriteRef.current = t
+    setSessionExpiredReason(null)
+  }, [])
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(SESSION_START_KEY)
+    localStorage.removeItem(LAST_ACTIVITY_KEY)
+  }, [])
+
+  const touchActivity = useCallback(() => {
+    const t = now()
+    if (t - lastWriteRef.current < ACTIVITY_WRITE_THROTTLE_MS) return
+    lastWriteRef.current = t
+    localStorage.setItem(LAST_ACTIVITY_KEY, String(t))
+  }, [])
+
+  // Returns 'idle' | 'max' | null. Pure check — no side effects, so it can
+  // be called from the auto-reconnect path before any state is set.
+  const checkSessionExpiry = useCallback(() => {
+    const start = readTs(SESSION_START_KEY)
+    const last  = readTs(LAST_ACTIVITY_KEY)
+    if (start === null || last === null) return null
+    const t = now()
+    if (t - start > MAX_SESSION_MS) return 'max'
+    if (t - last > IDLE_TIMEOUT_MS) return 'idle'
+    return null
+  }, [])
+
+  // ── Disconnect ───────────────────────────────────────────────────────
+  const performDisconnect = useCallback(async (reason = null) => {
+    try {
+      if (window.ethereum) {
+        // Revoking the site permission is what makes the disconnect real.
+        // Clearing React state alone leaves MetaMask still authorised, so
+        // the next eth_accounts call would silently reconnect.
+        await window.ethereum.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        })
+      }
+    } catch (err) {
+      // Older MetaMask builds don't implement this. The session flag and
+      // cleared state below still hold, so the disconnect stands.
+      console.warn('wallet_revokePermissions failed:', err?.message)
+    } finally {
+      sessionStorage.setItem(DISCONNECTED_KEY, 'true')
+      clearSession()
+      clearWalletState()
+      if (reason) setSessionExpiredReason(reason)
+    }
+  }, [clearSession, clearWalletState])
+
+  const disconnect = useCallback(() => performDisconnect(null), [performDisconnect])
+
+  // ── Auto-reconnect on load ───────────────────────────────────────────
+  // Order matters here. The expiry check runs BEFORE eth_accounts, so an
+  // expired session never briefly appears connected.
   useEffect(() => {
     const autoReconnect = async () => {
       if (!window.ethereum) {
@@ -74,32 +176,41 @@ export function useArcTestnet() {
         return
       }
 
-      // If user explicitly disconnected, do not auto-reconnect
-      // They must click Connect again manually
-      const userDisconnected = sessionStorage.getItem(DISCONNECTED_KEY)
-      if (userDisconnected === 'true') {
-        console.log('User previously disconnected — skipping auto-reconnect')
+      if (sessionStorage.getItem(DISCONNECTED_KEY) === 'true') {
+        setIsAutoConnecting(false)
+        return
+      }
+
+      const expired = checkSessionExpiry()
+      if (expired) {
+        // Revoke rather than merely skip — otherwise the permission sits
+        // there and the very next page load reconnects again.
+        await performDisconnect(expired)
         setIsAutoConnecting(false)
         return
       }
 
       try {
-        // eth_accounts does NOT prompt the user
-        // It only returns accounts if the site already has permission
+        // eth_accounts does not prompt — it only reports an existing grant.
         const accounts = await window.ethereum.request({ method: 'eth_accounts' })
         if (accounts && accounts.length > 0) {
+          // A live permission with no timestamps means the session predates
+          // this timeout logic. Start the clock now rather than trusting it.
+          if (readTs(SESSION_START_KEY) === null) startSession()
+          else localStorage.setItem(LAST_ACTIVITY_KEY, String(now()))
           await setWalletState(accounts[0])
         }
       } catch (err) {
-        console.warn('Auto-reconnect failed:', err.message)
+        console.warn('Auto-reconnect failed:', err?.message)
       } finally {
         setIsAutoConnecting(false)
       }
     }
     autoReconnect()
-  }, [setWalletState])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Manual connect — always prompts MetaMask for authorization
+  // ── Connect ──────────────────────────────────────────────────────────
   const connect = useCallback(async () => {
     if (!hasMetaMask) {
       setError('MetaMask not found. Please install MetaMask to use the testnet.')
@@ -107,93 +218,123 @@ export function useArcTestnet() {
     }
     setIsLoading(true)
     setError(null)
+    setSessionExpiredReason(null)
     try {
-      // First revoke any existing permissions so MetaMask
-      // always shows the account selection popup
+      // Revoke first so MetaMask always shows the account picker rather than
+      // silently reusing a prior grant — the user should see what they're
+      // authorising every time.
       try {
         await window.ethereum.request({
           method: 'wallet_revokePermissions',
           params: [{ eth_accounts: {} }],
         })
-      } catch {
-        // wallet_revokePermissions may not be supported on older MetaMask
-        // That is fine — we continue and request accounts anyway
-      }
+      } catch { /* not supported on older MetaMask — continue */ }
 
-      // eth_requestAccounts always prompts the user to select and approve
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      })
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
       if (!accounts.length) throw new Error('No accounts selected')
 
-      // Switch to Arc Testnet
       await switchToArcTestnet()
 
-      // Clear disconnected flag — user has now explicitly connected
       sessionStorage.removeItem(DISCONNECTED_KEY)
+      startSession()
 
       await setWalletState(accounts[0])
       return accounts[0]
     } catch (err) {
-      // User rejected the connection prompt
-      if (err.code === 4001) {
-        setError('Connection rejected. Please approve the MetaMask prompt to continue.')
-      } else {
-        setError(err.message || 'Failed to connect wallet')
-      }
+      if (err.code === 4001) setError('Connection rejected. Please approve the MetaMask prompt to continue.')
+      else setError(err.message || 'Failed to connect wallet')
       return false
     } finally {
       setIsLoading(false)
     }
-  }, [hasMetaMask, setWalletState])
+  }, [hasMetaMask, setWalletState, startSession])
 
-  // Disconnect — revokes MetaMask permissions and sets session flag
-  const disconnect = useCallback(async () => {
-    try {
-      // Revoke MetaMask site permissions so it won't auto-connect next visit
-      if (window.ethereum) {
-        await window.ethereum.request({
-          method: 'wallet_revokePermissions',
-          params: [{ eth_accounts: {} }],
-        })
-      }
-    } catch (err) {
-      console.warn('wallet_revokePermissions failed:', err.message)
-      // Continue with disconnect even if revoke fails
-    } finally {
-      // Set session flag — prevents auto-reconnect until user manually connects
-      sessionStorage.setItem(DISCONNECTED_KEY, 'true')
-      clearWalletState()
+  // ── Activity listeners ───────────────────────────────────────────────
+  // Only mounted while connected, so an idle logged-out page costs nothing.
+  useEffect(() => {
+    if (!isConnected) return
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, touchActivity, { passive: true }))
+
+    // Returning to a backgrounded tab counts as activity — but only if the
+    // session is still valid. The expiry sweep below handles the other case.
+    const onVisible = () => { if (!document.hidden) touchActivity() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, touchActivity))
+      document.removeEventListener('visibilitychange', onVisible)
     }
+  }, [isConnected, touchActivity])
+
+  // ── Expiry sweep ─────────────────────────────────────────────────────
+  // Runs every 10s while connected. Also drives the countdown the UI can
+  // use to warn before the cut-off.
+  useEffect(() => {
+    if (!isConnected) {
+      setSecondsUntilTimeout(null)
+      return
+    }
+
+    const tick = async () => {
+      if (!isConnectedRef.current) return
+      const expired = checkSessionExpiry()
+      if (expired) {
+        await performDisconnect(expired)
+        return
+      }
+      const last = readTs(LAST_ACTIVITY_KEY)
+      if (last !== null) {
+        const remaining = Math.max(0, Math.ceil((IDLE_TIMEOUT_MS - (now() - last)) / 1000))
+        setSecondsUntilTimeout(remaining)
+      }
+    }
+
+    tick()
+    const id = setInterval(tick, 10 * 1000)
+    return () => clearInterval(id)
+  }, [isConnected, checkSessionExpiry, performDisconnect])
+
+  // Another tab disconnecting must disconnect this one too — otherwise a
+  // second tab keeps the session alive after the first has ended it.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === SESSION_START_KEY && e.newValue === null && isConnectedRef.current) {
+        clearWalletState()
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [clearWalletState])
 
-  // Send USDC on Arc Testnet as native transfer
+  // ── Send ─────────────────────────────────────────────────────────────
   const sendUsdc = useCallback(async ({ to, amount }) => {
     if (!account || !isCorrectNetwork) throw new Error('Not connected to Arc Testnet')
+
+    // Signing is the most sensitive action in the app — re-check expiry
+    // rather than relying on the 10s sweep having already fired.
+    const expired = checkSessionExpiry()
+    if (expired) {
+      await performDisconnect(expired)
+      throw new Error('Your session expired. Please reconnect your wallet and try again.')
+    }
+    touchActivity()
+
     setIsLoading(true)
     setError(null)
 
     try {
-      const startTime = Date.now()
-
-      // Arc Testnet: 18 decimals
+      const start = Date.now()
       const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
       const amountHex = '0x' + rawAmount.toString(16)
-
       const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
 
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{
-          from: account,
-          to: to,
-          value: amountHex,
-          gasPrice,
-          gas: '0x5208',
-        }],
+        params: [{ from: account, to, value: amountHex, gasPrice, gas: '0x5208' }],
       })
 
-      // Poll for receipt
       let receipt = null
       let attempts = 0
       while (!receipt && attempts < 30) {
@@ -213,13 +354,9 @@ export function useArcTestnet() {
         attempts++
       }
 
-      const settlementTime = Date.now() - startTime
-
+      const settlementTime = Date.now() - start
       const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 21000
-      const gasPriceNum = parseInt(gasPrice, 16)
-      // Gas cost in native Arc token (18 decimals)
-      const gasCostRaw = BigInt(gasUsed) * BigInt(gasPriceNum)
-      const gasCostUsdc = (Number(gasCostRaw) / 1e18).toFixed(9)
+      const gasCostRaw = BigInt(gasUsed) * BigInt(parseInt(gasPrice, 16))
 
       await fetchBalance(account)
 
@@ -228,7 +365,7 @@ export function useArcTestnet() {
         from: account,
         to,
         amount: parseFloat(amount),
-        gasCost: gasCostUsdc,
+        gasCost: (Number(gasCostRaw) / 1e18).toFixed(9),
         gasUsed,
         settlementTime,
         blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : null,
@@ -243,24 +380,25 @@ export function useArcTestnet() {
     } finally {
       setIsLoading(false)
     }
-  }, [account, isCorrectNetwork, fetchBalance])
+  }, [account, isCorrectNetwork, fetchBalance, checkSessionExpiry, performDisconnect, touchActivity])
 
   const refreshBalance = useCallback(() => {
     if (account) fetchBalance(account)
   }, [account, fetchBalance])
 
-  // Listen to MetaMask account and network changes
+  // ── MetaMask events ──────────────────────────────────────────────────
   useEffect(() => {
     if (!window.ethereum) return
 
     const onAccountsChanged = async (accounts) => {
       if (accounts.length) {
-        // Only auto-update if user did not explicitly disconnect
-        const userDisconnected = sessionStorage.getItem(DISCONNECTED_KEY)
-        if (userDisconnected !== 'true') {
-          await setWalletState(accounts[0])
-        }
+        if (sessionStorage.getItem(DISCONNECTED_KEY) === 'true') return
+        // Switching accounts is a new session — the previous account's
+        // clock shouldn't carry over to a different address.
+        startSession()
+        await setWalletState(accounts[0])
       } else {
+        clearSession()
         clearWalletState()
       }
     }
@@ -279,7 +417,7 @@ export function useArcTestnet() {
       window.ethereum.removeListener('accountsChanged', onAccountsChanged)
       window.ethereum.removeListener('chainChanged', onChainChanged)
     }
-  }, [account, fetchBalance, setWalletState, clearWalletState])
+  }, [account, fetchBalance, setWalletState, clearWalletState, clearSession, startSession])
 
   return {
     account,
@@ -296,5 +434,13 @@ export function useArcTestnet() {
     sendUsdc,
     refreshBalance,
     arcTestnet: ARC_TESTNET,
+
+    // Session
+    sessionExpiredReason,           // 'idle' | 'max' | null
+    secondsUntilTimeout,            // number | null
+    showTimeoutWarning: secondsUntilTimeout !== null && secondsUntilTimeout <= WARN_BEFORE_MS / 1000,
+    extendSession: touchActivity,   // call from a "Stay connected" button
+    idleTimeoutMinutes: IDLE_TIMEOUT_MS / 60000,
+    maxSessionHours: MAX_SESSION_MS / 3600000,
   }
 }
