@@ -347,7 +347,7 @@ export default function TestnetSend() {
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-60"
         >
           <CoinIcon symbol="USDC" size={20} />
-          USDC <span className="text-[#8892a0] text-xs">⌄</span>
+          USDC <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </button>
         <input
           type="number"
@@ -384,7 +384,7 @@ export default function TestnetSend() {
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
         >
           <CoinIcon symbol="USDC" size={20} />
-          USDC <span className="text-[#8892a0] text-xs">⌄</span>
+          USDC <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </button>
         <input
           type="number"
@@ -469,7 +469,8 @@ export default function TestnetSend() {
                     >
                       <CoinIcon symbol={selectedToken} size={22} />
                       {selectedToken}
-                      <span className="text-[#8892a0] text-xs">⌄</span>
+                      {/* <span className="text-[#8892a0] text-xs">⌄</span> */}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
                     <span className="text-[10px] text-[#8892a0]">
                       Balance: {tokenSupported ? activeBalance : '0.000000'} {selectedToken}
