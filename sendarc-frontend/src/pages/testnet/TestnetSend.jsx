@@ -7,13 +7,63 @@ import {
   switchToChain, sendUsdcOnChain, getUsdcBalance,
   getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
-  payBridgeFeeToTreasury, BRIDGE_FLAT_FEE_USDC
+  BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT
 } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import Navbar from '../../components/Navbar'
 import TokenSelectModal from '../../components/TokenSelectModal'
 import { CoinIcon } from '../../components/CoinLogos'
 import NetworkTokenModal from '../../components/NetworkTokenModal'
+
+// ─── Chain icons ───────────────────────────────────────────────────────────
+// EVM_CHAINS.icon is either an emoji ('⬡') or an image path ('/ethlogo.svg').
+// Both are strings, so React renders either as text unless we branch on which
+// kind it is and wrap image paths in an <img>.
+function isImageIcon(icon) {
+  if (typeof icon !== 'string') return false
+  return (
+    icon.startsWith('/') ||
+    icon.startsWith('http') ||
+    icon.startsWith('data:') ||
+    /\.(svg|png|jpe?g|webp|gif)$/i.test(icon)
+  )
+}
+
+function ChainIcon({ chain, size = 16, className = '' }) {
+  if (!chain) return null
+  const { icon, name } = chain
+
+  if (isImageIcon(icon)) {
+    return (
+      <img
+        src={icon}
+        alt={name || 'chain'}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className={'inline-block object-contain rounded-full shrink-0 ' + className}
+      />
+    )
+  }
+
+  return (
+    <span
+      style={{ fontSize: size, lineHeight: 1 }}
+      className={'inline-block shrink-0 ' + className}
+      aria-hidden="true"
+    >
+      {icon}
+    </span>
+  )
+}
+
+const ChevronDown = ({ className = 'w-4 h-4' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    className={className} aria-hidden="true">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+)
 
 // CCTP flow steps shown while a bridge transaction is in flight
 const CCTP_STEPS = [
@@ -23,18 +73,21 @@ const CCTP_STEPS = [
   { key: 'mint',     label: 'Mint' },
 ]
 
-// Every network in the bridge picker. All of these are real, CCTP-bridge-
-// supported chains per Circle's own supported-blockchains reference — none
-// of them are placeholders anymore. Arc can be either side of the bridge.
 const ALL_NETWORKS = Object.keys(EVM_CHAINS).map(key => ({
   key,
   name: EVM_CHAINS[key].name,
   icon: EVM_CHAINS[key].icon,
+  iconNode: <ChainIcon chain={EVM_CHAINS[key]} size={20} />,
   usdcAddress: EVM_CHAINS[key].usdcAddress,
   enabled: true,
 }))
 
 const AMOUNT_PRESETS = [1, 5, 10]
+
+// How long a same-chain selection must persist before it's treated as a real
+// mistake worth warning about. Anything shorter than this is almost certainly
+// a transient state mid-swap, not something the user did.
+const SAME_CHAIN_WARNING_DELAY_MS = 300
 
 export default function TestnetSend() {
   const {
@@ -46,10 +99,6 @@ export default function TestnetSend() {
   const [activeTab, setActiveTab] = useState('send') // 'send' | 'bridge'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
 
-  // sourceChainKey / bridgeToKey belong to the BRIDGE tab only. The Send
-  // tab always operates on Arc directly and uses `arcBalance` from the
-  // hook — it never reads chainBalance, so swapping bridge direction can't
-  // affect what Send shows.
   const [sourceChainKey, setSourceChainKey] = useState('ethereum')
   const [bridgeToKey, setBridgeToKey] = useState('arc')
   const [chainBalance, setChainBalance] = useState('0.000000')
@@ -76,14 +125,21 @@ export default function TestnetSend() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
 
-  // Live pre-send gas estimate for the Send tab's "NETWORK FEE" row.
   const [estimatedFee, setEstimatedFee] = useState(null)
   const [estimatingFee, setEstimatingFee] = useState(false)
 
-  // CCTP progress tracking
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
+
+  // Debounced mirror of "source and destination are the same chain."
+  //
+  // Two separate things: the raw comparison (immediate, used to block the
+  // Review button — never let an invalid bridge start) and this state (delayed,
+  // used only to show the warning). Swapping direction sets one key before the
+  // other settles, so the raw comparison is briefly true even when the user
+  // did nothing wrong; showing the warning on that flicker reads as a bug.
+  const [showSameChainWarning, setShowSameChainWarning] = useState(false)
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
   const destChain = EVM_CHAINS[bridgeToKey]
@@ -91,23 +147,38 @@ export default function TestnetSend() {
   const tokenSupported = selectedToken === 'USDC' || selectedToken === 'EURC' || selectedToken === 'cirBTC'
   const activeBalance = selectedToken === 'EURC' ? eurcBalance : selectedToken === 'cirBTC' ? cirbtcBalance : arcUsdcBalance
 
+  const sameChainPicked = activeTab === 'bridge' && sourceChainKey === bridgeToKey
+
   const sendTokens = [
     { symbol: 'USDC',   name: 'USD Coin',       balance: arcUsdcBalance, enabled: true },
     { symbol: 'EURC',   name: 'Euro Coin',      balance: eurcBalance,   enabled: true },
     { symbol: 'cirBTC', name: 'Circle Bitcoin', balance: cirbtcBalance, enabled: true },
   ]
 
-  // Balance getters return null on a genuine fetch failure (after retries)
-  // rather than '0' — this keeps the last known good value on screen instead
-  // of flashing to zero, which is indistinguishable from an empty wallet.
   const applyBalance = (setter, value) => { if (value !== null && value !== undefined) setter(value) }
 
-  // The bridge fee is paid in USDC on Arc, so an Arc balance below the fee
-  // blocks the bridge no matter how much USDC sits on the source chain.
-  const hasArcFeeBalance = parseFloat(arcUsdcBalance || '0') >= BRIDGE_FLAT_FEE_USDC
+  // Only surface the same-chain warning once the condition has held for
+  // SAME_CHAIN_WARNING_DELAY_MS. Clearing is immediate — the moment the
+  // chains differ the warning should go, with no lag.
+  useEffect(() => {
+    if (!sameChainPicked) {
+      setShowSameChainWarning(false)
+      return
+    }
+    const timer = setTimeout(() => setShowSameChainWarning(true), SAME_CHAIN_WARNING_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [sameChainPicked])
 
   const handleChainSelect = async (chainKey) => {
     if (chainKey === sourceChainKey) return
+
+    // If the user picks the chain already set as the destination, swap rather
+    // than creating an invalid pair — that's what they almost certainly meant.
+    if (chainKey === bridgeToKey) {
+      handleSwapDirection()
+      return
+    }
+
     setSwitchingChain(true)
     setSwitchError(null)
     setAmount('')
@@ -122,16 +193,40 @@ export default function TestnetSend() {
     }
   }
 
-  const handleSwapDirection = () => {
-    const oldFrom = sourceChainKey
-    const oldTo = bridgeToKey
-    handleChainSelect(oldTo)
-    setBridgeToKey(oldFrom)
+  const handleSwapDirection = async () => {
+    const newSource = bridgeToKey
+    const newDest = sourceChainKey
+
+    // Both keys move in the same render pass, so the pair is never
+    // momentarily equal. React batches these — the old version awaited a
+    // MetaMask switch between them, which is what let the collision through.
+    setSourceChainKey(newSource)
+    setBridgeToKey(newDest)
+    setAmount('')
+
+    // Swap the cached balances too, so each box shows its own chain's number
+    // immediately instead of briefly displaying the other's.
+    setChainBalance(destBalance)
+    setDestBalance(chainBalance)
+
+    // The wallet switch happens after the UI is already consistent. A failure
+    // here is recoverable — the bridge itself will prompt for the right
+    // network — so it doesn't roll back the swap.
+    setSwitchingChain(true)
+    setSwitchError(null)
+    try {
+      await switchToChain(newSource)
+      if (account) {
+        applyBalance(setChainBalance, await getUsdcBalance(newSource, account))
+        applyBalance(setDestBalance, await getUsdcBalance(newDest, account))
+      }
+    } catch (err) {
+      setSwitchError(err.message || 'Could not switch network')
+    } finally {
+      setSwitchingChain(false)
+    }
   }
 
-  // Keep the wallet network in sync with the active tab. This only ever
-  // switches the WALLET's network — never sourceChainKey/bridgeToKey, so
-  // Bridge's chosen chains survive a trip to the Send tab and back.
   useEffect(() => {
     if (!isConnected) return
     if (activeTab === 'send') {
@@ -144,8 +239,6 @@ export default function TestnetSend() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected])
 
-  // Arc USDC balance — needed by the Send tab for the amount, and by the
-  // Bridge tab to check the fee is affordable before starting.
   useEffect(() => {
     if (!account) return
     getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
@@ -167,8 +260,6 @@ export default function TestnetSend() {
     getCirbtcBalance(account).then(v => applyBalance(setCirbtcBalance, v))
   }, [account, arcBalance])
 
-  // Default the recipient to the connected wallet until the person expands
-  // "Add receiving wallet" and picks someone else.
   useEffect(() => {
     if (activeTab === 'bridge' && account && !showWalletInput) {
       setRecipient(account)
@@ -176,10 +267,6 @@ export default function TestnetSend() {
     }
   }, [activeTab, account, showWalletInput])
 
-  // Recompute the Send tab's gas estimate as the form changes, debounced.
-  // Fires as soon as the wallet is connected — recipient and amount only
-  // sharpen the figure from "what this call costs generally" to "what this
-  // exact call costs." Neither is required for a number to exist.
   useEffect(() => {
     if (activeTab !== 'send' || selectedToken !== 'USDC') { setEstimatedFee(null); return }
     if (!account) { setEstimatedFee(null); return }
@@ -222,39 +309,22 @@ export default function TestnetSend() {
         result = await sendCirbtcOnArc({ from: account, to: recipient, amount })
 
       } else if (activeTab === 'bridge') {
-        // ── Fee FIRST, on Arc, before anything is bridged ──────────────
-        // A completed CCTP bridge cannot be reverted. Charging afterwards
-        // means a failed fee leaves a finished bridge with no revenue and
-        // nothing to undo — which is what produced the old "Not collected
-        // (retry needed)" line on an otherwise successful transfer.
-        // Taking the fee first makes failure clean: this throws, the catch
-        // below surfaces the reason, and no funds move anywhere.
-        //
-        // payBridgeFeeToTreasury forces the wallet onto Arc before sending,
-        // because `value` is always denominated in the ACTIVE chain's
-        // native token — on Ethereum Sepolia the same call would spend ETH.
-        handleStatusUpdate('Collecting ParagonFinance fee on Arc Testnet...')
-        const feeResult = await payBridgeFeeToTreasury({ from: account })
-
-        // The fee left the wallet on Arc. Return it to the bridge's source
-        // chain before handing off to App Kit.
-        if (sourceChainKey !== 'arc') {
-          handleStatusUpdate('Switching to ' + selectedChain?.name + '...')
-          await switchToChain(sourceChainKey)
-        }
-
+        // The ParagonFinance fee rides inside the bridge via App Kit's
+        // customFee — charged in USDC on the source chain, settled atomically.
         result = await bridgeUsdcViaAppKit(
-          { fromChainKey: sourceChainKey, toChainKey: bridgeToKey, from: account, to: recipient, amount },
+          {
+            fromChainKey: sourceChainKey,
+            toChainKey: bridgeToKey,
+            from: account,
+            to: recipient,
+            amount,
+            feeUsdc: BRIDGE_FLAT_FEE_USDC,
+            feeRecipient: BRIDGE_FEE_RECIPIENT,
+          },
           handleStatusUpdate
         )
 
-        result.bridgeFeePaid = BRIDGE_FLAT_FEE_USDC
-        result.bridgeFeeTxHash = feeResult.hash
-        result.gasCost = feeResult.gasCost
-
       } else {
-        // Send tab, USDC — always Arc, never sourceChainKey (that belongs
-        // to the Bridge tab and could be any of the 10 chains).
         result = await sendUsdcOnChain('arc', { to: recipient, amount }, handleStatusUpdate)
       }
 
@@ -268,8 +338,6 @@ export default function TestnetSend() {
       } else if (activeTab === 'bridge') {
         applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, account))
         applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, account))
-        // Arc balance always changed — the fee came out of it — regardless
-        // of whether Arc was either side of the bridge itself.
         refreshBalance()
         applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
       } else {
@@ -300,19 +368,22 @@ export default function TestnetSend() {
   }
 
   const validationBalance = activeTab === 'send' ? activeBalance : chainBalance
-  const afterSend = amount && parseFloat(validationBalance)
-    ? (parseFloat(validationBalance) - parseFloat(amount)).toFixed(6)
-    : null
-  const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
-  const isValidAmount = amount && parseFloat(amount) > 0 && parseFloat(amount) <= parseFloat(validationBalance)
-  const sameChainPicked = activeTab === 'bridge' && sourceChainKey === bridgeToKey
-  const canReview =
-    isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked &&
-    (activeTab !== 'bridge' || hasArcFeeBalance)
 
-  // Reads the chain off the transaction result itself (sourceChainKey was
-  // stamped on it at creation time in arcTestnet.js) — never off live UI
-  // state, which keeps changing as the Bridge tab is used.
+  const totalDebit = amount
+    ? parseFloat(amount) + (isCCTP ? BRIDGE_FLAT_FEE_USDC : 0)
+    : null
+
+  const afterSend = totalDebit !== null && parseFloat(validationBalance)
+    ? (parseFloat(validationBalance) - totalDebit).toFixed(6)
+    : null
+
+  const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
+  const isValidAmount = amount && parseFloat(amount) > 0 && totalDebit <= parseFloat(validationBalance)
+
+  // Gating uses the RAW comparison, not the delayed warning state — an
+  // invalid bridge must never be startable, not even for 300ms.
+  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked
+
   const explorerTxUrl = (hash, result) => {
     const key = result?.sourceChainKey || 'arc'
     const chain = EVM_CHAINS[key]
@@ -320,7 +391,8 @@ export default function TestnetSend() {
   }
 
   const fillAmount = (val) => {
-    const capped = Math.min(val, parseFloat(chainBalance) || 0)
+    const max = Math.max(0, (parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC)
+    const capped = Math.min(val, max)
     setAmount(capped > 0 ? capped.toString() : '')
   }
 
@@ -330,11 +402,13 @@ export default function TestnetSend() {
         <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
         <span className="text-[10px] text-[#8892a0]">
           Balance: {chainBalance} USDC
-          {parseFloat(chainBalance) > 0 && (
+          {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
             <>
-              <button onClick={() => setAmount((Math.max(0, parseFloat(chainBalance) || 0) * 0.5).toFixed(6))}
+              <button
+                onClick={() => setAmount(Math.max(0, ((parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC) * 0.5).toFixed(6))}
                 className="ml-2 text-[#8892a0] hover:text-[#00D4FF] transition-colors">50%</button>
-              <button onClick={() => setAmount(Math.max(0, parseFloat(chainBalance) - 0.001).toFixed(6))}
+              <button
+                onClick={() => setAmount(Math.max(0, (parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC - 0.001).toFixed(6))}
                 className="ml-2 text-[#00D4FF] hover:underline">Max</button>
             </>
           )}
@@ -347,7 +421,7 @@ export default function TestnetSend() {
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-60"
         >
           <CoinIcon symbol="USDC" size={20} />
-          USDC <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
           type="number"
@@ -362,12 +436,15 @@ export default function TestnetSend() {
           className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
         />
       </div>
-      <p className="text-[10px] text-[#556] mt-1">{selectedChain?.icon} {selectedChain?.name}</p>
-      {switchingChain && (
+      <p className="flex items-center gap-1.5 text-[10px] text-[#ccccd6] mt-1.5">
+        <ChainIcon chain={selectedChain} size={14} />
+        {selectedChain?.name}
+      </p>
+      {/* {switchingChain && (
         <p className="mt-1.5 text-xs text-[#00D4FF] flex items-center gap-1.5">
           <LoadingSpinner size="sm" /> Switching network…
         </p>
-      )}
+      )} */}
       {switchError && <p className="mt-1.5 text-xs text-red-400">{switchError}</p>}
     </div>
   )
@@ -384,7 +461,7 @@ export default function TestnetSend() {
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
         >
           <CoinIcon symbol="USDC" size={20} />
-          USDC <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
           type="number"
@@ -399,7 +476,10 @@ export default function TestnetSend() {
           className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
         />
       </div>
-      <p className="text-[10px] text-[#556] mt-1">{destChain?.icon} {destChain?.name}</p>
+      <p className="flex items-center gap-1.5 text-[10px] text-[#ccccd6] mt-1.5">
+        <ChainIcon chain={destChain} size={14} />
+        {destChain?.name}
+      </p>
     </div>
   )
 
@@ -443,9 +523,6 @@ export default function TestnetSend() {
 
           <Card className="p-6">
 
-            {/* Only shown when MetaMask itself isn't installed — a hard
-                blocker. Otherwise the forms below are always shown; the
-                Navbar's own Connect Wallet button handles connecting. */}
             {!hasMetaMask && (
               <div className="text-center py-4">
                 <h3 className="font-bold font-['Space_Grotesk'] mb-1.5">MetaMask required</h3>
@@ -469,8 +546,7 @@ export default function TestnetSend() {
                     >
                       <CoinIcon symbol={selectedToken} size={22} />
                       {selectedToken}
-                      {/* <span className="text-[#8892a0] text-xs">⌄</span> */}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-4 h-4 text-muted-foreground" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                      <ChevronDown className="w-4 h-4 text-[#8892a0]" />
                     </button>
                     <span className="text-[10px] text-[#8892a0]">
                       Balance: {tokenSupported ? activeBalance : '0.000000'} {selectedToken}
@@ -516,12 +592,10 @@ export default function TestnetSend() {
                   </div>
                 )}
 
-                {/* Divider arrow */}
                 <div className="flex justify-center -my-2.5 relative z-10">
                   <div className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0]">↓</div>
                 </div>
 
-                {/* Recipient */}
                 <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
                   <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
                     <span className="text-[10px] tracking-widest text-[#8892a0]">SEND TO</span>
@@ -616,46 +690,28 @@ export default function TestnetSend() {
                   </button>
                 </div>
 
-                {/* BRIDGE FROM is always top, BRIDGE TO always bottom. The
-                    arrow performs a real swap — both directions genuinely
-                    work, since App Kit supports Arc as either side. */}
                 {fromBox}
 
                 <div className="flex justify-center -my-2.5 relative z-10">
-                  <button
-                    onClick={handleSwapDirection}
-                    title="Swap direction"
-                    className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] active:scale-90 transition-all duration-300"
-                  >
-                    ↓↑
-                  </button>
+                <button
+                 onClick={handleSwapDirection}
+                    disabled={switchingChain}
+                 title="Swap direction" class="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530]
+                 flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] hover:rotate-[360deg] active:scale-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                  ↓↑</button>
                 </div>
 
                 {toBox}
 
-                {sameChainPicked && (
+                {/* Delayed by SAME_CHAIN_WARNING_DELAY_MS so a swap in progress
+                    doesn't flash a warning for something the user didn't do. */}
+                {showSameChainWarning && (
                   <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
                     <span className="text-sm">🚧</span>
                     <p className="text-xs text-[#e8c374]">Source and destination can't be the same chain.</p>
                   </div>
                 )}
 
-                {/* The fee is charged in USDC on Arc, so Arc needs the
-                    balance regardless of which chains are being bridged. */}
-                {!hasArcFeeBalance && (
-                  <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
-                    <span className="text-sm">⚠️</span>
-                    <p className="text-xs text-[#e8c374]">
-                      You need at least {BRIDGE_FLAT_FEE_USDC} USDC on Arc Testnet for the ParagonFinance fee.
-                      You have {arcUsdcBalance}.{' '}
-                      <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer" className="underline">
-                        Get some from the faucet →
-                      </a>
-                    </p>
-                  </div>
-                )}
-
-                {/* Receiving wallet */}
                 {!showWalletInput ? (
                   <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
                     + Add receiving wallet
@@ -683,7 +739,6 @@ export default function TestnetSend() {
                   </div>
                 )}
 
-                {/* Quick presets */}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {AMOUNT_PRESETS.map(v => (
                     <button
@@ -707,12 +762,28 @@ export default function TestnetSend() {
                   </div>
                   <div>
                     <p className="text-[9px] text-[#8892a0] mb-0.5">PARAGON FEE</p>
-                    <p className="text-xs text-white font-semibold">
-                      {BRIDGE_FLAT_FEE_USDC} USDC
-                    </p>
-                    <p className="text-[8px] text-[#556] mt-0.5">on Arc</p>
+                    <p className="text-xs text-white font-semibold">{BRIDGE_FLAT_FEE_USDC} USDC</p>
                   </div>
                 </div>
+
+                {amount && parseFloat(amount) > 0 && (
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-[#8892a0]">
+                      <span>Recipient receives</span>
+                      <span className="text-white font-semibold">{parseFloat(amount).toFixed(2)} USDC</span>
+                    </div>
+                    <div className="flex justify-between text-[#8892a0]">
+                      <span>Total debited</span>
+                      <span className="text-white font-semibold">{totalDebit.toFixed(2)} USDC</span>
+                    </div>
+                    {afterSend !== null && (
+                      <div className="flex justify-between text-[#8892a0]">
+                        <span>Balance after</span>
+                        <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>{afterSend} USDC</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setView('confirm')}
@@ -730,17 +801,31 @@ export default function TestnetSend() {
                 <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">
                   {activeTab === 'bridge' ? 'BRIDGE REVIEW' : 'TRANSFER REVIEW'}
                 </p>
+
+                {isCCTP && (
+                  <div className="flex items-center justify-center gap-3 mb-4 pb-4 border-b border-[#1e2530]">
+                    <span className="flex items-center gap-1.5 text-sm text-white font-semibold">
+                      <ChainIcon chain={selectedChain} size={18} />
+                      {selectedChain?.name}
+                    </span>
+                    <span className="text-[#00D4FF]">→</span>
+                    <span className="flex items-center gap-1.5 text-sm text-white font-semibold">
+                      <ChainIcon chain={destChain} size={18} />
+                      {destChain?.name}
+                    </span>
+                  </div>
+                )}
+
                 <div className="space-y-3 mb-5">
                   {[
-                    { l: 'Route',   v: isCCTP ? selectedChain?.name + ' → ' + destChain?.name + ' (CCTP)' : 'Arc Testnet (direct)' },
                     { l: 'From',    v: shortAddr(account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
-                    { l: 'Amount',  v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
-                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC (on Arc)' }] : []),
-                    { l: 'Recipient gets', v: isCCTP ? amount + ' USDC (full amount)' : undefined },
+                    { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
+                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
+                    ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' USDC' }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
-                    { l: 'Prompts', v: isCCTP ? '4 (fee, approve, burn, mint)' : '1 (sign)' },
-                  ].filter(r => r.v !== undefined).map(r => (
+                    { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },
+                  ].map(r => (
                     <div key={r.l} className="flex justify-between items-center border-b border-[#1e2530] pb-2.5 last:border-0 text-sm">
                       <span className="text-[#8892a0]">{r.l}</span>
                       <span className={'font-semibold ' + (r.accent ? 'text-[#00D4FF]' : 'text-white') + (r.mono ? ' font-mono text-xs' : '')}>
@@ -759,8 +844,8 @@ export default function TestnetSend() {
                 {isCCTP && (
                   <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl px-3 py-2.5 mb-4">
                     <p className="text-[11px] text-[#8892a0] leading-relaxed">
-                      The {BRIDGE_FLAT_FEE_USDC} USDC fee is collected on Arc Testnet first.
-                      If you decline it, nothing is bridged and no funds move.
+                      The {BRIDGE_FLAT_FEE_USDC} USDC fee is collected as part of the bridge itself,
+                      in USDC on {selectedChain?.name}. If the bridge doesn't complete, no fee is taken.
                     </p>
                   </div>
                 )}
@@ -823,9 +908,14 @@ export default function TestnetSend() {
                 <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-left mb-5 space-y-2.5">
                   {[
                     { l: 'Amount', v: txResult.amount + ' ' + (txResult.token || 'USDC') },
-                    { l: 'Gas Paid', v: (txResult.gasCost || '0') + ' USDC' },
                     ...(txResult.bridgeFeePaid
                       ? [{ l: 'ParagonFinance Fee', v: txResult.bridgeFeePaid + ' USDC' }]
+                      : []),
+                    ...(txResult.grossAmount
+                      ? [{ l: 'Total debited', v: txResult.grossAmount.toFixed(2) + ' USDC' }]
+                      : []),
+                    ...(!txResult.cctpBridge
+                      ? [{ l: 'Gas Paid', v: (txResult.gasCost || '0') + ' USDC' }]
                       : []),
                     { l: 'Status', v: 'Confirmed', green: true },
                   ].map(r => (
@@ -847,15 +937,6 @@ export default function TestnetSend() {
                       <a href={explorerTxUrl(txResult.mintTxHash, { sourceChainKey: txResult.destinationChainKey })} target="_blank" rel="noreferrer"
                         className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
                         {txResult.mintTxHash}
-                      </a>
-                    </div>
-                  )}
-                  {txResult.bridgeFeeTxHash && (
-                    <div>
-                      <p className="text-[10px] text-[#8892a0] mb-1">PARAGONFINANCE FEE TX (ARC TESTNET)</p>
-                      <a href={arcScanTx(txResult.bridgeFeeTxHash)} target="_blank" rel="noreferrer"
-                        className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
-                        {txResult.bridgeFeeTxHash}
                       </a>
                     </div>
                   )}

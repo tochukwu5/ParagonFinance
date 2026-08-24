@@ -4,27 +4,86 @@ import { useArcTestnet } from '../../hooks/useArcTestnet'
 import { useTestnet } from '../../context/TestnetContext'
 import {
   ARC_TESTNET, EVM_CHAINS, shortAddr, arcScanTx,
-  switchToChain, sendUsdcOnChain, getUsdcBalance
+  switchToChain, sendUsdcOnChain, getUsdcBalance,
+  getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
+  bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
+  BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT
 } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import Navbar from '../../components/Navbar'
+import TokenSelectModal from '../../components/TokenSelectModal'
+import { CoinIcon } from '../../components/CoinLogos'
+import NetworkTokenModal from '../../components/NetworkTokenModal'
 
-const STEPS = ['Connect Wallet', 'Send Details', 'Confirm', 'Complete']
+// ─── Chain icons ───────────────────────────────────────────────────────────
 
-const CHAIN_LIST = [
-  EVM_CHAINS.arc,
-  EVM_CHAINS.ethereum,
-  EVM_CHAINS.base,
-  EVM_CHAINS.arbitrum,
-]
+function isImageIcon(icon) {
+  if (typeof icon !== 'string') return false
+  return (
+    icon.startsWith('/') ||
+    icon.startsWith('http') ||
+    icon.startsWith('data:') ||
+    /\.(svg|png|jpe?g|webp|gif)$/i.test(icon)
+  )
+}
 
-// CCTP flow steps shown during cross-chain send
+function ChainIcon({ chain, size = 16, className = '' }) {
+  if (!chain) return null
+  const { icon, name } = chain
+
+  if (isImageIcon(icon)) {
+    return (
+      <img
+        src={icon}
+        alt={name || 'chain'}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className={'inline-block object-contain rounded-full shrink-0 ' + className}
+      />
+    )
+  }
+
+  return (
+    <span
+      style={{ fontSize: size, lineHeight: 1 }}
+      className={'inline-block shrink-0 ' + className}
+      aria-hidden="true"
+    >
+      {icon}
+    </span>
+  )
+}
+
+// CCTP flow steps shown while a bridge transaction is in flight
 const CCTP_STEPS = [
-  { key: 'approve',     label: 'Approve USDC',         desc: 'Allow CCTP to spend your USDC' },
-  { key: 'burn',        label: 'Burn on Source Chain',  desc: 'CCTP burns USDC on ' },
-  { key: 'attest',      label: 'Circle Attestation',    desc: 'Circle signs the burn proof' },
-  { key: 'mint',        label: 'Mint on Arc Testnet',   desc: 'USDC minted to recipient on Arc' },
+  { key: 'approve', label: 'Approve' },
+  { key: 'burn',     label: 'Burn' },
+  { key: 'attest',   label: 'Attest' },
+  { key: 'mint',     label: 'Mint' },
 ]
+
+// Every network in the bridge picker. `iconNode` is a ready-to-render element
+// so NetworkTokenModal doesn't need to know about the emoji/image distinction;
+// `icon` stays raw for any consumer that still expects the plain value.
+const ALL_NETWORKS = Object.keys(EVM_CHAINS).map(key => ({
+  key,
+  name: EVM_CHAINS[key].name,
+  icon: EVM_CHAINS[key].icon,
+  iconNode: <ChainIcon chain={EVM_CHAINS[key]} size={20} />,
+  usdcAddress: EVM_CHAINS[key].usdcAddress,
+  enabled: true,
+}))
+
+const AMOUNT_PRESETS = [1, 5, 10]
+
+const ChevronDown = ({ className = 'w-4 h-4' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    className={className} aria-hidden="true">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+)
 
 export default function TestnetSend() {
   const {
@@ -33,30 +92,58 @@ export default function TestnetSend() {
   } = useArcTestnet()
   const { recordTransaction, loadTransactions } = useTestnet()
 
-  const [step, setStep] = useState(isConnected ? 1 : 0)
-  const [sourceChainKey, setSourceChainKey] = useState('arc')
-  const [chainBalance, setChainBalance] = useState(arcBalance)
+  const [activeTab, setActiveTab] = useState('send') // 'send' | 'bridge'
+  const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
+
+  const [sourceChainKey, setSourceChainKey] = useState('ethereum')
+  const [bridgeToKey, setBridgeToKey] = useState('arc')
+  const [chainBalance, setChainBalance] = useState('0.000000')
+  const [destBalance, setDestBalance] = useState('0.000000')
+  const [arcUsdcBalance, setArcUsdcBalance] = useState('0.000000')
+  const [eurcBalance, setEurcBalance] = useState('0.000000')
+  const [cirbtcBalance, setCirbtcBalance] = useState('0.00000000')
   const [switchingChain, setSwitchingChain] = useState(false)
   const [switchError, setSwitchError] = useState(null)
+
+  const [selectedToken, setSelectedToken] = useState('USDC')
+  const [showTokenModal, setShowTokenModal] = useState(false)
+  const [showFromModal, setShowFromModal] = useState(false)
+  const [showToModal, setShowToModal] = useState(false)
+
   const [recipient, setRecipient] = useState('')
+  const [useOwnAddress, setUseOwnAddress] = useState(false)
+  const [showWalletInput, setShowWalletInput] = useState(false)
   const [amount, setAmount] = useState('')
+  const [showMemo, setShowMemo] = useState(false)
   const [memo, setMemo] = useState('')
+
   const [txResult, setTxResult] = useState(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
-  const [useOwnAddress, setUseOwnAddress] = useState(false)
 
-  // CCTP progress tracking
+  const [estimatedFee, setEstimatedFee] = useState(null)
+  const [estimatingFee, setEstimatingFee] = useState(false)
+
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
-  const isCCTP = selectedChain && selectedChain.useCCTP
+  const destChain = EVM_CHAINS[bridgeToKey]
+  const isCCTP = activeTab === 'bridge'
+  const tokenSupported = selectedToken === 'USDC' || selectedToken === 'EURC' || selectedToken === 'cirBTC'
+  const activeBalance = selectedToken === 'EURC' ? eurcBalance : selectedToken === 'cirBTC' ? cirbtcBalance : arcUsdcBalance
 
-  useEffect(() => {
-    if (isConnected && step === 0) setStep(1)
-  }, [isConnected, step])
+  const sendTokens = [
+    { symbol: 'USDC',   name: 'USD Coin',       balance: arcUsdcBalance, enabled: true },
+    { symbol: 'EURC',   name: 'Euro Coin',      balance: eurcBalance,   enabled: true },
+    { symbol: 'cirBTC', name: 'Circle Bitcoin', balance: cirbtcBalance, enabled: true },
+  ]
+
+  // getUsdcBalance returns null when a read genuinely failed (as opposed to a
+  // confirmed zero), so skipping null keeps the last good number on screen
+  // instead of flashing to 0.000000 on a flaky public RPC.
+  const applyBalance = (setter, value) => { if (value !== null && value !== undefined) setter(value) }
 
   const handleChainSelect = async (chainKey) => {
     if (chainKey === sourceChainKey) return
@@ -66,10 +153,7 @@ export default function TestnetSend() {
     try {
       await switchToChain(chainKey)
       setSourceChainKey(chainKey)
-      if (account) {
-        const bal = await getUsdcBalance(chainKey, account)
-        setChainBalance(bal)
-      }
+      if (account) applyBalance(setChainBalance, await getUsdcBalance(chainKey, account))
     } catch (err) {
       setSwitchError(err.message || 'Could not switch network')
     } finally {
@@ -77,22 +161,80 @@ export default function TestnetSend() {
     }
   }
 
+  const handleSwapDirection = () => {
+    const oldFrom = sourceChainKey
+    const oldTo = bridgeToKey
+    handleChainSelect(oldTo)
+    setBridgeToKey(oldFrom)
+  }
+
+  useEffect(() => {
+    if (!isConnected) return
+    if (activeTab === 'send') {
+      switchToChain('arc').catch(() => {})
+      if (account) getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
+    }
+    if (activeTab === 'bridge' && sourceChainKey === bridgeToKey) {
+      setBridgeToKey(sourceChainKey === 'arc' ? 'ethereum' : 'arc')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isConnected])
+
   useEffect(() => {
     if (!account) return
-    getUsdcBalance(sourceChainKey, account).then(setChainBalance)
+    getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
+  }, [account])
+
+  useEffect(() => {
+    if (!account) return
+    getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v))
   }, [sourceChainKey, account, arcBalance])
 
-  // Parse CCTP status message to update step indicators
+  useEffect(() => {
+    if (!account) return
+    getUsdcBalance(bridgeToKey, account).then(v => applyBalance(setDestBalance, v))
+  }, [bridgeToKey, account, arcBalance])
+
+  useEffect(() => {
+    if (!account) return
+    getEurcBalance(account).then(v => applyBalance(setEurcBalance, v))
+    getCirbtcBalance(account).then(v => applyBalance(setCirbtcBalance, v))
+  }, [account, arcBalance])
+
+  useEffect(() => {
+    if (activeTab === 'bridge' && account && !showWalletInput) {
+      setRecipient(account)
+      setUseOwnAddress(true)
+    }
+  }, [activeTab, account, showWalletInput])
+
+  // Send tab gas estimate, debounced. Fires as soon as the wallet is
+  // connected — recipient and amount only sharpen the figure.
+  useEffect(() => {
+    if (activeTab !== 'send' || selectedToken !== 'USDC') { setEstimatedFee(null); return }
+    if (!account) { setEstimatedFee(null); return }
+
+    let cancelled = false
+    setEstimatingFee(true)
+    const timer = setTimeout(() => {
+      estimateSendPaymentGasCost({ from: account, to: recipient, amount })
+        .then(v => { if (!cancelled) setEstimatedFee(v) })
+        .finally(() => { if (!cancelled) setEstimatingFee(false) })
+    }, 400)
+
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [activeTab, selectedToken, account, recipient, amount])
+
   const handleStatusUpdate = (msg) => {
     setCctpStatus(msg)
     if (msg.includes('Approving')) { setCctpActiveStep(0); setCctpDoneSteps([]) }
-    else if (msg.includes('Approval confirmed')) { setCctpDoneSteps(['approve']); setCctpActiveStep(1) }
+    else if (msg.includes('approved')) { setCctpDoneSteps(['approve']); setCctpActiveStep(1) }
     else if (msg.includes('Burning')) { setCctpActiveStep(1) }
-    else if (msg.includes('burned on')) { setCctpDoneSteps(p => [...p, 'burn']); setCctpActiveStep(2) }
+    else if (msg.includes('burned')) { setCctpDoneSteps(p => [...p, 'burn']); setCctpActiveStep(2) }
     else if (msg.includes('attestation')) { setCctpActiveStep(2) }
     else if (msg.includes('Attestation received')) { setCctpDoneSteps(p => [...p, 'attest']); setCctpActiveStep(3) }
-    else if (msg.includes('Switching to Arc') || msg.includes('minting')) { setCctpActiveStep(3) }
-    else if (msg.includes('minted on Arc')) { setCctpDoneSteps(p => [...p, 'mint']); setCctpActiveStep(-1) }
+    else if (msg.includes('Minting')) { setCctpActiveStep(3) }
+    else if (msg.includes('minted')) { setCctpDoneSteps(p => [...p, 'mint']); setCctpActiveStep(-1) }
   }
 
   const handleSend = async () => {
@@ -102,16 +244,54 @@ export default function TestnetSend() {
     setCctpActiveStep(-1)
     setCctpDoneSteps([])
     try {
-      const result = await sendUsdcOnChain(sourceChainKey, { to: recipient, amount }, handleStatusUpdate)
+      let result
+      if (activeTab === 'send' && selectedToken === 'EURC') {
+        result = await sendEurcOnArc({ from: account, to: recipient, amount })
+
+      } else if (activeTab === 'send' && selectedToken === 'cirBTC') {
+        result = await sendCirbtcOnArc({ from: account, to: recipient, amount })
+
+      } else if (activeTab === 'bridge') {
+        // The ParagonFinance fee rides inside the bridge via App Kit's
+        // customFee — charged in USDC on the source chain, settled
+        // atomically. A failed fee can no longer leave a completed bridge
+        // uncollected, and it can't be charged in the wrong token.
+        result = await bridgeUsdcViaAppKit(
+          {
+            fromChainKey: sourceChainKey,
+            toChainKey: bridgeToKey,
+            from: account,
+            to: recipient,
+            amount,
+            feeUsdc: BRIDGE_FLAT_FEE_USDC,
+            feeRecipient: BRIDGE_FEE_RECIPIENT,
+          },
+          handleStatusUpdate
+        )
+
+      } else {
+        result = await sendUsdcOnChain('arc', { to: recipient, amount }, handleStatusUpdate)
+      }
+
       await recordTransaction(result, account)
       await loadTransactions(account)
-      if (sourceChainKey === 'arc') refreshBalance()
-      else {
-        const bal = await getUsdcBalance(sourceChainKey, account)
-        setChainBalance(bal)
+
+      if (selectedToken === 'EURC') {
+        applyBalance(setEurcBalance, await getEurcBalance(account))
+      } else if (selectedToken === 'cirBTC') {
+        applyBalance(setCirbtcBalance, await getCirbtcBalance(account))
+      } else if (activeTab === 'bridge') {
+        applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, account))
+        applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, account))
+        refreshBalance()
+        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
+      } else {
+        refreshBalance()
+        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
       }
+
       setTxResult(result)
-      setStep(3)
+      setView('success')
     } catch (err) {
       if (err.code === 4001) setSendError('Transaction rejected in MetaMask.')
       else setSendError(err.message || 'Transaction failed. Please try again.')
@@ -120,596 +300,649 @@ export default function TestnetSend() {
     }
   }
 
-  const afterSend = amount && parseFloat(chainBalance)
-    ? (parseFloat(chainBalance) - parseFloat(amount)).toFixed(6)
-    : null
-  const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
-  const isValidAmount = amount && parseFloat(amount) > 0 && parseFloat(amount) <= parseFloat(chainBalance)
+  const resetForm = () => {
+    setView('form'); setAmount(''); setMemo(''); setShowMemo(false); setShowWalletInput(false)
+    setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1); setSendError(null)
+  }
 
-  const explorerTxUrl = (hash) => selectedChain
-    ? selectedChain.explorerUrl + '/tx/' + hash
-    : arcScanTx(hash)
+  const changeTab = (tab) => {
+    if (tab === activeTab) return
+    setActiveTab(tab)
+    setSelectedToken('USDC')
+    resetForm()
+  }
+
+  const validationBalance = activeTab === 'send' ? activeBalance : chainBalance
+
+  // On the Bridge tab the fee is added on top, so the source chain must cover
+  // amount + fee for the recipient to receive the full amount.
+  const totalDebit = amount
+    ? parseFloat(amount) + (isCCTP ? BRIDGE_FLAT_FEE_USDC : 0)
+    : null
+
+  const afterSend = totalDebit !== null && parseFloat(validationBalance)
+    ? (parseFloat(validationBalance) - totalDebit).toFixed(6)
+    : null
+
+  const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
+  const isValidAmount = amount && parseFloat(amount) > 0 && totalDebit <= parseFloat(validationBalance)
+  const sameChainPicked = activeTab === 'bridge' && sourceChainKey === bridgeToKey
+  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked
+
+  const explorerTxUrl = (hash, result) => {
+    const key = result?.sourceChainKey || 'arc'
+    const chain = EVM_CHAINS[key]
+    return chain ? chain.explorerUrl + '/tx/' + hash : arcScanTx(hash)
+  }
+
+  const fillAmount = (val) => {
+    const max = Math.max(0, (parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC)
+    const capped = Math.min(val, max)
+    setAmount(capped > 0 ? capped.toString() : '')
+  }
+
+  const fromBox = (
+    <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+        <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
+        <span className="text-[10px] text-[#8892a0]">
+          Balance: {chainBalance} USDC
+          {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
+            <>
+              <button
+                onClick={() => setAmount(Math.max(0, ((parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC) * 0.5).toFixed(6))}
+                className="ml-2 text-[#8892a0] hover:text-[#00D4FF] transition-colors">50%</button>
+              <button
+                onClick={() => setAmount(Math.max(0, (parseFloat(chainBalance) || 0) - BRIDGE_FLAT_FEE_USDC - 0.001).toFixed(6))}
+                className="ml-2 text-[#00D4FF] hover:underline">Max</button>
+            </>
+          )}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <button
+          onClick={() => setShowFromModal(true)}
+          disabled={switchingChain}
+          className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-60"
+        >
+          <CoinIcon symbol="USDC" size={20} />
+          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
+        </button>
+        <input
+          type="number"
+          placeholder="0.00"
+          value={amount}
+          onChange={e => {
+            const val = parseFloat(e.target.value)
+            if (e.target.value === '' || e.target.value === '0') setAmount('')
+            else if (!isNaN(val) && val > 0) setAmount(e.target.value)
+          }}
+          min="0"
+          className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
+        />
+      </div>
+      <p className="flex items-center gap-1.5 text-[10px] text-[#8892a0] mt-1.5">
+        <ChainIcon chain={selectedChain} size={14} />
+        {selectedChain?.name}
+      </p>
+      {switchingChain && (
+        <p className="mt-1.5 text-xs text-[#00D4FF] flex items-center gap-1.5">
+          {/* <LoadingSpinner size="sm" /> Switching network… */}
+        </p>
+      )}
+      {switchError && <p className="mt-1.5 text-xs text-red-400">{switchError}</p>}
+    </div>
+  )
+
+  const toBox = (
+    <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+        <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE TO</span>
+        <span className="text-[10px] text-[#8892a0]">Balance: {destBalance} USDC</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setShowToModal(true)}
+          className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
+        >
+          <CoinIcon symbol="USDC" size={20} />
+          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
+        </button>
+        <input
+          type="number"
+          placeholder="0.00"
+          value={amount}
+          onChange={e => {
+            const val = parseFloat(e.target.value)
+            if (e.target.value === '' || e.target.value === '0') setAmount('')
+            else if (!isNaN(val) && val > 0) setAmount(e.target.value)
+          }}
+          min="0"
+          className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
+        />
+      </div>
+      <p className="flex items-center gap-1.5 text-[10px] text-[#8892a0] mt-1.5">
+        <ChainIcon chain={destChain} size={14} />
+        {destChain?.name}
+      </p>
+    </div>
+  )
 
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-[#0D1117]">
+      <div className="min-h-screen bg-[#0D1117] px-4 py-10">
+        <div className="max-w-lg mx-auto">
 
-        {/* Top bar */}
-        <div className="border-b border-[#1e2530] bg-[#0f1822] px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Link to="/testnet" className="text-[#8892a0] hover:text-white text-sm transition-colors">
-              ← Testnet Hub
-            </Link>
-            <span className="text-[#1e2530]">/</span>
-            <span className="text-sm text-white font-['Space_Grotesk'] font-semibold">Send USDC</span>
-            {isCCTP && (
-              <span className="text-[10px] bg-[#00D4FF]/10 border border-[#00D4FF]/40 text-[#00D4FF] px-2 py-0.5 rounded-full">
-                Circle CCTP Bridge
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] border border-[#00D4FF]/30 text-[#00D4FF] px-2 py-1 rounded-full">
-              {selectedChain ? selectedChain.name : 'Arc Testnet'}
-              {isCCTP && ' → Arc Testnet'}
-            </span>
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold font-['Space_Grotesk'] text-white">Send &amp; Bridge USDC</h1>
+              <p className="text-xs text-[#8892a0] mt-0.5">Move USDC across wallets and chains.</p>
+            </div>
             {account && (
-              <div className="flex items-center gap-2 bg-[#0D1117] border border-[#1e2530] rounded-lg px-3 py-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <div className="flex items-center gap-2 bg-[#0f1822] border border-[#1e2530] rounded-lg px-3 py-1.5">
+                <span className="live-dot" />
                 <span className="text-xs font-mono text-white">{shortAddr(account)}</span>
-                <span className="text-xs text-[#00D4FF] font-semibold">{chainBalance} USDC</span>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="max-w-5xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-5 gap-8">
-
-          {/* Left */}
-          <div className="lg:col-span-3">
-            <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Send USDC</h1>
-            <p className="text-[#8892a0] text-sm mb-8">
-              {isCCTP
-                ? 'Cross-chain via Circle CCTP — USDC burns on source, mints on Arc Testnet'
-                : 'Native Arc Testnet transfer — instant sub-second settlement'
-              }
-            </p>
-
-            {/* Steps */}
-            <div className="space-y-2 mb-8">
-              {STEPS.map((s, i) => (
-                <div key={s} className={'flex items-center gap-3 p-3.5 rounded-xl border transition-all ' + (
-                  i === step ? 'bg-[#0a2030] border-[#00D4FF]' :
-                  i < step  ? 'border-[#1e2530] bg-[#0f1822]' : 'border-[#1e2530] opacity-40'
-                )}>
-                  <div className={'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ' + (
-                    i < step  ? 'bg-[#00D4FF] text-[#0D1117]' :
-                    i === step ? 'border-2 border-[#00D4FF] text-[#00D4FF]' : 'border border-[#1e2530] text-[#8892a0]'
-                  )}>
-                    {i < step ? '✓' : i + 1}
-                  </div>
-                  <span className={'text-sm font-[\'Space_Grotesk\'] font-semibold ' + (i === step ? 'text-white' : 'text-[#8892a0]')}>{s}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Step 0 — Connect */}
-            {step === 0 && (
-              <Card className="p-6 text-center">
-                <div className="text-4xl mb-4">🦊</div>
-                {!hasMetaMask ? (
-                  <>
-                    <h3 className="font-bold font-['Space_Grotesk'] mb-2">MetaMask Required</h3>
-                    <p className="text-[#8892a0] text-sm mb-4">Install MetaMask to use ParagonFinance — it handles all chains automatically.</p>
-                    <a href="https://metamask.io" target="_blank" rel="noreferrer"
-                      className="bg-[#e8821a] text-white font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl hover:opacity-90 inline-block">
-                      Install MetaMask ↗
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="font-bold font-['Space_Grotesk'] mb-2">Connect MetaMask</h3>
-                    <p className="text-[#8892a0] text-sm mb-4">Connect once — we switch networks automatically for CCTP.</p>
-                    <button onClick={connect} disabled={isLoading}
-                      className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-8 py-3 rounded-xl hover:opacity-90 disabled:opacity-50">
-                      {isLoading ? 'Connecting…' : 'Connect MetaMask'}
-                    </button>
-                    {error && <p className="mt-3 text-red-400 text-xs">{error}</p>}
-                  </>
+          {/* Tabs */}
+          <div className="flex gap-1 bg-[#0f1822] border border-[#1e2530] rounded-xl p-1 mb-4">
+            {[
+              { key: 'send', label: 'Send' },
+              { key: 'bridge', label: 'Bridge' },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => changeTab(t.key)}
+                className={'flex-1 py-2 rounded-lg text-sm font-semibold font-[\'Space_Grotesk\'] transition-all ' + (
+                  activeTab === t.key ? 'bg-[#00D4FF] text-[#0D1117]' : 'text-[#8892a0] hover:text-white'
                 )}
-              </Card>
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <Card className="p-6">
+
+            {!hasMetaMask && (
+              <div className="text-center py-4">
+                <h3 className="font-bold font-['Space_Grotesk'] mb-1.5">MetaMask required</h3>
+                <p className="text-[#8892a0] text-sm mb-4">Install MetaMask to send or bridge USDC.</p>
+                <a href="https://metamask.io" target="_blank" rel="noreferrer"
+                  className="bg-[#e8821a] text-white font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl hover:opacity-90 inline-block">
+                  Install MetaMask ↗
+                </a>
+              </div>
             )}
 
-            {/* Step 1 — Send Details */}
-            {step === 1 && (
-              <div className="space-y-4">
-
-                {/* Source Chain */}
-                <Card className="p-5">
-                  <p className="text-[10px] tracking-widest text-[#8892a0] mb-3">SOURCE CHAIN</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {CHAIN_LIST.map(chain => {
-                      const key = Object.keys(EVM_CHAINS).find(k => EVM_CHAINS[k].id === chain.id)
-                      const isActive = sourceChainKey === key
-                      return (
-                        <button
-                          key={chain.id}
-                          onClick={() => handleChainSelect(key)}
-                          disabled={switchingChain}
-                          className={'px-4 py-2 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 ' + (
-                            isActive ? 'text-white' : 'border-[#1e2530] text-[#8892a0] hover:border-[#00D4FF]/50 hover:text-white'
-                          )}
-                          style={isActive ? { borderColor: chain.color, backgroundColor: chain.color + '15' } : {}}
-                        >
-                          <span>{chain.icon}</span>
-                          <span>{chain.name}</span>
-                        </button>
-                      )
-                    })}
+            {/* ── SEND FORM ─────────────────────────────────────────── */}
+            {hasMetaMask && view === 'form' && activeTab === 'send' && (
+              <div>
+                <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">YOU SEND</p>
+                <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+                    <button
+                      onClick={() => setShowTokenModal(true)}
+                      className="flex items-center gap-1.5 text-sm text-white font-semibold hover:text-[#00D4FF] transition-colors"
+                    >
+                      <CoinIcon symbol={selectedToken} size={22} />
+                      {selectedToken}
+                      <ChevronDown className="w-4 h-4 text-[#8892a0]" />
+                    </button>
+                    <span className="text-[10px] text-[#8892a0]">
+                      Balance: {tokenSupported ? activeBalance : '0.000000'} {selectedToken}
+                    </span>
                   </div>
-
-                  {switchingChain && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-[#00D4FF]">
-                      <LoadingSpinner size="sm" /> Switching network in MetaMask…
-                    </div>
-                  )}
-                  {switchError && <p className="mt-2 text-xs text-red-400">{switchError}</p>}
-
-                  {!switchingChain && !switchError && selectedChain && (
-                    <div className={'mt-3 flex items-center gap-2 text-xs px-3 py-2 rounded-lg ' + (
-                      isCCTP
-                        ? 'bg-[#00D4FF]/5 border border-[#00D4FF]/20 text-[#00D4FF]'
-                        : 'bg-green-900/10 border border-green-500/20 text-green-400'
-                    )}>
-                      {isCCTP ? (
-                        <>
-                          <span>⚡ Circle CCTP</span>
-                          <span>·</span>
-                          <span>Burns on {selectedChain.name} → Mints on Arc Testnet</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>● Native Arc</span>
-                          <span>·</span>
-                          <span>Direct transfer · sub-second finality</span>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* CCTP explanation */}
-                  {isCCTP && (
-                    <div className="mt-3 bg-[#0a1520] rounded-lg p-3">
-                      <p className="text-[10px] text-[#8892a0] leading-relaxed">
-                        <span className="text-[#00D4FF] font-semibold">How CCTP works:</span> Your USDC is
-                        burned on {selectedChain?.name}, Circle's attestation service verifies the burn,
-                        then equivalent USDC is minted directly on Arc Testnet for the recipient.
-                        No wrapping. No bridges to trust. Circle guarantees the mint.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-
-                {/* Wallet + Amount */}
-                <Card className="p-5">
-                  <p className="text-[10px] tracking-widest text-[#8892a0] mb-3">FROM (YOUR WALLET)</p>
-                  <div className="bg-[#0D1117] border border-[#1e2530] rounded-lg p-3 mb-4">
-                    <p className="font-mono text-sm text-white break-all">{account}</p>
-                    <div className="flex justify-between mt-2">
-                      <span className="text-[10px] text-[#8892a0]">USDC Balance on {selectedChain?.name}</span>
-                      <span className="text-[10px] text-[#00D4FF] font-semibold">{chainBalance} USDC</span>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">AMOUNT (USDC)</p>
-                  <div className="flex items-center gap-3 bg-[#0D1117] border border-[#1e2530] rounded-lg px-4 py-3 mb-2">
+                  <div className="flex items-center gap-3">
                     <input
                       type="number"
                       placeholder="0.00"
                       value={amount}
+                      disabled={!tokenSupported}
                       onChange={e => {
                         const val = parseFloat(e.target.value)
                         if (e.target.value === '' || e.target.value === '0') setAmount('')
                         else if (!isNaN(val) && val > 0) setAmount(e.target.value)
                       }}
                       min="0"
-                      max={parseFloat(chainBalance)}
-                      className="flex-1 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk']"
+                      className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
                     />
-                    <span className="text-sm text-white bg-[#1e2530] px-3 py-1 rounded-md">USDC</span>
+                    {tokenSupported && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => setAmount((Math.max(0, parseFloat(activeBalance) || 0) * 0.5).toFixed(6))}
+                          className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] transition-colors"
+                        >
+                          50%
+                        </button>
+                        <button
+                          onClick={() => setAmount(Math.max(0, parseFloat(activeBalance) - 0.001).toFixed(6))}
+                          className="text-[10px] text-[#00D4FF] hover:underline"
+                        >
+                          Max
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between text-xs text-[#8892a0]">
-                    <span>Balance: <span className="text-[#00D4FF]">{chainBalance} USDC</span></span>
-                    <button
-                      onClick={() => setAmount((Math.max(0, parseFloat(chainBalance) - 0.001)).toFixed(6))}
-                      className="text-[#00D4FF] hover:underline"
-                    >
-                      Max
-                    </button>
-                  </div>
-                  {afterSend !== null && (
-                    <div className="flex justify-between text-xs mt-1">
-                      <span className="text-[#8892a0]">After Send</span>
-                      <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-[#8892a0]'}>
-                        {afterSend} USDC
-                      </span>
-                    </div>
-                  )}
-                </Card>
+                </div>
 
-                <Card className="p-5">
-                  <div className="flex justify-between items-center mb-3">
-                    <p className="text-[10px] tracking-widest text-[#8892a0]">RECIPIENT ADDRESS (ARC TESTNET)</p>
+                {!tokenSupported && (
+                  <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
+                    <span className="text-sm">🚧</span>
+                    <p className="text-xs text-[#e8c374]">{selectedToken} isn't live on Arc Testnet yet — switch to USDC to send.</p>
+                  </div>
+                )}
+
+                <div className="flex justify-center -my-2.5 relative z-10">
+                  <div className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0]">↓</div>
+                </div>
+
+                <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+                    <span className="text-[10px] tracking-widest text-[#8892a0]">SEND TO</span>
                     <button onClick={() => { setRecipient(account || ''); setUseOwnAddress(true) }}
                       className="text-[10px] text-[#00D4FF] hover:underline">
-                      Use my own address
+                      Use my address
                     </button>
                   </div>
                   <input
                     type="text"
-                    placeholder="0x... Arc Testnet wallet address"
+                    placeholder="0x… wallet address"
                     value={recipient}
                     onChange={e => { setRecipient(e.target.value); setUseOwnAddress(false) }}
-                    className="w-full bg-[#0D1117] border border-[#1e2530] rounded-lg px-4 py-3 text-sm text-white outline-none focus:border-[#00D4FF] transition-colors font-mono"
+                    className="w-full bg-transparent text-white text-sm font-mono outline-none"
                   />
-                  {useOwnAddress && <p className="text-[10px] text-[#00D4FF] mt-2">✓ Sending to your own address</p>}
+                  {useOwnAddress && <p className="text-[10px] text-[#00D4FF] mt-1">✓ Sending to your own address</p>}
                   {recipient && !isValidAddress && (
-                    <p className="text-[10px] text-red-400 mt-2">Must be a valid 0x address (42 characters)</p>
+                    <p className="text-[10px] text-red-400 mt-1">Must be a valid 0x address</p>
                   )}
+                </div>
 
-                  <p className="text-[10px] tracking-widests text-[#8892a0] mt-4 mb-2">MEMO (OPTIONAL)</p>
+                {!showMemo ? (
+                  <button onClick={() => setShowMemo(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                    + Add a note (optional)
+                  </button>
+                ) : (
                   <input
                     type="text"
                     placeholder="Add a note to this transaction"
                     value={memo}
                     onChange={e => setMemo(e.target.value)}
                     maxLength={100}
-                    className="w-full bg-[#0D1117] border border-[#1e2530] rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-[#00D4FF] transition-colors"
+                    className="w-full mt-2 bg-[#0D1117] border border-[#1e2530] rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-[#00D4FF] transition-colors"
                   />
-                </Card>
+                )}
 
-                {isCCTP && (
-                  <div className="bg-amber-900/10 border border-amber-500/30 rounded-xl p-4">
-                    <p className="text-xs text-amber-400 font-semibold mb-1">⏱ CCTP takes 2–5 minutes</p>
-                    <p className="text-xs text-[#8892a0]">
-                      Cross-chain via CCTP requires Circle's attestation service to verify the burn.
-                      You will need ETH for gas on {selectedChain?.name} + a small amount for the Arc mint step.
-                      MetaMask will prompt you 3 times: approve, burn, then mint on Arc.
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#1e2530] text-center">
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">RATE</p>
+                    <p className="text-xs text-white font-semibold">1 : 1</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">EST. TIME</p>
+                    <p className="text-xs text-white font-semibold">&lt; 1 sec</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">NETWORK FEE</p>
+                    <p className="text-xs text-white font-semibold">
+                      {estimatingFee && !estimatedFee
+                        ? '…'
+                        : estimatedFee
+                          ? '~' + estimatedFee + ' USDC'
+                          : '—'}
                     </p>
+                  </div>
+                </div>
+
+                {afterSend !== null && tokenSupported && (
+                  <div className="flex justify-between text-xs mt-3 text-[#8892a0]">
+                    <span>After send</span>
+                    <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>{afterSend} {selectedToken}</span>
                   </div>
                 )}
 
                 <button
-                  onClick={() => setStep(2)}
-                  disabled={!isValidAddress || !isValidAmount || switchingChain}
-                  className="w-full bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setView('confirm')}
+                  disabled={!canReview}
+                  className="w-full mt-5 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Review Transaction →
+                  Review &amp; Send →
                 </button>
               </div>
             )}
 
-            {/* Step 2 — Confirm */}
-            {step === 2 && (
-              <div className="space-y-4">
-                <Card className="p-5">
-                  <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">TRANSACTION REVIEW</p>
-                  <div className="space-y-3">
-                    {[
-                      { l: 'Bridge Type',   v: isCCTP ? 'Circle CCTP (official)' : 'Native Arc transfer', accent: isCCTP },
-                      { l: 'Source Chain',  v: selectedChain ? selectedChain.name : 'Arc Testnet' },
-                      { l: 'Destination',   v: 'Arc Testnet (Chain 5042002)' },
-                      { l: 'From',          v: shortAddr(account), mono: true },
-                      { l: 'To',            v: shortAddr(recipient), mono: true },
-                      { l: 'Amount',        v: amount + ' USDC' },
-                      { l: 'Gas Token',     v: isCCTP ? 'ETH (on ' + selectedChain?.name + ')' : 'USDC (native Arc)' },
-                      { l: 'Est. Time',     v: isCCTP ? '2–5 minutes (CCTP attestation)' : '< 1 second', accent: true },
-                      { l: 'MetaMask Prompts', v: isCCTP ? '3 (approve + burn + mint)' : '1 (sign tx)' },
-                    ].map(r => (
-                      <div key={r.l} className="flex justify-between items-center border-b border-[#1e2530] pb-2.5 last:border-0 text-sm">
-                        <span className="text-[#8892a0]">{r.l}</span>
-                        <span className={'font-semibold ' + (r.accent ? 'text-[#00D4FF]' : 'text-white') + (r.mono ? ' font-mono text-xs' : '')}>
-                          {r.v}
-                        </span>
-                      </div>
-                    ))}
-                    {memo && (
-                      <div className="border-t border-[#1e2530] pt-2.5 text-sm">
-                        <span className="text-[#8892a0]">Memo: </span>
-                        <span className="text-white">{memo}</span>
+            {/* ── BRIDGE FORM ───────────────────────────────────────── */}
+            {hasMetaMask && view === 'form' && activeTab === 'bridge' && (
+              <div>
+                <div className="flex justify-end gap-2 mb-3">
+                  <Link to="/testnet/transactions" title="History"
+                    className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
+                    🕓
+                  </Link>
+                  <button
+                    title="Refresh balances"
+                    onClick={() => account && Promise.all([
+                      getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v)),
+                      getUsdcBalance(bridgeToKey, account).then(v => applyBalance(setDestBalance, v)),
+                      getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v)),
+                    ])}
+                    className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
+                    🔄
+                  </button>
+                </div>
+
+                {fromBox}
+
+                <div className="flex justify-center -my-2.5 relative z-10">
+                  <button
+                    onClick={handleSwapDirection}
+                    title="Swap direction"
+                    className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] active:scale-90 transition-all duration-300"
+                  >
+                    ↓↑
+                  </button>
+                </div>
+
+                {toBox}
+
+                {sameChainPicked && (
+                  <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
+                    <span className="text-sm">🚧</span>
+                    <p className="text-xs text-[#e8c374]">Source and destination can't be the same chain.</p>
+                  </div>
+                )}
+
+                {!showWalletInput ? (
+                  <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                    + Add receiving wallet
+                  </button>
+                ) : (
+                  <div className="mt-2 bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between flex-wrap gap-y-1 mb-1.5">
+                      <span className="text-[10px] tracking-widest text-[#8892a0]">RECEIVING WALLET ({destChain?.name?.toUpperCase()})</span>
+                      <button onClick={() => { setRecipient(account || ''); setUseOwnAddress(true) }}
+                        className="text-[10px] text-[#00D4FF] hover:underline">
+                        Use my address
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0x… wallet address"
+                      value={recipient}
+                      onChange={e => { setRecipient(e.target.value); setUseOwnAddress(false) }}
+                      className="w-full bg-transparent text-white text-sm font-mono outline-none"
+                    />
+                    {useOwnAddress && <p className="text-[10px] text-[#00D4FF] mt-1">✓ Sending to your own address</p>}
+                    {recipient && !isValidAddress && (
+                      <p className="text-[10px] text-red-400 mt-1">Must be a valid 0x address</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {AMOUNT_PRESETS.map(v => (
+                    <button
+                      key={v}
+                      onClick={() => fillAmount(v)}
+                      className="flex items-center gap-1 bg-[#0f1822] border border-[#1e2530] rounded-full px-3 py-1 text-[11px] text-white hover:border-[#00D4FF] transition-colors"
+                    >
+                      <CoinIcon symbol="USDC" size={14} /> {v} USDC
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#1e2530] text-center">
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">RATE</p>
+                    <p className="text-xs text-white font-semibold">1 : 1</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">EST. TIME</p>
+                    <p className="text-xs text-white font-semibold">~2–5 min</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-[#8892a0] mb-0.5">PARAGON FEE</p>
+                    <p className="text-xs text-white font-semibold">{BRIDGE_FLAT_FEE_USDC} USDC</p>
+                  </div>
+                </div>
+
+                {amount && parseFloat(amount) > 0 && (
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-[#8892a0]">
+                      <span>Recipient receives</span>
+                      <span className="text-white font-semibold">{parseFloat(amount).toFixed(2)} USDC</span>
+                    </div>
+                    <div className="flex justify-between text-[#8892a0]">
+                      <span>Total debited</span>
+                      <span className="text-white font-semibold">{totalDebit.toFixed(2)} USDC</span>
+                    </div>
+                    {afterSend !== null && (
+                      <div className="flex justify-between text-[#8892a0]">
+                        <span>Balance after</span>
+                        <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>{afterSend} USDC</span>
                       </div>
                     )}
                   </div>
-                </Card>
-
-                {/* CCTP flow indicator */}
-                {isCCTP && (
-                  <Card className="p-5">
-                    <p className="text-[10px] tracking-widests text-[#8892a0] mb-3">CCTP BRIDGE FLOW</p>
-                    <div className="space-y-3">
-                      {CCTP_STEPS.map((s, i) => (
-                        <div key={s.key} className="flex items-center gap-3">
-                          <div className={'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 border ' + (
-                            cctpDoneSteps.includes(s.key)
-                              ? 'bg-green-500 border-green-500 text-white'
-                              : cctpActiveStep === i && sending
-                              ? 'border-[#00D4FF] text-[#00D4FF] animate-pulse'
-                              : 'border-[#1e2530] text-[#556]'
-                          )}>
-                            {cctpDoneSteps.includes(s.key) ? '✓' : i + 1}
-                          </div>
-                          <div className="flex-1">
-                            <p className={'text-sm font-semibold ' + (cctpActiveStep === i && sending ? 'text-[#00D4FF]' : cctpDoneSteps.includes(s.key) ? 'text-green-400' : 'text-[#8892a0]')}>
-                              {s.label}
-                            </p>
-                            <p className="text-[10px] text-[#556]">{s.desc}{s.key === 'burn' ? selectedChain?.name : ''}</p>
-                          </div>
-                          {cctpActiveStep === i && sending && <LoadingSpinner size="sm" />}
-                        </div>
-                      ))}
-                    </div>
-                    {cctpStatus && (
-                      <div className="mt-3 bg-[#0a2030] rounded-lg px-3 py-2">
-                        <p className="text-xs text-[#00D4FF]">{cctpStatus}</p>
-                      </div>
-                    )}
-                  </Card>
                 )}
 
-                <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl p-4">
-                  <p className="text-xs text-[#8892a0] leading-relaxed">
-                    {isCCTP ? (
-                      <>
-                        <span className="text-white font-semibold">MetaMask will prompt 3 times:</span> First to
-                        approve USDC spend, then to burn on {selectedChain?.name}, then to mint on Arc Testnet.
-                        Do not close MetaMask between prompts.
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-white font-semibold">MetaMask will open once</span> — sign the
-                        transfer. Gas is paid in USDC on Arc Testnet. Confirms in under 1 second.
-                      </>
-                    )}
-                  </p>
+                <button
+                  onClick={() => setView('confirm')}
+                  disabled={!canReview}
+                  className="w-full mt-5 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Review &amp; Bridge →
+                </button>
+              </div>
+            )}
+
+            {/* Confirm view */}
+            {view === 'confirm' && (
+              <div>
+                <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">
+                  {activeTab === 'bridge' ? 'BRIDGE REVIEW' : 'TRANSFER REVIEW'}
+                </p>
+
+                {isCCTP && (
+                  <div className="flex items-center justify-center gap-3 mb-4 pb-4 border-b border-[#1e2530]">
+                    <span className="flex items-center gap-1.5 text-sm text-white font-semibold">
+                      <ChainIcon chain={selectedChain} size={18} />
+                      {selectedChain?.name}
+                    </span>
+                    <span className="text-[#00D4FF]">→</span>
+                    <span className="flex items-center gap-1.5 text-sm text-white font-semibold">
+                      <ChainIcon chain={destChain} size={18} />
+                      {destChain?.name}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-3 mb-5">
+                  {[
+                    { l: 'From',    v: shortAddr(account), mono: true },
+                    { l: 'To',      v: shortAddr(recipient), mono: true },
+                    { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
+                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
+                    ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' USDC' }] : []),
+                    { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
+                    { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },
+                  ].map(r => (
+                    <div key={r.l} className="flex justify-between items-center border-b border-[#1e2530] pb-2.5 last:border-0 text-sm">
+                      <span className="text-[#8892a0]">{r.l}</span>
+                      <span className={'font-semibold ' + (r.accent ? 'text-[#00D4FF]' : 'text-white') + (r.mono ? ' font-mono text-xs' : '')}>
+                        {r.v}
+                      </span>
+                    </div>
+                  ))}
+                  {memo && (
+                    <div className="border-t border-[#1e2530] pt-2.5 text-sm">
+                      <span className="text-[#8892a0]">Note: </span>
+                      <span className="text-white">{memo}</span>
+                    </div>
+                  )}
                 </div>
 
+                {isCCTP && (
+                  <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl px-3 py-2.5 mb-4">
+                    <p className="text-[11px] text-[#8892a0] leading-relaxed">
+                      The {BRIDGE_FLAT_FEE_USDC} USDC fee is collected as part of the bridge itself,
+                      in USDC on {selectedChain?.name}. If the bridge doesn't complete, no fee is taken.
+                    </p>
+                  </div>
+                )}
+
+                {isCCTP && (
+                  <div className="flex items-center justify-between mb-5 bg-[#0D1117] border border-[#1e2530] rounded-xl px-3 py-3">
+                    {CCTP_STEPS.map((s, i) => (
+                      <div key={s.key} className="flex-1 flex flex-col items-center gap-1">
+                        <div className={'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ' + (
+                          cctpDoneSteps.includes(s.key) ? 'bg-green-500 border-green-500 text-white' :
+                          cctpActiveStep === i && sending ? 'border-[#00D4FF] text-[#00D4FF] animate-pulse' :
+                          'border-[#1e2530] text-[#556]'
+                        )}>
+                          {cctpDoneSteps.includes(s.key) ? '✓' : i + 1}
+                        </div>
+                        <span className="text-[9px] text-[#8892a0] text-center">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {cctpStatus && sending && (
+                  <p className="text-xs text-[#00D4FF] mb-4 -mt-2">{cctpStatus}</p>
+                )}
+
                 {sendError && (
-                  <div className="bg-red-900/10 border border-red-500/30 rounded-xl p-4">
+                  <div className="bg-red-900/10 border border-red-500/30 rounded-xl p-3 mb-4">
                     <p className="text-xs text-red-400">{sendError}</p>
                   </div>
                 )}
 
                 <div className="flex gap-3">
-                  <button onClick={() => { setStep(1); setSendError(null); setCctpStatus('') }}
-                    className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm">
+                  <button onClick={() => { setView('form'); setSendError(null) }} disabled={sending}
+                    className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
                     Edit
                   </button>
                   <button onClick={handleSend} disabled={sending}
                     className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
                     {sending ? (
-                      <><LoadingSpinner size="sm" /> {isCCTP ? 'Bridging via CCTP…' : 'Processing…'}</>
+                      <><LoadingSpinner size="sm" /> {isCCTP ? 'Bridging…' : 'Sending…'}</>
                     ) : (
-                      isCCTP ? '⚡ Bridge via CCTP →' : 'Sign & Send →'
+                      isCCTP ? 'Confirm & Bridge →' : 'Confirm & Send →'
                     )}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 3 — Success */}
-            {step === 3 && txResult && (
-              <Card glow className="p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-900/30 border-2 border-green-500 flex items-center justify-center mx-auto mb-5 text-3xl">✓</div>
-                <h2 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">
-                  {txResult.cctpBridge ? 'CCTP Bridge ' : 'Transfer '}
-                  <span className="text-green-400">Confirmed!</span>
+            {/* Success view */}
+            {view === 'success' && txResult && (
+              <div className="text-center">
+                <div className="w-14 h-14 rounded-full bg-green-900/30 border-2 border-green-500 flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
+                <h2 className="text-xl font-bold font-['Space_Grotesk'] mb-1">
+                  {txResult.cctpBridge ? 'Bridge ' : 'Transfer '}<span className="text-green-400">confirmed</span>
                 </h2>
-                <p className="text-[#8892a0] text-sm mb-1">
-                  {txResult.cctpBridge
-                    ? txResult.sourceChain + ' → Arc Testnet via Circle CCTP'
-                    : 'Confirmed on Arc Testnet'
-                  }
-                </p>
-                <p className="text-[#00D4FF] text-xs mb-8">
-                  Total time: <strong>{(txResult.settlementTime / 1000).toFixed(1)}s</strong>
+                <p className="text-[#8892a0] text-xs mb-6">
+                  {txResult.cctpBridge ? txResult.sourceChain + ' → ' + txResult.destinationChain + ' via CCTP' : 'Confirmed on Arc Testnet'}
+                  {' · '}{(txResult.settlementTime / 1000).toFixed(1)}s
                 </p>
 
-                {txResult.cctpBridge && (
-                  <div className="bg-[#0a2030] border border-[#00D4FF]/20 rounded-xl p-4 mb-5 text-left">
-                    <p className="text-[10px] tracking-widests text-[#8892a0] mb-2">CCTP BRIDGE COMPLETED</p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-white font-semibold">{txResult.sourceChain}</span>
-                      <span className="text-[#00D4FF]">→ Circle CCTP →</span>
-                      <span className="text-white font-semibold">Arc Testnet</span>
-                      <span className="text-green-400 ml-auto">✓ Minted</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 text-left mb-5 space-y-3">
+                <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-left mb-5 space-y-2.5">
                   {[
-                    { l: 'Amount',       v: txResult.amount + ' USDC' },
-                    { l: 'Source Chain', v: txResult.sourceChain },
-                    { l: 'Destination',  v: 'Arc Testnet' },
-                    { l: 'Gas Paid',     v: txResult.gasCost, accent: true },
-                    { l: 'Total Time',   v: (txResult.settlementTime / 1000).toFixed(1) + 's', accent: true },
-                    { l: 'Status',       v: 'Confirmed · FINAL', green: true },
-                    { l: 'Bridge',       v: txResult.cctpBridge ? 'Circle CCTP V1' : 'Native Arc' },
+                    { l: 'Amount', v: txResult.amount + ' ' + (txResult.token || 'USDC') },
+                    ...(txResult.bridgeFeePaid
+                      ? [{ l: 'ParagonFinance Fee', v: txResult.bridgeFeePaid + ' USDC' }]
+                      : []),
+                    ...(txResult.grossAmount
+                      ? [{ l: 'Total debited', v: txResult.grossAmount.toFixed(2) + ' USDC' }]
+                      : []),
+                    ...(!txResult.cctpBridge
+                      ? [{ l: 'Gas Paid', v: (txResult.gasCost || '0') + ' USDC' }]
+                      : []),
+                    { l: 'Status', v: 'Confirmed', green: true },
                   ].map(r => (
                     <div key={r.l} className="flex justify-between border-b border-[#1e2530] pb-2 last:border-0 text-sm">
                       <span className="text-[#8892a0]">{r.l}</span>
-                      <span className={'font-semibold ' + (r.green ? 'text-green-400' : r.accent ? 'text-[#00D4FF]' : 'text-white')}>
-                        {r.v}
-                      </span>
+                      <span className={'font-semibold ' + (r.green ? 'text-green-400' : 'text-white')}>{r.v}</span>
                     </div>
                   ))}
-
-                  <div className="pt-1 space-y-2">
+                  <div className="pt-1">
+                    <p className="text-[10px] text-[#8892a0] mb-1">TX HASH</p>
+                    <a href={explorerTxUrl(txResult.hash, txResult)} target="_blank" rel="noreferrer"
+                      className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
+                      {txResult.hash}
+                    </a>
+                  </div>
+                  {txResult.mintTxHash && (
                     <div>
-                      <p className="text-[10px] text-[#8892a0] mb-1">{txResult.cctpBridge ? 'BURN TX HASH' : 'TX HASH'}</p>
-                      <a href={explorerTxUrl(txResult.hash)} target="_blank" rel="noreferrer"
+                      <p className="text-[10px] text-[#8892a0] mb-1">MINT TX ({(txResult.destinationChain || 'ARC TESTNET').toUpperCase()})</p>
+                      <a href={explorerTxUrl(txResult.mintTxHash, { sourceChainKey: txResult.destinationChainKey })} target="_blank" rel="noreferrer"
                         className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
-                        {txResult.hash}
+                        {txResult.mintTxHash}
                       </a>
                     </div>
-                    {txResult.mintTxHash && (
-                      <div>
-                        <p className="text-[10px] text-[#8892a0] mb-1">MINT TX HASH (ARC TESTNET)</p>
-                        <a href={arcScanTx(txResult.mintTxHash)} target="_blank" rel="noreferrer"
-                          className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline">
-                          {txResult.mintTxHash}
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 mb-3">
-                  <a href={explorerTxUrl(txResult.hash)} target="_blank" rel="noreferrer"
+                  <a href={explorerTxUrl(txResult.hash, txResult)} target="_blank" rel="noreferrer"
                     className="flex-1 border border-[#00D4FF] text-[#00D4FF] py-2.5 rounded-xl text-sm font-['Space_Grotesk'] font-bold hover:bg-[#0a2030] transition-all text-center">
                     View on Explorer ↗
                   </a>
                   <button onClick={() => navigator.clipboard.writeText(txResult.hash)}
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] transition-all">
-                    📋 Copy TX Hash
+                    Copy TX Hash
                   </button>
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={() => {
-                    setStep(1); setRecipient(''); setAmount(''); setMemo('')
-                    setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1)
-                  }} className="flex-1 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-2.5 rounded-xl text-sm hover:opacity-90">
-                    Send Another →
+                  <button onClick={resetForm}
+                    className="flex-1 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-2.5 rounded-xl text-sm hover:opacity-90">
+                    {txResult.cctpBridge ? 'Bridge Another →' : 'Send Another →'}
                   </button>
                   <Link to="/testnet/transactions"
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all text-center">
                     View History
                   </Link>
                 </div>
-              </Card>
+              </div>
             )}
-          </div>
+          </Card>
 
-          {/* Right Sidebar */}
-          <div className="lg:col-span-2 space-y-4">
-            <Card className="p-5">
-              <p className="text-[10px] tracking-widests text-[#8892a0] mb-3">TRANSACTION SUMMARY</p>
-              {selectedChain && (
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#1e2530]">
-                  <span className="text-xl">{selectedChain.icon}</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-white font-semibold">{selectedChain.name}</p>
-                    <p className="text-[10px] text-green-400">● Live</p>
-                  </div>
-                  {isCCTP && (
-                    <>
-                      <span className="text-[#00D4FF] text-sm">→</span>
-                      <div>
-                        <p className="text-sm text-white font-semibold">Arc Testnet</p>
-                        <p className="text-[10px] text-[#00D4FF]">via CCTP</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className="text-4xl font-bold font-['Space_Grotesk'] text-white mb-1">{amount || '0'}</div>
-              <p className="text-xs text-[#8892a0] mb-4">USDC</p>
-
-              {amount && parseFloat(amount) > 0 && (
-                <div className="bg-[#0D1117] border border-[#1e2530] rounded-lg p-3 mb-4 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-[#8892a0]">Your Balance</span>
-                    <span className="text-[#00D4FF]">{chainBalance} USDC</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8892a0]">After Send</span>
-                    <span className={afterSend && parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>
-                      {afterSend} USDC
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2.5 text-sm">
-                {[
-                  { l: 'Gas Token',   v: isCCTP ? 'ETH (source chain)' : 'USDC (native Arc)' },
-                  { l: 'Settlement',  v: isCCTP ? '2–5 min (CCTP)' : '< 1 second', accent: !isCCTP },
-                  { l: 'Bridge',      v: isCCTP ? 'Circle CCTP V1' : 'Direct transfer', accent: isCCTP },
-                  { l: 'MetaMask',    v: isCCTP ? '3 prompts' : '1 prompt' },
-                ].map(r => (
-                  <div key={r.l} className="flex justify-between border-b border-[#1e2530] pb-2 last:border-0">
-                    <span className="text-[#8892a0]">{r.l}</span>
-                    <span className={r.accent ? 'text-[#00D4FF] font-semibold' : 'text-white'}>{r.v}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            <Card className="p-5">
-              <p className="text-[10px] tracking-widests text-[#8892a0] mb-4">YOUR WALLET</p>
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[#8892a0]">Address</span>
-                  <span className="font-mono text-xs text-white">{shortAddr(account)}</span>
-                </div>
-                <div className="flex justify-between border-t border-[#1e2530] pt-2.5">
-                  <span className="text-[#8892a0]">USDC Balance</span>
-                  <span className="text-[#00D4FF] font-bold">{chainBalance}</span>
-                </div>
-                <div className="flex justify-between border-t border-[#1e2530] pt-2.5">
-                  <span className="text-[#8892a0]">Active Chain</span>
-                  <span className="text-green-400 text-xs font-semibold">
-                    ● {selectedChain ? selectedChain.name : 'Arc Testnet'}
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-5">
-              <p className="text-[10px] tracking-widests text-[#8892a0] mb-3">SUPPORTED CHAINS</p>
-              <div className="space-y-1">
-                {CHAIN_LIST.map(chain => {
-                  const key = Object.keys(EVM_CHAINS).find(k => EVM_CHAINS[k].id === chain.id)
-                  const isActive = sourceChainKey === key
-                  return (
-                    <button
-                      key={chain.id}
-                      onClick={() => handleChainSelect(key)}
-                      disabled={switchingChain}
-                      className={'w-full flex items-center justify-between py-2 px-2 rounded-lg border transition-all ' + (
-                        isActive ? 'border-[#00D4FF]/40 bg-[#0a2030]' : 'border-transparent hover:border-[#1e2530]'
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{chain.icon}</span>
-                        <div className="text-left">
-                          <p className="text-sm text-white">{chain.name}</p>
-                          {chain.useCCTP && <p className="text-[9px] text-[#00D4FF]">via CCTP</p>}
-                        </div>
-                      </div>
-                      <span className="text-[10px] bg-green-900/20 border border-green-500 text-green-400 px-2 py-0.5 rounded-full">
-                        Live
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <p className="text-[10px] tracking-widests text-[#8892a0] mb-1">NEED TESTNET USDC?</p>
-              <p className="text-[10px] text-[#556] mb-3">Get USDC on any testnet from Circle's official faucet</p>
-              <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer"
-                className="block w-full text-center border border-[#00D4FF] text-[#00D4FF] py-2.5 rounded-xl text-sm font-['Space_Grotesk'] font-bold hover:bg-[#0a2030] transition-all">
-                Circle Faucet → Free Testnet USDC
-              </a>
-            </Card>
-          </div>
+          <p className="text-center text-xs text-[#556] mt-4">
+            Need testnet USDC?{' '}
+            <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer" className="text-[#00D4FF] hover:underline">
+              Get some from Circle's faucet →
+            </a>
+          </p>
         </div>
       </div>
+
+      <TokenSelectModal
+        open={showTokenModal}
+        onClose={() => setShowTokenModal(false)}
+        tokens={sendTokens}
+        selected={selectedToken}
+        onSelect={setSelectedToken}
+      />
+      <NetworkTokenModal
+        open={showFromModal}
+        onClose={() => setShowFromModal(false)}
+        title="Bridge from"
+        networks={ALL_NETWORKS}
+        activeKey={sourceChainKey}
+        onSelect={handleChainSelect}
+      />
+      <NetworkTokenModal
+        open={showToModal}
+        onClose={() => setShowToModal(false)}
+        title="Bridge to"
+        networks={ALL_NETWORKS}
+        activeKey={bridgeToKey}
+        onSelect={setBridgeToKey}
+      />
     </>
   )
 }

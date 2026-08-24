@@ -1,6 +1,5 @@
 // Paragon Finance — Arc Network + Circle App Kit CCTP Integration
 // Cross-chain transfers powered by Circle's official App Kit SDK
-
 // ─── Paragon Finance Contract Addresses ──────────────────────────────
 export const PARAGON_CONTRACTS = {
   paymentRouter: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
@@ -37,7 +36,7 @@ export const EVM_CHAINS = {
     usdcAddress: '0x3600000000000000000000000000000000000000',
     nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     faucetUrl: 'https://faucet.circle.com',
-    icon: '⬡',
+    icon: '/arc.svg',
     color: '#00D4FF',
     live: true,
     useCCTP: false,
@@ -54,7 +53,7 @@ export const EVM_CHAINS = {
     usdcAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
     faucetUrl: 'https://faucet.circle.com',
-    icon: '⟠',
+    icon: "/ethlogo.svg",
     color: '#627EEA',
     live: true,
     useCCTP: true,
@@ -71,7 +70,7 @@ export const EVM_CHAINS = {
     usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
     faucetUrl: 'https://faucet.circle.com',
-    icon: '🔵',
+    icon: '/base.svg',
     color: '#0052FF',
     live: true,
     useCCTP: true,
@@ -88,7 +87,7 @@ export const EVM_CHAINS = {
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
     faucetUrl: 'https://faucet.circle.com',
-    icon: '🔷',
+    icon: '/arbitrum.svg',
     color: '#28A0F0',
     live: true,
     useCCTP: true,

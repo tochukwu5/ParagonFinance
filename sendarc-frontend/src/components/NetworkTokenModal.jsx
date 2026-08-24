@@ -1,6 +1,47 @@
 import { useState, useEffect } from 'react'
 import { CoinIcon } from './CoinLogos'
 
+// Network icons arrive as one of two kinds of string: an emoji ('⬡') or a
+// path to an image ('/ethlogo.svg'). React renders both as text unless we
+// branch on which it is and wrap image paths in an <img> — printing the raw
+// path is what produced "/ethlogo.svg Ethereum Sepolia" in the list.
+function isImageIcon(icon) {
+  if (typeof icon !== 'string') return false
+  return (
+    icon.startsWith('/') ||
+    icon.startsWith('http') ||
+    icon.startsWith('data:') ||
+    /\.(svg|png|jpe?g|webp|gif)$/i.test(icon)
+  )
+}
+
+function NetworkIcon({ icon, name, size = 18, className = '' }) {
+  if (!icon) return null
+
+  if (isImageIcon(icon)) {
+    return (
+      <img
+        src={icon}
+        alt={name || 'network'}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className={'inline-block object-contain rounded-full shrink-0 ' + className}
+      />
+    )
+  }
+
+  return (
+    <span
+      style={{ fontSize: size, lineHeight: 1 }}
+      className={'inline-block shrink-0 ' + className}
+      aria-hidden="true"
+    >
+      {icon}
+    </span>
+  )
+}
+
 // networks: [{ key, name, icon, enabled, usdcAddress }]
 export default function NetworkTokenModal({ open, onClose, title, networks, activeKey, onSelect }) {
   const [search, setSearch] = useState('')
@@ -35,18 +76,23 @@ export default function NetworkTokenModal({ open, onClose, title, networks, acti
           </div>
           <p className="px-4 text-[9px] tracking-widest text-[#8892a0] mb-1">TOP CHAINS</p>
           <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+            {filtered.length === 0 && (
+              <p className="text-center text-[11px] text-[#556] py-6">No networks match "{search}"</p>
+            )}
             {filtered.map(n => (
               <button
                 key={n.key}
                 onClick={() => n.enabled && setPaneKey(n.key)}
                 disabled={!n.enabled}
                 className={
-                  'w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-left transition-colors mb-0.5 ' +
+                  'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs text-left transition-colors mb-0.5 ' +
                   (!n.enabled ? 'opacity-40 cursor-not-allowed text-[#8892a0]' :
                     paneKey === n.key ? 'bg-[#1e2530] text-white font-semibold' : 'text-[#c5cdd6] hover:bg-[#161d27]')
                 }
               >
-                <span>{n.icon}</span>
+                {/* iconNode is used when the caller pre-built an element;
+                    otherwise NetworkIcon works it out from the raw value. */}
+                {n.iconNode || <NetworkIcon icon={n.icon} name={n.name} size={18} />}
                 <span className="flex-1 truncate">{n.name}</span>
                 {!n.enabled && <span className="text-[8px] text-[#556] flex-shrink-0">Soon</span>}
               </button>
@@ -60,6 +106,17 @@ export default function NetworkTokenModal({ open, onClose, title, networks, acti
             <h3 className="font-bold font-['Space_Grotesk'] text-white text-sm">{title}</h3>
             <button onClick={onClose} className="text-[#8892a0] hover:text-white transition-colors">✕</button>
           </div>
+
+          {/* Which network the token below belongs to — without this the
+              right pane gives no indication of what's selected on mobile,
+              where the list collapses to a short scrollable strip. */}
+          {paneNetwork && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-[#1e2530] flex-shrink-0">
+              {paneNetwork.iconNode || <NetworkIcon icon={paneNetwork.icon} name={paneNetwork.name} size={16} />}
+              <span className="text-[11px] text-[#8892a0]">{paneNetwork.name}</span>
+            </div>
+          )}
+
           <div className="p-3 flex-shrink-0">
             <input
               type="text"
