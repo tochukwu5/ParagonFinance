@@ -127,6 +127,11 @@ export default function TestnetSend() {
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
+    // Set when a bridge burned on the source chain but failed to mint on the
+  // destination. Kept separate from sendError because the user's next step is
+  // recovery, not "try something else" — the funds exist, they're just stuck
+  // behind an unpaid mint.
+  const [strandedBridge, setStrandedBridge] = useState(null)
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
   const destChain = EVM_CHAINS[bridgeToKey]
@@ -292,9 +297,18 @@ export default function TestnetSend() {
 
       setTxResult(result)
       setView('success')
-    } catch (err) {
+      } catch (err) {
       if (err.code === 4001) setSendError('Transaction rejected in MetaMask.')
       else setSendError(err.message || 'Transaction failed. Please try again.')
+
+      if (err.recoverable) {
+        setStrandedBridge({
+          burnHash: err.burnHash,
+          sourceChainKey: err.sourceChainKey || sourceChainKey,
+          destinationChainKey: err.destinationChainKey || bridgeToKey,
+          amount: err.pendingAmount || parseFloat(amount),
+        })
+      }
     } finally {
       setSending(false)
     }
@@ -302,7 +316,8 @@ export default function TestnetSend() {
 
   const resetForm = () => {
     setView('form'); setAmount(''); setMemo(''); setShowMemo(false); setShowWalletInput(false)
-    setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1); setSendError(null)
+        setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1)
+    setSendError(null); setStrandedBridge(null)
   }
 
   const changeTab = (tab) => {
@@ -814,11 +829,42 @@ export default function TestnetSend() {
                   <p className="text-xs text-[#00D4FF] mb-4 -mt-2">{cctpStatus}</p>
                 )}
 
-                {sendError && (
+                             {/* A stranded bridge replaces the plain error rather than
+                    sitting beside it — a red failure box next to "your funds
+                    are safe" sends two contradictory signals at the worst
+                    possible moment. */}
+                {strandedBridge ? (
+                  <div className="bg-[#1a1408] border border-[#3d2f10] rounded-xl p-3.5 mb-4">
+                    <p className="text-xs text-[#e8c374] font-semibold mb-1.5">
+                      Your USDC is safe and recoverable
+                    </p>
+                    <p className="text-[11px] text-[#e8c374] leading-relaxed mb-2.5">
+                      {strandedBridge.amount} USDC was burned on{' '}
+                      {EVM_CHAINS[strandedBridge.sourceChainKey]?.name} but has not minted on{' '}
+                      {EVM_CHAINS[strandedBridge.destinationChainKey]?.name} yet. Circle holds a
+                      signed attestation authorising the mint and it does not expire. Fund your
+                      wallet with{' '}
+                      <strong>{EVM_CHAINS[strandedBridge.destinationChainKey]?.nativeCurrency?.symbol}</strong>{' '}
+                      on {EVM_CHAINS[strandedBridge.destinationChainKey]?.name}, then run this same
+                      bridge again to complete it.
+                    </p>
+                    
+                     <a href={
+                        (EVM_CHAINS[strandedBridge.sourceChainKey]?.explorerUrl || '') +
+                        '/tx/' + strandedBridge.burnHash
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline"
+                    >
+                      Burn tx: {strandedBridge.burnHash} ↗
+                    </a>
+                  </div>
+                ) : sendError ? (
                   <div className="bg-red-900/10 border border-red-500/30 rounded-xl p-3 mb-4">
                     <p className="text-xs text-red-400">{sendError}</p>
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex gap-3">
                   <button onClick={() => { setView('form'); setSendError(null) }} disabled={sending}

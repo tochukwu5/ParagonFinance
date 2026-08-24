@@ -429,10 +429,87 @@ export const BRIDGE_FEE_RECIPIENT =
   PARAGON_FINANCE_TREASURY_ADDRESS ||
   null
 
+  // JSON.stringify throws outright on BigInt values ("Do not know how to
+// serialize a BigInt"), and App Kit's result objects are full of them —
+// amounts, block numbers, gas figures. That turned every bridge failure into
+// a misleading BigInt error thrown from the line meant to REPORT the failure,
+// so the actual cause never reached the user.
+function safeStringify(value, space) {
+  return JSON.stringify(
+    value,
+    (_key, v) => (typeof v === 'bigint' ? v.toString() : v),
+    space
+  )
+}
+
+// Deep-converts BigInt to Number so a result object can cross any JSON
+// boundary — the backend POST in TestnetContext.recordTransaction being the
+// one that matters here. Numbers are safe: USDC amounts and testnet block
+// heights are far below Number.MAX_SAFE_INTEGER.
+function sanitizeBigInts(value) {
+  if (typeof value === 'bigint') return Number(value)
+  if (Array.isArray(value)) return value.map(sanitizeBigInts)
+  if (value && typeof value === 'object') {
+    const out = {}
+    for (const [k, v] of Object.entries(value)) out[k] = sanitizeBigInts(v)
+    return out
+  }
+  return value
+}
+
+// Chains where CCTP's mint step is paid in the chain's own native token, so
+// bridging INTO them requires a non-zero balance of that token — separate
+// from the USDC being bridged. Arc is the exception: gas there is USDC.
+const DESTINATION_GAS_TOKEN = {
+  ethereum: 'ETH',
+  base: 'ETH',
+  arbitrum: 'ETH',
+  optimism: 'ETH',
+  linea: 'ETH',
+  unichain: 'ETH',
+  avalanche: 'AVAX',
+  polygon: 'POL',
+  sonic: 'S',
+  arc: null, // gas is USDC — nothing extra needed
+}
+
+export function destinationGasToken(chainKey) {
+  return DESTINATION_GAS_TOKEN[chainKey] ?? null
+}
+
+// Native (gas-token) balance on a chain, as a decimal string. Distinct from
+// getUsdcBalance — this is what pays for the CCTP mint.
+export async function getNativeBalance(chainKey, address) {
+  const chain = EVM_CHAINS[chainKey]
+  if (!chain || !address) return null
+  try {
+    const raw = await readChain(chain, 'eth_getBalance', [address, 'latest'])
+    if (!raw) return null
+    const decimals = chain.nativeCurrency?.decimals ?? 18
+    return (Number(BigInt(raw)) / Math.pow(10, decimals)).toFixed(6)
+  } catch (err) {
+    console.warn('[native balance] ' + chainKey + ' read failed:', err?.message)
+    return null
+  }
+}
+
 // Circle App Kit CCTP bridge — handles approve/burn/attest/mint, plus the
 // ParagonFinance fee when a recipient is configured.
+//
+// CCTP is burn-then-mint across two chains, which has a consequence worth
+// stating plainly: the burn and the mint are separate transactions on
+// separate networks, and the mint is paid for in the DESTINATION chain's
+// native token. Bridging into Avalanche needs AVAX, into Polygon needs POL,
+// and so on — the USDC being bridged does not pay for its own arrival.
+//
+// If the burn succeeds and the mint doesn't, the USDC leaves the source
+// chain and doesn't appear on the destination. It is not lost — Circle
+// issues a signed attestation that authorises that exact mint, and it
+// doesn't expire — but it IS stranded until someone retries with gas.
+// Hence the pre-flight check below: refusing to start is far cheaper than
+// stranding funds and explaining it afterwards.
 export async function bridgeUsdcViaAppKit(
-  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient },
+  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false },
   onStatusUpdate = () => {}
 ) {
   const fromChain = EVM_CHAINS[fromChainKey]
@@ -454,6 +531,27 @@ export async function bridgeUsdcViaAppKit(
   const netAmount = parseFloat(amount)
   const grossAmount = collectFee ? netAmount + fee : netAmount
 
+  // ── Pre-flight: destination gas ──────────────────────────────────────
+  // Runs BEFORE kit.bridge, so a failure here costs nothing. Once the burn
+  // fires there is no undo.
+  //
+  // A read failure (null) does NOT block — public RPCs are flaky, and
+  // refusing a bridge because we couldn't confirm a balance would be its
+  // own kind of broken. Only a confirmed zero stops us.
+  const gasToken = destinationGasToken(toChainKey)
+  if (gasToken && !skipGasCheck) {
+    onStatusUpdate('Checking ' + gasToken + ' balance on ' + toChain.name + '...')
+    const destGas = await getNativeBalance(toChainKey, to || from)
+    if (destGas !== null && parseFloat(destGas) === 0) {
+      throw new Error(
+        'Bridge not started: the receiving wallet has no ' + gasToken + ' on ' + toChain.name + '. ' +
+        'CCTP mints on the destination chain and that mint is paid in ' + gasToken + ', not USDC. ' +
+        'Without it the USDC would be burned on ' + fromChain.name + ' and never arrive. ' +
+        'Fund the wallet with ' + gasToken + ' on ' + toChain.name + ' first, then try again.'
+      )
+    }
+  }
+
   try {
     const { AppKit } = await import('@circle-fin/app-kit')
     const { createViemAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2')
@@ -461,9 +559,16 @@ export async function bridgeUsdcViaAppKit(
     const kit = new AppKit()
     const start = Date.now()
 
+    // Tracked outside the result object so a thrown error can still report
+    // the burn hash — that hash is what makes stranded funds recoverable.
+    let observedBurnHash = null
+
     kit.on('*', (payload) => {
       const step = payload?.values?.name || payload?.method || ''
       const state = payload?.values?.state || ''
+      const hash = payload?.values?.txHash || payload?.values?.data?.txHash
+      if (step === 'burn' && hash) observedBurnHash = hash
+
       if (step === 'approve' && state !== 'success') onStatusUpdate('Step 1/3: Approving USDC spend...')
       else if (step === 'approve') onStatusUpdate('Step 1/3: USDC approved ✓')
       else if (step === 'burn' && state !== 'success') onStatusUpdate('Step 2/3: Burning USDC on ' + fromChain.name + '...')
@@ -498,16 +603,70 @@ export async function bridgeUsdcViaAppKit(
       result = await kit.retryBridge(result, { from: adapter, to: adapter })
     }
 
-    if (result.state === 'error') throw new Error('Bridge failed: ' + JSON.stringify(result))
+    if (result.state === 'error') {
+      // safeStringify, not JSON.stringify — App Kit results carry BigInt
+      // values, and JSON.stringify throws on those. That meant this very
+      // line, whose whole job is to report the failure, threw its own
+      // "Do not know how to serialize a BigInt" over the real cause.
+      const detail = safeStringify(result)
+
+      const steps = result.steps || []
+      const burnStep = steps.find(s => s.name === 'burn')
+      const burnHash = burnStep?.txHash || burnStep?.data?.txHash || observedBurnHash
+
+      if (burnHash) {
+        // Burn landed, mint didn't. Funds are stranded but recoverable —
+        // say so explicitly rather than leaving someone to conclude their
+        // money vanished.
+        const err = new Error(
+          'The burn on ' + fromChain.name + ' completed but the mint on ' + toChain.name + ' did not. ' +
+          'Your USDC is NOT lost — Circle holds a signed attestation authorising the mint, and it does not expire. ' +
+          (gasToken
+            ? 'The mint is paid in ' + gasToken + ' on ' + toChain.name + ': fund the wallet with ' + gasToken + ', then run this same bridge again to complete it. '
+            : 'Retry this same bridge to complete it. ') +
+          'Burn tx: ' + burnHash
+        )
+        err.recoverable = true
+        err.burnHash = burnHash
+        err.sourceChainKey = fromChainKey
+        err.destinationChainKey = toChainKey
+        err.pendingAmount = grossAmount
+        throw err
+      }
+
+      // Nothing burned — no funds moved, so this is a clean failure.
+      const err = new Error('Bridge failed before any funds moved. No USDC left your wallet. Details: ' + detail)
+      err.recoverable = false
+      throw err
+    }
 
     const steps = result.steps || []
     const burnStep = steps.find(s => s.name === 'burn')
     const mintStep = steps.find(s => s.name === 'mint')
     const approveStep = steps.find(s => s.name === 'approve')
 
-    return {
-      hash: burnStep?.txHash || burnStep?.data?.txHash || '',
-      mintTxHash: mintStep?.txHash || mintStep?.data?.txHash || '',
+    const mintHash = mintStep?.txHash || mintStep?.data?.txHash || ''
+    const burnHash = burnStep?.txHash || burnStep?.data?.txHash || observedBurnHash || ''
+
+    // App Kit can report state 'success' while the mint step is still
+    // pending attestation. Treating that as confirmed would tell the user
+    // funds arrived when they haven't.
+    if (!mintHash && burnHash) {
+      const err = new Error(
+        'The burn on ' + fromChain.name + ' completed but no mint was recorded on ' + toChain.name + '. ' +
+        'Your USDC is held by Circle\'s attestation and is recoverable — retry this bridge to complete the mint. ' +
+        'Burn tx: ' + burnHash
+      )
+      err.recoverable = true
+      err.burnHash = burnHash
+      throw err
+    }
+
+    // sanitizeBigInts so this object survives the JSON.stringify inside
+    // recordTransaction's backend POST.
+    return sanitizeBigInts({
+      hash: burnHash,
+      mintTxHash: mintHash,
       approvalHash: approveStep?.txHash || '',
       from,
       to,
@@ -529,11 +688,13 @@ export async function bridgeUsdcViaAppKit(
       cctpBridge: true,
       appKitBridge: true,
       simulated: false,
-    }
+    })
   } catch (err) {
     if (err.message && err.message.includes('Cannot find module')) {
       throw new Error('Circle App Kit not installed. Run: npm install @circle-fin/app-kit @circle-fin/adapter-viem-v2 viem')
     }
+    // Our own errors already carry recoverable / burnHash — pass through
+    // untouched so the UI can act on them.
     throw err
   }
 }
