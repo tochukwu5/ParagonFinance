@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ARC_TESTNET, switchToArcTestnet } from '../utils/arcTestnet'
+import { getProviderFor, WALLET_LABELS, WALLET_INSTALL_URLS } from '../utils/walletProviders'
 
 // ─── Session policy ────────────────────────────────────────────────────────
 // Two independent limits, both enforced:
@@ -14,18 +15,18 @@ import { ARC_TESTNET, switchToArcTestnet } from '../utils/arcTestnet'
 //     re-authenticates at all.
 //
 // Both live in localStorage rather than sessionStorage on purpose.
-// sessionStorage is wiped when the tab closes — but MetaMask's site
+// sessionStorage is wiped when the tab closes — but the wallet's site
 // permission is NOT, so eth_accounts silently restores the session on the
-// next visit with no timer to stop it. That is exactly the gap you hit:
-// close the page, come back, still connected. localStorage keeps the clock
-// running across tab closes and browser restarts.
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000   // 15 minutes
+// next visit with no timer to stop it. localStorage keeps the clock running
+// across tab closes and browser restarts.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000       // 15 minutes
 const MAX_SESSION_MS   = 12 * 60 * 60 * 1000 // 12 hours
-const WARN_BEFORE_MS   = 60 * 1000       // warn 60s before idle expiry
+const WARN_BEFORE_MS   = 60 * 1000           // warn 60s before idle expiry
 
 const DISCONNECTED_KEY  = 'paragonfinance_disconnected'
 const LAST_ACTIVITY_KEY = 'paragonfinance_last_activity'
 const SESSION_START_KEY = 'paragonfinance_session_start'
+const WALLET_ID_KEY     = 'paragonfinance_wallet_id'
 
 // Writing on every mousemove would hammer localStorage; once every 30s of
 // continuous activity is plenty of resolution for a 15-minute timeout.
@@ -54,6 +55,18 @@ export function useArcTestnet() {
   const [secondsUntilTimeout, setSecondsUntilTimeout] = useState(null)
 
   const hasMetaMask = typeof window !== 'undefined' && !!window.ethereum
+
+  // Which injected provider we're actually talking to.
+  //
+  // Reaching for window.ethereum directly means talking to whichever
+  // extension won the global — not necessarily the one the user picked on the
+  // connect screen. With MetaMask and Rabby both installed, they overwrite
+  // each other, and a Rabby user would get MetaMask prompts. eth() resolves
+  // that: it returns the chosen provider, falling back to the global only
+  // when nothing has been selected yet.
+  const providerRef = useRef(null)
+  const [walletId, setWalletId] = useState(() => localStorage.getItem(WALLET_ID_KEY) || null)
+  const eth = useCallback(() => providerRef.current || window.ethereum, [])
 
   // Read inside interval callbacks without making them dependencies.
   const isConnectedRef = useRef(false)
@@ -88,14 +101,14 @@ export function useArcTestnet() {
   }, [])
 
   const setWalletState = useCallback(async (address) => {
-    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' })
+    const chainIdHex = await eth().request({ method: 'eth_chainId' })
     const chainId = parseInt(chainIdHex, 16)
     setAccount(address)
     setNetwork(chainId)
     setIsConnected(true)
     setIsCorrectNetwork(chainId === ARC_TESTNET.id)
     await fetchBalance(address)
-  }, [fetchBalance])
+  }, [fetchBalance, eth])
 
   const clearWalletState = useCallback(() => {
     setAccount(null)
@@ -128,8 +141,8 @@ export function useArcTestnet() {
     localStorage.setItem(LAST_ACTIVITY_KEY, String(t))
   }, [])
 
-  // Returns 'idle' | 'max' | null. Pure check — no side effects, so it can
-  // be called from the auto-reconnect path before any state is set.
+  // Returns 'idle' | 'max' | null. Pure check — no side effects, so it can be
+  // called from the auto-reconnect path before any state is set.
   const checkSessionExpiry = useCallback(() => {
     const start = readTs(SESSION_START_KEY)
     const last  = readTs(LAST_ACTIVITY_KEY)
@@ -143,35 +156,39 @@ export function useArcTestnet() {
   // ── Disconnect ───────────────────────────────────────────────────────
   const performDisconnect = useCallback(async (reason = null) => {
     try {
-      if (window.ethereum) {
+      const provider = eth()
+      if (provider) {
         // Revoking the site permission is what makes the disconnect real.
-        // Clearing React state alone leaves MetaMask still authorised, so
+        // Clearing React state alone leaves the wallet still authorised, so
         // the next eth_accounts call would silently reconnect.
-        await window.ethereum.request({
+        await provider.request({
           method: 'wallet_revokePermissions',
           params: [{ eth_accounts: {} }],
         })
       }
     } catch (err) {
-      // Older MetaMask builds don't implement this. The session flag and
-      // cleared state below still hold, so the disconnect stands.
+      // Not every wallet implements this. The session flag and cleared state
+      // below still hold, so the disconnect stands.
       console.warn('wallet_revokePermissions failed:', err?.message)
     } finally {
       sessionStorage.setItem(DISCONNECTED_KEY, 'true')
+      providerRef.current = null
+      localStorage.removeItem(WALLET_ID_KEY)
+      setWalletId(null)
       clearSession()
       clearWalletState()
       if (reason) setSessionExpiredReason(reason)
     }
-  }, [clearSession, clearWalletState])
+  }, [clearSession, clearWalletState, eth])
 
   const disconnect = useCallback(() => performDisconnect(null), [performDisconnect])
 
   // ── Auto-reconnect on load ───────────────────────────────────────────
-  // Order matters here. The expiry check runs BEFORE eth_accounts, so an
-  // expired session never briefly appears connected.
+  // Order matters: the expiry check runs BEFORE eth_accounts, so an expired
+  // session never briefly appears connected.
   useEffect(() => {
     const autoReconnect = async () => {
-      if (!window.ethereum) {
+      if (typeof window === 'undefined' || !window.ethereum) {
         setIsAutoConnecting(false)
         return
       }
@@ -184,15 +201,27 @@ export function useArcTestnet() {
       const expired = checkSessionExpiry()
       if (expired) {
         // Revoke rather than merely skip — otherwise the permission sits
-        // there and the very next page load reconnects again.
+        // there and the next page load reconnects again.
         await performDisconnect(expired)
         setIsAutoConnecting(false)
         return
       }
 
+      // Restore the provider the user actually chose. Without this a reload
+      // falls back to window.ethereum, so someone who connected with Rabby
+      // would silently resume against whichever extension won the global.
+      const savedId = localStorage.getItem(WALLET_ID_KEY)
+      if (savedId) {
+        const provider = await getProviderFor(savedId)
+        if (provider) {
+          providerRef.current = provider
+          setWalletId(savedId)
+        }
+      }
+
       try {
         // eth_accounts does not prompt — it only reports an existing grant.
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' })
+        const accounts = await eth().request({ method: 'eth_accounts' })
         if (accounts && accounts.length > 0) {
           // A live permission with no timestamps means the session predates
           // this timeout logic. Start the clock now rather than trusting it.
@@ -211,43 +240,52 @@ export function useArcTestnet() {
   }, [])
 
   // ── Connect ──────────────────────────────────────────────────────────
-  const connect = useCallback(async () => {
-    if (!hasMetaMask) {
-      setError('MetaMask not found. Please install MetaMask to use the testnet.')
-      return false
-    }
+  const connect = useCallback(async (requestedWalletId = 'metamask') => {
     setIsLoading(true)
     setError(null)
     setSessionExpiredReason(null)
+
     try {
-      // Revoke first so MetaMask always shows the account picker rather than
-      // silently reusing a prior grant — the user should see what they're
-      // authorising every time.
+      const provider = await getProviderFor(requestedWalletId)
+      if (!provider) {
+        const label = WALLET_LABELS[requestedWalletId] || requestedWalletId
+        const err = new Error(label + ' is not installed.')
+        err.installUrl = WALLET_INSTALL_URLS[requestedWalletId]
+        err.walletId = requestedWalletId
+        throw err
+      }
+
+      providerRef.current = provider
+
+      // Revoke first so the account picker always appears — the user should
+      // see what they're authorising, not have a prior grant silently reused.
       try {
-        await window.ethereum.request({
+        await provider.request({
           method: 'wallet_revokePermissions',
           params: [{ eth_accounts: {} }],
         })
-      } catch { /* not supported on older MetaMask — continue */ }
+      } catch { /* not supported on every wallet — continue */ }
 
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+      const accounts = await provider.request({ method: 'eth_requestAccounts' })
       if (!accounts.length) throw new Error('No accounts selected')
 
-      await switchToArcTestnet()
+      await switchToArcTestnet(provider)
 
       sessionStorage.removeItem(DISCONNECTED_KEY)
+      localStorage.setItem(WALLET_ID_KEY, requestedWalletId)
+      setWalletId(requestedWalletId)
       startSession()
 
       await setWalletState(accounts[0])
       return accounts[0]
     } catch (err) {
-      if (err.code === 4001) setError('Connection rejected. Please approve the MetaMask prompt to continue.')
+      if (err.code === 4001) setError('Connection rejected. Please approve the prompt in your wallet.')
       else setError(err.message || 'Failed to connect wallet')
-      return false
+      throw err
     } finally {
       setIsLoading(false)
     }
-  }, [hasMetaMask, setWalletState, startSession])
+  }, [setWalletState, startSession])
 
   // ── Activity listeners ───────────────────────────────────────────────
   // Only mounted while connected, so an idle logged-out page costs nothing.
@@ -269,8 +307,8 @@ export function useArcTestnet() {
   }, [isConnected, touchActivity])
 
   // ── Expiry sweep ─────────────────────────────────────────────────────
-  // Runs every 10s while connected. Also drives the countdown the UI can
-  // use to warn before the cut-off.
+  // Runs every 10s while connected. Also drives the countdown the UI uses to
+  // warn before the cut-off.
   useEffect(() => {
     if (!isConnected) {
       setSecondsUntilTimeout(null)
@@ -325,12 +363,13 @@ export function useArcTestnet() {
     setError(null)
 
     try {
+      const provider = eth()
       const start = Date.now()
       const rawAmount = BigInt(Math.round(parseFloat(amount) * 1e6)) * BigInt(1e12)
       const amountHex = '0x' + rawAmount.toString(16)
-      const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
+      const gasPrice = await provider.request({ method: 'eth_gasPrice' })
 
-      const txHash = await window.ethereum.request({
+      const txHash = await provider.request({
         method: 'eth_sendTransaction',
         params: [{ from: account, to, value: amountHex, gasPrice, gas: '0x5208' }],
       })
@@ -380,21 +419,24 @@ export function useArcTestnet() {
     } finally {
       setIsLoading(false)
     }
-  }, [account, isCorrectNetwork, fetchBalance, checkSessionExpiry, performDisconnect, touchActivity])
+  }, [account, isCorrectNetwork, fetchBalance, checkSessionExpiry, performDisconnect, touchActivity, eth])
 
   const refreshBalance = useCallback(() => {
     if (account) fetchBalance(account)
   }, [account, fetchBalance])
 
-  // ── MetaMask events ──────────────────────────────────────────────────
+  // ── Wallet events ────────────────────────────────────────────────────
+  // Bound to the ACTIVE provider, not window.ethereum — otherwise a Rabby
+  // session would listen for MetaMask's account changes and miss its own.
   useEffect(() => {
-    if (!window.ethereum) return
+    const provider = eth()
+    if (!provider?.on) return
 
     const onAccountsChanged = async (accounts) => {
       if (accounts.length) {
         if (sessionStorage.getItem(DISCONNECTED_KEY) === 'true') return
-        // Switching accounts is a new session — the previous account's
-        // clock shouldn't carry over to a different address.
+        // Switching accounts is a new session — the previous account's clock
+        // shouldn't carry over to a different address.
         startSession()
         await setWalletState(accounts[0])
       } else {
@@ -410,14 +452,15 @@ export function useArcTestnet() {
       if (account) fetchBalance(account)
     }
 
-    window.ethereum.on('accountsChanged', onAccountsChanged)
-    window.ethereum.on('chainChanged', onChainChanged)
+    provider.on('accountsChanged', onAccountsChanged)
+    provider.on('chainChanged', onChainChanged)
 
     return () => {
-      window.ethereum.removeListener('accountsChanged', onAccountsChanged)
-      window.ethereum.removeListener('chainChanged', onChainChanged)
+      provider.removeListener?.('accountsChanged', onAccountsChanged)
+      provider.removeListener?.('chainChanged', onChainChanged)
     }
-  }, [account, fetchBalance, setWalletState, clearWalletState, clearSession, startSession])
+    // walletId is a dependency so listeners rebind when the provider changes.
+  }, [account, walletId, fetchBalance, setWalletState, clearWalletState, clearSession, startSession, eth])
 
   return {
     account,
@@ -429,6 +472,7 @@ export function useArcTestnet() {
     isAutoConnecting,
     error,
     hasMetaMask,
+    walletId,
     connect,
     disconnect,
     sendUsdc,

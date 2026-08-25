@@ -54,7 +54,7 @@ export default function Docs() {
               Borderless money infrastructure built on Arc Network. This document covers the full architecture, use cases, security model, and roadmap of the Paragon Finance protocol.
             </p>
             <div className="flex gap-3 flex-wrap">
-              <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
+              <Link to="/testnet/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
                 Launch App →
               </Link>
               <a href="https://www.arc.network" target="_blank" rel="noreferrer"
@@ -484,7 +484,7 @@ paragonFinance.transfer({
                   "Move money faster. Move money cheaper. Move money globally. Built on Arc. Powered by Stablecoins."
                 </p>
                 <div className="flex gap-3 flex-wrap">
-                  <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
+                  <Link to="/testnet/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
                     Launch App →
                   </Link>
                   <Link to="/about" className="border border-[#1e2530] text-[#8892a0] text-sm px-5 py-2.5 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">

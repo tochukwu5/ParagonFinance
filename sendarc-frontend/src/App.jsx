@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate,  useLocation } from 'react-router-dom'
 import { WalletProvider } from './context/WalletContext'
 import { TestnetProvider } from './context/TestnetContext'
 import { useEffect } from 'react'
@@ -68,7 +68,7 @@ export default function App() {
 
             {/* App pages */}
             <Route path="/connect" element={<ConnectWallet />} />
-            <Route path="/send" element={<SendMoney />} />
+             <Route path="/send" element={<Navigate to="/testnet/send" replace />} />
 
             {/* Dashboard */}
             <Route path="/dashboard" element={<Dashboard />} />

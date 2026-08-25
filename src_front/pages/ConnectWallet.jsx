@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import MetaMaskIcon from '../assets/wallets/metamask.svg'
 import RabbyIcon from '../assets/wallets/rabby.svg'
@@ -47,8 +47,7 @@ export default function ConnectWallet() {
   const [step, setStep] = useState('idle') // idle | waiting | switching | success
 
   if (isConnected && wallet) {
-    navigate('/dashboard')
-    return null
+    return <Navigate to="/testnet/send" replace />
   }
 
   const handleConnect = async (walletId) => {
@@ -65,7 +64,7 @@ export default function ConnectWallet() {
       await registerWallet(address)
       setStep('success')
       await new Promise(r => setTimeout(r, 600))
-      navigate('/dashboard')
+      navigate('/testnet/send')
     } catch (err) {
       setError(err.message || 'Connection failed. Please try again.')
       setConnecting(null)

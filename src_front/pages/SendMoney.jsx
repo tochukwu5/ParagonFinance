@@ -2,12 +2,17 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import { COUNTRIES, CHAINS } from '../data/constants'
+import { useArcTestnet } from '../hooks/useArcTestnet'
 import { Card, Badge, LoadingSpinner } from '../components/UI'
 
 const STEPS = ['Connect Wallet', 'Send Details', 'Review & Confirm', 'Transaction Complete']
 
 export default function SendMoney() {
-  const { wallet, isConnected } = useWallet()
+    const { wallet, isConnected: contextConnected } = useWallet()
+  const { account: arcAccount, balance: arcBalance } = useArcTestnet()
+
+  const isConnected = contextConnected || !!arcAccount
+
   const navigate = useNavigate()
   const [step, setStep] = useState(isConnected ? 1 : 0)
   const [selectedChain, setSelectedChain] = useState(CHAINS[0])

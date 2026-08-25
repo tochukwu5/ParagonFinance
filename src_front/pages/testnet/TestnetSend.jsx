@@ -184,6 +184,12 @@ export default function TestnetSend() {
   }, [activeTab, isConnected])
 
   useEffect(() => {
+    setMissingGas(null)
+    setStrandedBridge(null)
+    setSendError(null)
+  }, [sourceChainKey, bridgeToKey, activeTab])
+
+  useEffect(() => {
     if (!account) return
     getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
   }, [account])
@@ -227,6 +233,14 @@ export default function TestnetSend() {
 
     return () => { cancelled = true; clearTimeout(timer) }
   }, [activeTab, selectedToken, account, recipient, amount])
+
+  //useeffect for the reset chain on edit 
+
+  useEffect(() => {
+    setMissingGas(null)
+    setStrandedBridge(null)
+    setSendError(null)
+  }, [sourceChainKey, bridgeToKey, activeTab])
 
   const handleStatusUpdate = (msg) => {
     setCctpStatus(msg)
@@ -885,7 +899,13 @@ export default function TestnetSend() {
                 ) : null}
 
                 <div className="flex gap-3">
-                  <button onClick={() => { setView('form'); setSendError(null) }} disabled={sending}
+                                    <button onClick={() => {
+                    setView('form')
+                    setSendError(null)
+                    setMissingGas(null)
+                    setStrandedBridge(null)
+                  }} disabled={sending}
+
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
                     Edit
                   </button>

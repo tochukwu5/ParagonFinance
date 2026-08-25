@@ -6,23 +6,25 @@ const WalletContext = createContext(null)
 // This provider wraps useArcTestnet and exposes a unified wallet object
 // so the rest of the app (Dashboard, Sidebar, etc) can just do useWallet()
 export function WalletProvider({ children }) {
-  const {
+   const {
     account,
     balance,
     isConnected,
     isAutoConnecting,
+    walletId,
     connect: arcConnect,
     disconnect: arcDisconnect,
   } = useArcTestnet()
 
   // Build the wallet object that the rest of the app expects
-  const wallet = isConnected && account
+   const wallet = isConnected && account
     ? {
         address: account,
         shortAddress: account.slice(0, 6) + '...' + account.slice(-4),
         balance: parseFloat(balance).toFixed(2),
         network: 'Arc Testnet',
-        provider: 'metamask',
+        // Was hardcoded — so a Rabby user's wallet object claimed MetaMask.
+        provider: walletId || 'metamask',
       }
     : null
 

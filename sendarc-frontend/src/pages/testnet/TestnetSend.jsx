@@ -231,8 +231,14 @@ export default function TestnetSend() {
     if (activeTab === 'bridge' && sourceChainKey === bridgeToKey) {
       setBridgeToKey(sourceChainKey === 'arc' ? 'ethereum' : 'arc')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected])
+
+  useEffect(() => {
+    setMissingGas(null)
+    setStrandedBridge(null)
+    setSendError(null)
+  }, [sourceChainKey, bridgeToKey, activeTab])
 
   useEffect(() => {
     if (!account) return
@@ -924,13 +930,17 @@ export default function TestnetSend() {
                     <p className="text-xs text-red-400">{sendError}</p>
                   </div>
                 ) : null}
-
-                <div className="flex gap-3">
-                  <button onClick={() => { setView('form'); setSendError(null) }} disabled={sending}
+                   <div className="flex gap-3">
+                  <button onClick={() => {
+                    setView('form')
+                    setSendError(null)
+                    setMissingGas(null)
+                    setStrandedBridge(null)
+                  }} disabled={sending}
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
                     Edit
                   </button>
-                                    <button onClick={handleSend} disabled={sending || !!missingGas}
+                  <button onClick={handleSend} disabled={sending || !!missingGas}
                     className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
                     {sending ? (
                       <><LoadingSpinner size="sm" /> {isCCTP ? 'Bridging…' : 'Sending…'}</>

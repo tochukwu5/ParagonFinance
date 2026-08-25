@@ -75,7 +75,7 @@ export default function SendMoney() {
         <body>
           <div class="header">
             <div>
-              <div class="brand">Send<span>Arc</span></div>
+              <div class="brand">Paragon<span>Finance</span></div>
               <div style="font-size:12px;color:#6b7280;margin-top:4px;">Transaction Receipt</div>
             </div>
             <div class="meta">
@@ -141,8 +141,8 @@ export default function SendMoney() {
           <button onClick={() => navigate(-1)} className="text-[#8892a0] hover:text-white text-sm transition-colors">← Back</button>
           <div className="flex items-center gap-2">
             <img src="/logo.jpg" alt="Paragon Finance" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="font-['Space_Grotesk'] font-bold text-lg text-white">Send</span>
-            <span className="font-['Space_Grotesk'] font-bold text-lg text-[#00D4FF] -ml-1">Arc</span>
+            <span className="font-['Space_Grotesk'] font-bold text-lg text-white">Paragon</span>
+            <span className="font-['Space_Grotesk'] font-bold text-lg text-[#00D4FF] -ml-1">Finance</span>
           </div>
         </div>
         {wallet && (
