@@ -131,14 +131,9 @@ export default function TestnetSend() {
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
+  const [strandedBridge, setStrandedBridge] = useState(null)
+  const [missingGas, setMissingGas] = useState(null)
 
-  // Debounced mirror of "source and destination are the same chain."
-  //
-  // Two separate things: the raw comparison (immediate, used to block the
-  // Review button — never let an invalid bridge start) and this state (delayed,
-  // used only to show the warning). Swapping direction sets one key before the
-  // other settles, so the raw comparison is briefly true even when the user
-  // did nothing wrong; showing the warning on that flicker reads as a bug.
   const [showSameChainWarning, setShowSameChainWarning] = useState(false)
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
@@ -347,9 +342,24 @@ export default function TestnetSend() {
 
       setTxResult(result)
       setView('success')
-    } catch (err) {
-      if (err.code === 4001) setSendError('Transaction rejected in MetaMask.')
-      else setSendError(err.message || 'Transaction failed. Please try again.')
+     } catch (err) {
+      if (err.preflightBlocked) {
+        setMissingGas({ token: err.missingGasToken, chain: err.missingGasChain })
+        setSendError(null)
+      } else if (err.code === 4001) {
+        setSendError('Transaction rejected in MetaMask.')
+      } else {
+        setSendError(err.message || 'Transaction failed. Please try again.')
+      }
+
+      if (err.recoverable) {
+        setStrandedBridge({
+          burnHash: err.burnHash,
+          sourceChainKey: err.sourceChainKey || sourceChainKey,
+          destinationChainKey: err.destinationChainKey || bridgeToKey,
+          amount: err.pendingAmount || parseFloat(amount),
+        })
+      }
     } finally {
       setSending(false)
     }
@@ -357,7 +367,8 @@ export default function TestnetSend() {
 
   const resetForm = () => {
     setView('form'); setAmount(''); setMemo(''); setShowMemo(false); setShowWalletInput(false)
-    setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1); setSendError(null)
+        setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1)
+    setSendError(null); setStrandedBridge(null); setMissingGas(null)
   }
 
   const changeTab = (tab) => {
@@ -618,7 +629,7 @@ export default function TestnetSend() {
                 </div>
 
                 {!showMemo ? (
-                  <button onClick={() => setShowMemo(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                  <button onClick={() => setShowMemo(true)} className="text-[10px] text-[#ccccd6] hover:text-[#00D4FF] mt-2 pl-4">
                     + Add a note (optional)
                   </button>
                 ) : (
@@ -713,7 +724,7 @@ export default function TestnetSend() {
                 )}
 
                 {!showWalletInput ? (
-                  <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                  <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#ccccd6] hover:text-[#00D4FF] mt-2 pl-4">
                     + Add receiving wallet
                   </button>
                 ) : (
@@ -870,19 +881,57 @@ export default function TestnetSend() {
                   <p className="text-xs text-[#00D4FF] mb-4 -mt-2">{cctpStatus}</p>
                 )}
 
-                {sendError && (
+               {missingGas ? (
+                  <div className="bg-[#1a1408] border border-[#3d2f10] rounded-xl p-3 mb-4">
+                    <p className="text-xs text-[#e8c374]">
+                      You need <strong>{missingGas.token}</strong> on {missingGas.chain} to
+                      receive this bridge —{' '}
+                      <a href="https://faucet.circle.com" target="_blank" rel="noreferrer"
+                        className="text-[#00D4FF] underline">
+                        get some from the faucet →
+                      </a>
+                    </p>
+                  </div>
+                ) : strandedBridge ? (
+                  <div className="bg-[#1a1408] border border-[#3d2f10] rounded-xl p-3.5 mb-4">
+                    <p className="text-xs text-[#e8c374] font-semibold mb-1.5">
+                      Your USDC is safe and recoverable
+                    </p>
+                    <p className="text-[11px] text-[#e8c374] leading-relaxed mb-2.5">
+                      {strandedBridge.amount} USDC was burned on{' '}
+                      {EVM_CHAINS[strandedBridge.sourceChainKey]?.name} but has not minted on{' '}
+                      {EVM_CHAINS[strandedBridge.destinationChainKey]?.name} yet. Circle holds a
+                      signed attestation authorising the mint and it does not expire. Fund your
+                      wallet with{' '}
+                      <strong>{EVM_CHAINS[strandedBridge.destinationChainKey]?.nativeCurrency?.symbol}</strong>{' '}
+                      on {EVM_CHAINS[strandedBridge.destinationChainKey]?.name}, then run this same
+                      bridge again to complete it.
+                    </p>
+                    
+                     <a href={
+                        (EVM_CHAINS[strandedBridge.sourceChainKey]?.explorerUrl || '') +
+                        '/tx/' + strandedBridge.burnHash
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-[#00D4FF] font-mono break-all hover:underline"
+                    >
+                      Burn tx: {strandedBridge.burnHash} ↗
+                    </a>
+                  </div>
+                ) : sendError ? (
                   <div className="bg-red-900/10 border border-red-500/30 rounded-xl p-3 mb-4">
                     <p className="text-xs text-red-400">{sendError}</p>
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex gap-3">
                   <button onClick={() => { setView('form'); setSendError(null) }} disabled={sending}
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
                     Edit
                   </button>
-                  <button onClick={handleSend} disabled={sending}
-                    className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                                    <button onClick={handleSend} disabled={sending || !!missingGas}
+                    className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
                     {sending ? (
                       <><LoadingSpinner size="sm" /> {isCCTP ? 'Bridging…' : 'Sending…'}</>
                     ) : (

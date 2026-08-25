@@ -127,11 +127,9 @@ export default function TestnetSend() {
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
-    // Set when a bridge burned on the source chain but failed to mint on the
-  // destination. Kept separate from sendError because the user's next step is
-  // recovery, not "try something else" — the funds exist, they're just stuck
-  // behind an unpaid mint.
+  
   const [strandedBridge, setStrandedBridge] = useState(null)
+  const [missingGas, setMissingGas] = useState(null)
 
   const selectedChain = EVM_CHAINS[sourceChainKey]
   const destChain = EVM_CHAINS[bridgeToKey]
@@ -297,9 +295,17 @@ export default function TestnetSend() {
 
       setTxResult(result)
       setView('success')
-      } catch (err) {
-      if (err.code === 4001) setSendError('Transaction rejected in MetaMask.')
-      else setSendError(err.message || 'Transaction failed. Please try again.')
+         } catch (err) {
+      if (err.preflightBlocked) {
+        // Blocked before the burn — no funds moved. Shown as a prerequisite
+        // rather than a failure, so it doesn't read as "your bridge broke."
+        setMissingGas({ token: err.missingGasToken, chain: err.missingGasChain })
+        setSendError(null)
+      } else if (err.code === 4001) {
+        setSendError('Transaction rejected in MetaMask.')
+      } else {
+        setSendError(err.message || 'Transaction failed. Please try again.')
+      }
 
       if (err.recoverable) {
         setStrandedBridge({
@@ -317,8 +323,8 @@ export default function TestnetSend() {
   const resetForm = () => {
     setView('form'); setAmount(''); setMemo(''); setShowMemo(false); setShowWalletInput(false)
         setTxResult(null); setCctpStatus(''); setCctpDoneSteps([]); setCctpActiveStep(-1)
-    setSendError(null); setStrandedBridge(null)
-  }
+          setSendError(null); setStrandedBridge(null); setMissingGas(null)
+      }
 
   const changeTab = (tab) => {
     if (tab === activeTab) return
@@ -578,7 +584,7 @@ export default function TestnetSend() {
                 </div>
 
                 {!showMemo ? (
-                  <button onClick={() => setShowMemo(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                  <button onClick={() => setShowMemo(true)} className="text-[10px] text-[#ccccd6] hover:text-[#00D4FF] mt-2 pl-4">
                     + Add a note (optional)
                   </button>
                 ) : (
@@ -672,7 +678,7 @@ export default function TestnetSend() {
                 )}
 
                 {!showWalletInput ? (
-                  <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] mt-2">
+                  <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#ccccd6] hover:text-[#00D4FF] mt-2 pl-4">
                     + Add receiving wallet
                   </button>
                 ) : (
@@ -829,11 +835,23 @@ export default function TestnetSend() {
                   <p className="text-xs text-[#00D4FF] mb-4 -mt-2">{cctpStatus}</p>
                 )}
 
-                             {/* A stranded bridge replaces the plain error rather than
-                    sitting beside it — a red failure box next to "your funds
-                    are safe" sends two contradictory signals at the worst
-                    possible moment. */}
-                {strandedBridge ? (
+                {/* Three mutually exclusive outcomes, in order of severity:
+                    a prerequisite that stopped us before anything moved, funds
+                    stranded mid-bridge, or an ordinary failure. Chained rather
+                    than three separate blocks — a red "failed" box beside
+                    "your funds are safe" would contradict itself. */}
+                {missingGas ? (
+                  <div className="bg-[#1a1408] border border-[#3d2f10] rounded-xl p-3 mb-4">
+                    <p className="text-xs text-[#e8c374]">
+                      You need <strong>{missingGas.token}</strong> on {missingGas.chain} to
+                      receive this bridge —{' '}
+                      <a href="https://faucet.circle.com" target="_blank" rel="noreferrer"
+                        className="text-[#00D4FF] underline">
+                        get some from the faucet →
+                      </a>
+                    </p>
+                  </div>
+                ) : strandedBridge ? (
                   <div className="bg-[#1a1408] border border-[#3d2f10] rounded-xl p-3.5 mb-4">
                     <p className="text-xs text-[#e8c374] font-semibold mb-1.5">
                       Your USDC is safe and recoverable
@@ -849,7 +867,7 @@ export default function TestnetSend() {
                       bridge again to complete it.
                     </p>
                     
-                     <a href={
+                    <a href={
                         (EVM_CHAINS[strandedBridge.sourceChainKey]?.explorerUrl || '') +
                         '/tx/' + strandedBridge.burnHash
                       }
@@ -871,8 +889,8 @@ export default function TestnetSend() {
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
                     Edit
                   </button>
-                  <button onClick={handleSend} disabled={sending}
-                    className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                                    <button onClick={handleSend} disabled={sending || !!missingGas}
+                    className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
                     {sending ? (
                       <><LoadingSpinner size="sm" /> {isCCTP ? 'Bridging…' : 'Sending…'}</>
                     ) : (

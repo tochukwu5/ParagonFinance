@@ -535,20 +535,22 @@ export async function bridgeUsdcViaAppKit(
   // Runs BEFORE kit.bridge, so a failure here costs nothing. Once the burn
   // fires there is no undo.
   //
-  // A read failure (null) does NOT block — public RPCs are flaky, and
-  // refusing a bridge because we couldn't confirm a balance would be its
-  // own kind of broken. Only a confirmed zero stops us.
-  const gasToken = destinationGasToken(toChainKey)
+  
+   const gasToken = destinationGasToken(toChainKey)
   if (gasToken && !skipGasCheck) {
     onStatusUpdate('Checking ' + gasToken + ' balance on ' + toChain.name + '...')
     const destGas = await getNativeBalance(toChainKey, to || from)
     if (destGas !== null && parseFloat(destGas) === 0) {
-      throw new Error(
-        'Bridge not started: the receiving wallet has no ' + gasToken + ' on ' + toChain.name + '. ' +
-        'CCTP mints on the destination chain and that mint is paid in ' + gasToken + ', not USDC. ' +
-        'Without it the USDC would be burned on ' + fromChain.name + ' and never arrive. ' +
-        'Fund the wallet with ' + gasToken + ' on ' + toChain.name + ' first, then try again.'
+      const err = new Error(
+        'No ' + gasToken + ' on ' + toChain.name + '. The mint step is paid in ' +
+        gasToken + ', not USDC — without it your USDC would burn on ' +
+        fromChain.name + ' and never arrive.'
       )
+      err.missingGasToken = gasToken
+      err.missingGasChain = toChain.name
+      err.missingGasChainKey = toChainKey
+      err.preflightBlocked = true
+      throw err
     }
   }
 
@@ -1122,11 +1124,11 @@ export async function payBridgeFeeToTreasury({ from }) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-export function shortAddr(addr) { return !addr ? '—' : addr.slice(0, 6) + '...' + addr.slice(-4) }
+export function shortAddr(addr) { return !addr ? '--' : addr.slice(0, 6) + '...' + addr.slice(-4) }
 export function arcScanTx(hash) { return ARC_TESTNET.explorerUrl + '/tx/' + hash }
 export function arcScanAddr(addr) { return ARC_TESTNET.explorerUrl + '/address/' + addr }
 export function switchToArcTestnet() { return switchToChain('arc') }
 export function formatUsdc(raw, decimals = 6) { return (Number(raw) / Math.pow(10, decimals)).toFixed(6) }
 export function parseUsdc(amount, decimals = 6) { return BigInt(Math.round(parseFloat(amount) * Math.pow(10, decimals))) }
-export function formatSettlement(ms) { if (!ms || ms < 0) return '—'; return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's' }
+export function formatSettlement(ms) { if (!ms || ms < 0) return '--'; return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's' }
 export function addArcTestnetToWallet() { return switchToChain('arc') }
