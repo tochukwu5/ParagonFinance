@@ -145,9 +145,18 @@ export async function switchToChain(chainKey, provider) {
         blockExplorerUrls: [chain.explorerUrl],
       }],
     })
-  } catch (addErr) {
+   } catch (addErr) {
     if (addErr.code === 4001) {
       throw new Error('Adding ' + chain.name + ' was rejected. Approve it in your wallet to continue.')
+    }
+    // A stale entry for the same RPC under a different chain ID blocks the
+    // add. The wallet's own message names a chain ID the user has never
+    // heard of, so translate it into something actionable.
+    if (/same rpc|already exist|duplicate/i.test(addErr.message || '')) {
+      throw new Error(
+        'Your wallet already has a network using this RPC under a different chain ID. ' +
+        'Open your wallet settings, delete the existing "Arc" network, then try again.'
+      )
     }
     throw addErr
   }
