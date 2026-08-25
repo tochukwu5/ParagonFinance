@@ -95,32 +95,78 @@ export const EVM_CHAINS = {
   },
 }
 
-export async function switchToChain(chainKey) {
-  if (!window.ethereum) throw new Error('MetaMask not found')
+// Accepts an explicit provider so a Rabby or Coinbase session prompts the
+// wallet the user actually connected with. Falling back to window.ethereum
+// meant the connect prompt came from one extension and the network prompt
+// from whichever won the global — the source of "Unrecognized chain ID"
+// when the two disagreed about what had been added.
+export async function switchToChain(chainKey, provider) {
+  const eth = provider || (typeof window !== 'undefined' ? window.ethereum : null)
+  if (!eth) throw new Error('No wallet found. Please install MetaMask, Rabby, or Coinbase Wallet.')
+
   const chain = EVM_CHAINS[chainKey]
   if (!chain) throw new Error('Unknown chain: ' + chainKey)
+
+  // Switch FIRST. The old order tried wallet_addEthereumChain every time,
+  // which re-prompts to add a chain the wallet already has — and if the user
+  // declines that redundant prompt, the catch fired before the switch was
+  // ever attempted. Switching first means an already-added chain needs no
+  // prompt at all, and 4902 (unrecognised chain) tells us when to add.
   try {
-    await window.ethereum.request({
+    await eth.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chain.chainIdHex }],
+    })
+    return
+  } catch (switchErr) {
+    if (switchErr.code === 4001) {
+      throw new Error('Network switch rejected. Approve the prompt in your wallet to continue.')
+    }
+    // 4902 = chain not added. Some wallets nest it, some report -32603 with
+    // the same meaning, so we fall through to add on anything that isn't an
+    // outright rejection.
+    const notAdded =
+      switchErr.code === 4902 ||
+      switchErr.code === -32603 ||
+      switchErr.data?.originalError?.code === 4902 ||
+      /unrecognized chain|not.*added|unknown chain/i.test(switchErr.message || '')
+
+    if (!notAdded) throw switchErr
+  }
+
+  try {
+    await eth.request({
       method: 'wallet_addEthereumChain',
       params: [{
         chainId: chain.chainIdHex,
         chainName: chain.name,
         nativeCurrency: chain.nativeCurrency,
-        rpcUrls: [chain.rpcUrl],
+        rpcUrls: chain.rpcUrls || [chain.rpcUrl],
         blockExplorerUrls: [chain.explorerUrl],
       }],
     })
   } catch (addErr) {
-    if (addErr.code === 4001) throw new Error('User rejected adding the network.')
-    try {
-      await window.ethereum.request({
+    if (addErr.code === 4001) {
+      throw new Error('Adding ' + chain.name + ' was rejected. Approve it in your wallet to continue.')
+    }
+    throw addErr
+  }
+
+  // Adding does not always switch — several wallets add silently and stay
+  // put. Verify, and switch again if needed.
+  try {
+    const current = await eth.request({ method: 'eth_chainId' })
+    if (current?.toLowerCase() !== chain.chainIdHex.toLowerCase()) {
+      await eth.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: chain.chainIdHex }],
       })
-    } catch (switchErr) {
-      if (switchErr.code === 4001) throw new Error('User rejected the network switch.')
-      throw switchErr
     }
+  } catch (err) {
+    if (err.code === 4001) {
+      throw new Error('Network switch rejected. Approve the prompt in your wallet to continue.')
+    }
+    throw err
   }
 }
 
@@ -332,8 +378,8 @@ export function arcScanTx(hash) {
 export function arcScanAddr(addr) {
   return ARC_TESTNET.explorerUrl + '/address/' + addr
 }
-export function switchToArcTestnet() {
-  return switchToChain('arc')
+export function switchToArcTestnet(provider) {
+  return switchToChain('arc', provider)
 }
 export function formatUsdc(raw, decimals = 6) {
   return (Number(raw) / Math.pow(10, decimals)).toFixed(6)
@@ -345,6 +391,4 @@ export function formatSettlement(ms) {
   if (!ms || ms < 0) return '—'
   return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'
 }
-export function addArcTestnetToWallet() {
-  return switchToChain('arc')
-}
+export function addArcTestnetToWallet(provider) { return switchToChain('arc', provider) }
