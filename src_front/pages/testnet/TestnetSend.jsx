@@ -14,6 +14,7 @@ import Navbar from '../../components/Navbar'
 import TokenSelectModal from '../../components/TokenSelectModal'
 import { CoinIcon } from '../../components/CoinLogos'
 import NetworkTokenModal from '../../components/NetworkTokenModal'
+import SwapTab from './SwapTab'
 
 // ─── Chain icons ───────────────────────────────────────────────────────────
 
@@ -92,8 +93,9 @@ export default function TestnetSend() {
   } = useArcTestnet()
   const { recordTransaction, loadTransactions } = useTestnet()
 
-  const [activeTab, setActiveTab] = useState('send') // 'send' | 'bridge'
+  const [activeTab, setActiveTab] = useState('bridge') // 'send' | 'bridge'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
+  
 
   const [sourceChainKey, setSourceChainKey] = useState('ethereum')
   const [bridgeToKey, setBridgeToKey] = useState('arc')
@@ -486,8 +488,9 @@ export default function TestnetSend() {
           {/* Tabs */}
           <div className="flex gap-1 bg-[#0f1822] border border-[#1e2530] rounded-xl p-1 mb-4">
             {[
+             { key: 'bridge', label: 'Bridge' },
               { key: 'send', label: 'Send' },
-              { key: 'bridge', label: 'Bridge' },
+              { key: 'swap', label: 'Swap' },
             ].map(t => (
               <button
                 key={t.key}
@@ -774,8 +777,16 @@ export default function TestnetSend() {
               </div>
             )}
 
+              {hasMetaMask && activeTab === 'swap' && (
+              <SwapTab
+                account={account}
+                provider={typeof window !== 'undefined' ? window.ethereum : null}
+                onRecordTransaction={recordTransaction}
+              />
+            )}
+
             {/* Confirm view */}
-            {view === 'confirm' && (
+             {view === 'confirm' && activeTab !== 'swap' && (
               <div>
                 <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">
                   {activeTab === 'bridge' ? 'BRIDGE REVIEW' : 'TRANSFER REVIEW'}
@@ -922,7 +933,7 @@ export default function TestnetSend() {
             )}
 
             {/* Success view */}
-            {view === 'success' && txResult && (
+            {view === 'success' && txResult && activeTab !== 'swap' && (
               <div className="text-center">
                 <div className="w-14 h-14 rounded-full bg-green-900/30 border-2 border-green-500 flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
                 <h2 className="text-xl font-bold font-['Space_Grotesk'] mb-1">
