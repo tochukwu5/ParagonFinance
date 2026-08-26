@@ -364,9 +364,9 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
-        <span className="text-[10px] tracking-widest text-[#8892a0]">
+        {/* <span className="text-[10px] tracking-widest text-[#8892a0]">
           POWERED BY UNITFLOW
-        </span>
+        </span> */}
         <button
           onClick={() => setShowSlippage(!showSlippage)}
           className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] transition-colors border border-[#1e2530] rounded-lg px-2.5 py-1"
