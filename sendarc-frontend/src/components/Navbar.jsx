@@ -47,13 +47,13 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[#1e2530] bg-[#0D1117]/95 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src="/logo.jpg" alt="Paragon Finance" className="h-9 w-9 rounded-lg object-contain" />
-          <span className="font-['Space_Grotesk'] text-xl font-bold text-white">Paragon </span>
-          <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Finance</span>
+        <Link to="/" className="flex items-center gap-2.5 min-w-0">
+          <img src="/logo.jpg" alt="Paragon Finance" className="h-9 w-9 rounded-lg object-contain flex-shrink-0" />
+          <span className="font-['Space_Grotesk'] text-lg sm:text-xl font-bold text-white truncate">Paragon </span>
+          <span className="font-['Space_Grotesk'] text-lg sm:text-xl font-bold text-[#00D4FF] -ml-1.5 truncate">Finance</span>
         </Link>
 
         {/* Desktop links */}
@@ -80,7 +80,7 @@ export default function Navbar() {
           </span>
         </div>
 
-        {/* Right CTA */}
+        {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
           {isConnected ? (
             <div className="flex items-center gap-3">
@@ -104,14 +104,45 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
-        <button className="md:hidden text-[#8892a0]" onClick={() => setMenuOpen(!menuOpen)}>
-          <div className="space-y-1.5">
-            <span className="block w-5 h-0.5 bg-current" />
-            <span className="block w-5 h-0.5 bg-current" />
-            <span className="block w-5 h-0.5 bg-current" />
-          </div>
-        </button>
+        {/* Mobile: chain pill + connect + hamburger.
+            Connecting is the primary action on a landing page, so on mobile it
+            belongs in the persistent top bar rather than two taps deep behind
+            the menu — which is where it used to live. */}
+        <div className="flex md:hidden items-center gap-2 flex-shrink-0">
+
+          {/* Chain indicator. Doubles as a link to the testnet section, and
+              lights up when you're already in it. */}
+       
+
+          {isConnected ? (
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-1.5 bg-[#0f1822] border border-[#1e2530] rounded-full px-2.5 py-1.5"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span className="text-xs font-mono text-white">{displayAddress}</span>
+            </Link>
+          ) : (
+            <Link
+              to="/connect"
+              className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-xs px-4 py-2 rounded-full hover:opacity-90 transition-all"
+            >
+              Connect
+            </Link>
+          )}
+
+          <button
+            className="text-[#8892a0] p-1"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Menu"
+          >
+            <div className="space-y-1.5">
+              <span className="block w-5 h-0.5 bg-current" />
+              <span className="block w-5 h-0.5 bg-current" />
+              <span className="block w-5 h-0.5 bg-current" />
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
@@ -122,6 +153,7 @@ export default function Navbar() {
             <span className="font-['Space_Grotesk'] text-lg font-bold text-white">Paragon</span>
             <span className="font-['Space_Grotesk'] text-lg font-bold text-[#00D4FF] -ml-1.5">Finance</span>
           </Link>
+
           {links.map((l) => (
             <Link key={l.to} to={l.to} className="text-sm text-[#8892a0] hover:text-white" onClick={() => setMenuOpen(false)}>
               {l.label}
@@ -139,9 +171,10 @@ export default function Navbar() {
             Testnet
           </Link>
 
-          {/* Mirrors the desktop CTA — this branch was missing entirely, so
-              the drawer showed "Connect Wallet" even while connected. */}
-          {isConnected ? (
+          {/* No Connect button here — it lives in the top bar on mobile now.
+              A connected wallet still shows its details and a disconnect,
+              since neither fits in the pill. */}
+          {isConnected && (
             <>
               <Link to="/dashboard" onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-2 bg-[#0D1117] border border-[#1e2530] rounded-lg px-3 py-2.5">
@@ -154,10 +187,6 @@ export default function Navbar() {
                 Disconnect
               </button>
             </>
-          ) : (
-            <Link to="/connect" className="bg-[#00D4FF] text-[#0D1117] font-bold text-sm px-5 py-2 rounded-lg text-center" onClick={() => setMenuOpen(false)}>
-              Connect Wallet
-            </Link>
           )}
         </div>
       )}

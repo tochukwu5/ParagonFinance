@@ -214,7 +214,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
         {readOnly ? (
           <span className={
             'flex-1 min-w-0 text-2xl font-bold font-[\'Space_Grotesk\'] text-right truncate ' +
-            (quoting ? 'text-[#556] animate-pulse' : 'text-white')
+            (quoting ? 'text-[#ccccd6] animate-pulse' : 'text-white')
           }>
             {quoting ? '…' : quote ? parseFloat(quote.amountOut).toFixed(6) : '0.00'}
           </span>
@@ -233,7 +233,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           />
         )}
       </div>
-      <p className="text-[10px] text-[#556] mt-1.5">{token.name}</p>
+      <p className="text-[10px] text-[#ccccd6] mt-1.5">{token.name}</p>
       {!token.available && (
         <p className="text-[10px] text-[#e8c374] mt-1">{token.unavailableReason}</p>
       )}
@@ -415,7 +415,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
         <button
           onClick={handleFlip}
           title="Flip direction"
-          className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] active:scale-90 transition-all duration-300"
+          className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] hover:rotate-180 active:scale-90 transition-all duration-300"
         >
           ↓↑
         </button>

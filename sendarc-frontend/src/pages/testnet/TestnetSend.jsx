@@ -510,7 +510,7 @@ export default function TestnetSend() {
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
             <div>
-              <h1 className="text-lg sm:text-xl font-bold font-['Space_Grotesk'] text-white">Send &amp; Bridge USDC</h1>
+              <h1 className="text-lg sm:text-xl font-bold font-['Space_Grotesk'] text-white">Bridge, Send &amp; Swap USDC</h1>
               <p className="text-xs text-[#8892a0] mt-0.5">Move USDC across wallets and chains.</p>
             </div>
             {account && (
