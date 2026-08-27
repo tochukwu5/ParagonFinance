@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTRIES, COMPETITORS } from '../data/constants'
 import { Badge, StatCard, Card } from '../components/UI'
+import Footer from '../components/Footer'
 
 export default function Home() {
   const [sendAmount, setSendAmount] = useState(100)
@@ -23,16 +24,15 @@ export default function Home() {
 
         <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-16">
           <div className="text-center max-w-3xl mx-auto mb-14">
-            <Badge>🌐 THE WORLD'S FASTEST REMITTANCE NETWORK</Badge>
+            <Badge>🌐 A STABLECOIN FINANCIAL INFRASTRUCTURE</Badge>
 
-            <h1 className="mt-6 text-5xl md:text-6xl font-bold leading-tight">
-              Send Money<br />
-              <span className="gradient-text">Anywhere, Instantly</span>
+            <h1 className="mt-6 text-3xl md:text-5xl font-bold leading-tight">
+              Move Money, Access Liquidity<br />
+              <span className="gradient-text ">Anywhere, Instantly</span>
             </h1>
 
             <p className="mt-5 text-[#8892a0] text-lg leading-relaxed">
-              Zero bank delays. Near-zero fees. Send USDC to 18+ countries across
-              every continent recipients receive in under 1 second.
+             Send, bridge, and swap stablecoins across borders and chains — in seconds.
             </p>
 
             <div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
@@ -259,6 +259,9 @@ export default function Home() {
           </Link>
         </div>
       </section>
+         <Footer />
     </div>
+    
+    
   )
 }

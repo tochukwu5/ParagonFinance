@@ -1,48 +1,53 @@
-import { BrowserRouter, Routes, Route, Navigate,  useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { WalletProvider } from './context/WalletContext'
 import { TestnetProvider } from './context/TestnetContext'
 import { useEffect } from 'react'
 import { useArcTestnet } from './hooks/useArcTestnet'
 import { useTestnet } from './context/TestnetContext'
 
-import Navbar from './components/Navbar'
-import Footer from './components/Footer'
+import Sidebar from './components/Sidebar'
+// import Footer from './components/Footer'
 
 import Home from './pages/Home'
 import ConnectWallet from './pages/ConnectWallet'
-import SendMoney from './pages/SendMoney'
 import Dashboard from './pages/Dashboard'
 import { Transactions, WalletPage, Notifications, Settings } from './pages/DashboardPages'
 import { HowItWorks, CountriesPage, RatesPage, AboutPage, DocsPage } from './pages/PublicPages'
 
-// Testnet pages
-import TestnetHub from './pages/testnet/TestnetHub'
 import TestnetSend from './pages/testnet/TestnetSend'
-import { TestnetTransactions /*, TestnetLeaderboard */ } from './pages/testnet/TestnetPages'
 import AdminPage from './pages/AdminPage'
 import StatsPage from './pages/StatsPage'
 
-function PublicLayout({ children }) {
+// No <Footer /> here — Docs, PublicPages, StatsPage and the testnet pages
+// each render their own, and adding one at the layout level would show two.
+function AppLayout({ children }) {
   return (
     <>
-      <Navbar />
-      {children}
-      <Footer />
+      <Sidebar />
+      <div className="md:pl-16 min-h-screen bg-[#0D1117]">
+        {children}
+      </div>
     </>
   )
 }
 
+// Some pages bring their own chrome — Dashboard renders its own sidebar,
+// ConnectWallet is a focused single-purpose screen, Admin is internal.
+// Wrapping those would double up the navigation.
+function BareLayout({ children }) {
+  return <div className="min-h-screen bg-[#0D1117]">{children}</div>
+}
+
 // ─── GLOBAL WALLET BRIDGE ─────────────────────────────────────────────
-// This component sits inside the app and watches for MetaMask auto-reconnect
-// The moment account becomes available (on any page, including after refresh)
-// it automatically loads the user's MongoDB data
+// Watches for wallet auto-reconnect on any page. The moment an account
+// becomes available — including after a refresh — it loads that wallet's
+// MongoDB history, so individual pages don't each have to arrange it.
 function WalletBridge() {
   const { account, isConnected } = useArcTestnet()
   const { loadTransactions } = useTestnet()
 
   useEffect(() => {
     if (account && isConnected) {
-      console.log('WalletBridge: account detected, loading MongoDB data for', account)
       loadTransactions(account)
     }
   }, [account, isConnected])
@@ -55,42 +60,50 @@ export default function App() {
     <WalletProvider>
       <TestnetProvider>
         <BrowserRouter>
-          {/* WalletBridge must be inside BrowserRouter and TestnetProvider */}
+          {/* Must sit inside BrowserRouter and TestnetProvider */}
           <WalletBridge />
           <Routes>
-            {/* Public pages */}
-            <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/countries" element={<CountriesPage />} />
-            <Route path="/rates" element={<RatesPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/docs" element={<DocsPage />} />
 
-            {/* App pages */}
-            <Route path="/connect" element={<ConnectWallet />} />
-             <Route path="/send" element={<Navigate to="/testnet/send" replace />} />
+            {/* ── Public ─────────────────────────────────────────── */}
+            <Route path="/" element={<AppLayout><Home /></AppLayout>} />
+            <Route path="/how-it-works" element={<AppLayout><HowItWorks /></AppLayout>} />
+            <Route path="/countries" element={<AppLayout><CountriesPage /></AppLayout>} />
+            <Route path="/rates" element={<AppLayout><RatesPage /></AppLayout>} />
+            <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
+            <Route path="/docs" element={<AppLayout><DocsPage /></AppLayout>} />
 
-            {/* Dashboard */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/transactions" element={<Transactions />} />
-            <Route path="/dashboard/wallet" element={<WalletPage />} />
-            <Route path="/dashboard/notifications" element={<Notifications />} />
-            <Route path="/dashboard/settings" element={<Settings />} />
+            {/* ── Testnet ────────────────────────────────────────────
+                The hub and the leaderboard are retired — the sidebar does
+                the launching the hub used to do, so it was a page that only
+                pointed elsewhere. Redirects rather than 404s keep existing
+                links, bookmarks and anything already shared working. */}
+            <Route path="/testnet/send" element={<AppLayout><TestnetSend /></AppLayout>} />
+            <Route path="/testnet" element={<Navigate to="/testnet/send" replace />} />
+            <Route path="/testnet/transactions" element={<Navigate to="/testnet/send" replace />} />
+            <Route path="/testnet/leaderboard" element={<Navigate to="/testnet/send" replace />} />
 
-            {/* Testnet */}
-            <Route path="/testnet" element={<TestnetHub />} />
-            <Route path="/testnet/send" element={<TestnetSend />} />
-            <Route path="/testnet/transactions" element={<TestnetTransactions />} />
-            {/* Leaderboard — commented out for now, uncomment when ready to launch it */}
-            {/* <Route path="/testnet/leaderboard" element={<TestnetLeaderboard />} /> */}
+            {/* /send is the mainnet flow and isn't live yet — it rendered a
+                wallet prompt that went nowhere. Points at the working flow
+                instead of removing the URL entirely. */}
+            <Route path="/send" element={<Navigate to="/testnet/send" replace />} />
 
-            {/* Admin (password protected) */}
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/stats" element={<StatsPage />} />
+            {/* ── Wallet ─────────────────────────────────────────── */}
+            <Route path="/connect" element={<BareLayout><ConnectWallet /></BareLayout>} />
 
-            {/* 404 */}
+            {/* ── Dashboard — renders its own sidebar ────────────── */}
+            <Route path="/dashboard" element={<BareLayout><Dashboard /></BareLayout>} />
+            <Route path="/dashboard/transactions" element={<BareLayout><Transactions /></BareLayout>} />
+            <Route path="/dashboard/wallet" element={<BareLayout><WalletPage /></BareLayout>} />
+            <Route path="/dashboard/notifications" element={<BareLayout><Notifications /></BareLayout>} />
+            <Route path="/dashboard/settings" element={<BareLayout><Settings /></BareLayout>} />
+
+            {/* ── Internal ───────────────────────────────────────── */}
+            <Route path="/admin" element={<BareLayout><AdminPage /></BareLayout>} />
+            <Route path="/stats" element={<BareLayout><StatsPage /></BareLayout>} />
+
+            {/* ── 404 ────────────────────────────────────────────── */}
             <Route path="*" element={
-              <PublicLayout>
+              <AppLayout>
                 <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
                   <p className="text-8xl font-bold text-[#1e2530] font-['Space_Grotesk'] mb-4">404</p>
                   <h1 className="text-2xl font-bold mb-3">Page not found</h1>
@@ -99,7 +112,7 @@ export default function App() {
                     Back to Home →
                   </a>
                 </div>
-              </PublicLayout>
+              </AppLayout>
             } />
           </Routes>
         </BrowserRouter>

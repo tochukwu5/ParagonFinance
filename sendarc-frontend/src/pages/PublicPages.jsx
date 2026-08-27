@@ -3,104 +3,252 @@ import { Link } from 'react-router-dom'
 import { COUNTRIES, COMPETITORS, REGIONS } from '../data/constants'
 import { Badge, Card, StatCard, LiveBadge } from '../components/UI'
 import Footer from '../components/Footer'
-import Navbar from '../components/Navbar'
 
-// ─── HOW IT WORKS ────────────────────────────────────────────────────
+// ─── Shared bits ──────────────────────────────────────────────────────────
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[11px] font-semibold tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] mb-3">
+      {children}
+    </p>
+  )
+}
+
+function InfoCard({ icon, title, desc }) {
+  return (
+    <div className="bg-[#0f1822] border border-[#1e2530] rounded-xl p-5 hover:border-[#00D4FF]/40 transition-all">
+      {icon && <div className="text-2xl mb-3">{icon}</div>}
+      <p className="font-semibold font-['Space_Grotesk'] text-white text-sm mb-2">{title}</p>
+      <p className="text-xs text-[#8892a0] leading-relaxed">{desc}</p>
+    </div>
+  )
+}
+
+function CheckRow({ label }) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-[#1e2530] last:border-0 text-sm">
+      <span className="text-[#8892a0]">{label}</span>
+      <span className="text-green-400 font-bold flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />Yes
+      </span>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HOW IT WORKS
+// Focused on what people can DO with the platform — the use cases and the
+// flow. The architecture behind it lives in Docs.
+// ═══════════════════════════════════════════════════════════════════════════
 export function HowItWorks() {
-  const steps = [
-    { num: '01', icon: '👛', tag: 'STEP ONE', title: 'Connect your wallet', desc: 'Connect MetaMask, Coinbase Wallet, or any EVM-compatible wallet. No bank account, no KYC for basic transfers. Your wallet is your identity on Arc Network.', details: [{ l: 'Supported wallets', v: 'MetaMask, WalletConnect, Coinbase' }, { l: 'Network', v: 'Arc Testnet (EVM)' }, { l: 'Token required', v: 'USDC (Circle)' }] },
-    { num: '02', icon: '💸', tag: 'STEP TWO', title: 'Enter amount & recipient', desc: 'Choose your source chain, enter how much USDC to send, pick the destination country, and paste or scan the recipient\'s wallet address. See exact fees before you send — no surprises.', details: [{ l: 'Source chains', v: 'Arc, Ethereum, Base, Arbitrum, Solana' }, { l: 'Destinations', v: '18+ countries worldwide' }, { l: 'Fee shown upfront', v: '~$0.003' }] },
-    { num: '03', icon: '⚡', tag: 'STEP THREE', title: 'Arc settles instantly', desc: 'Once you confirm the transaction in your wallet, Arc Network processes and finalises it in under one second. Deterministic finality no challenge period, no waiting.', details: [{ l: 'Settlement time', v: '< 1 second' }, { l: 'Finality type', v: 'Deterministic · Irreversible' }, { l: 'Network fee', v: '$0.003 USDC' }] },
-    { num: '04', icon: '✅', tag: 'STEP FOUR', title: 'Recipient gets USDC', desc: 'Your family receives USDC directly in their wallet. They can hold it, spend it, or cash out through local partners. An on-chain receipt is auto-generated and shareable via WhatsApp.', details: [{ l: 'Receipt type', v: 'On-chain · Downloadable PDF' }, { l: 'Shareable via', v: 'WhatsApp · Copy TX ID' }, { l: 'Explorer', v: 'ArcScan (public)' }] },
-  ]
-
-  const faqs = [
-    { q: 'Do I need a bank account?', a: 'No. Paragon Finance is fully non-custodial. You only need a crypto wallet like MetaMask. No bank account, no wire transfer, no paperwork.' },
-    { q: 'How does the recipient cash out?', a: 'Recipients can hold USDC in their wallet, spend it with USDC-accepting merchants, or use local partners like Mara, Yellow Card, or Binance P2P to convert to local currency.' },
-    { q: 'What is Arc Network?', a: 'Arc is a stablecoin-native Layer-1 blockchain built by Circle the company behind USDC. It offers sub-second finality, USDC-denominated fees, and is backed by Goldman Sachs, Mastercard, and Visa.' },
-    { q: 'Is my money safe?', a: 'USDC is fully backed 1:1 by US dollars and issued by Circle. Every transaction is recorded on-chain and publicly verifiable on ArcScan. Paragon Finance never holds your funds.' },
-  ]
-
   return (
     <>
-      <Navbar />
       <div className="bg-[#0D1117] min-h-screen">
-        <div className="relative overflow-hidden">
+
+        {/* ── HERO ── */}
+        <div className="relative overflow-hidden border-b border-[#1e2530]">
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 right-0 w-[500px] h-[400px] rounded-full bg-[#00D4FF] opacity-[0.05] blur-[100px]" />
+            <div className="absolute top-0 right-0 w-[600px] h-[400px] rounded-full bg-[#00D4FF] opacity-[0.05] blur-[120px]" />
           </div>
-          <div className="max-w-5xl mx-auto px-6 pt-16 pb-10 text-center">
-            <Badge>SIMPLE PROCESS</Badge>
-            <h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4">How <span className="gradient-text">Paragon Finance</span> Works</h1>
-            <p className="text-[#8892a0] text-base max-w-xl mx-auto leading-relaxed">Four simple steps. No bank account needed. Your family receives USDC in under one second on-chain and verifiable.</p>
+          <div className="max-w-6xl mx-auto px-6 pt-16 pb-14 relative text-center">
+            <Badge>HOW IT WORKS</Badge>
+            <h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4 font-['Space_Grotesk']">
+              One platform.<br />
+              <span className="gradient-text">Every stablecoin rail.</span>
+            </h1>
+            <p className="text-[#8892a0] text-base leading-relaxed max-w-2xl mx-auto">
+              Swap assets, access liquidity, move value across chains, and settle payments
+              globally — without hopping between half a dozen disconnected applications.
+            </p>
           </div>
         </div>
 
-        {/* Steps */}
-        <div className="max-w-5xl mx-auto px-6 pb-16">
-          <div className="space-y-6">
-            {steps.map((s, i) => (
-              <Card key={s.num} className="p-6 flex flex-col md:flex-row gap-6">
-                <div className="flex-shrink-0 flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#0a2030] border-2 border-[#00D4FF] flex items-center justify-center">
-                    <span className="text-[#00D4FF] font-bold text-sm font-['Space_Grotesk']">{s.num}</span>
-                  </div>
+        {/* ── THE FLOW ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>THE FLOW</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+            Four steps, under two minutes
+          </h2>
+          <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+            The same shape whether you're swapping stablecoins, bridging across chains,
+            or sending money to family.
+          </p>
+
+          <div className="space-y-5">
+            {[
+              {
+                num: '01',
+                title: 'Connect your wallet',
+                desc: 'MetaMask, Rabby, or Coinbase Wallet. No bank account, no signup form, no KYC gate before you can look around. Your wallet is your identity, and your balance is read directly from the chain.',
+              },
+              {
+                num: '02',
+                title: 'Choose what to do',
+                desc: 'Send stablecoins to a wallet, bridge USDC in from another network, or swap between USDC, EURC and cirBTC. Costs and expected output are shown before you commit to anything.',
+              },
+              {
+                num: '03',
+                title: 'Sign once',
+                desc: 'Paragon routes the transaction through the best available liquidity and settles it on Arc. Fees are denominated in USDC, so what you are quoted is what you pay — no gas token to acquire first, no volatile pricing.',
+              },
+              {
+                num: '04',
+                title: 'Settled and verifiable',
+                desc: 'Arc finalises in under a second. Every transaction produces an on-chain receipt you can check on ArcScan, download, or share — not a reference number you have to phone someone about.',
+              },
+            ].map(s => (
+              <div key={s.num} className="flex gap-5">
+                <div className="flex-shrink-0 w-11 h-11 rounded-full bg-[#0a2030] border-2 border-[#00D4FF] flex items-center justify-center">
+                  <span className="text-[#00D4FF] text-xs font-bold font-['Space_Grotesk']">{s.num}</span>
                 </div>
-                <div className="flex-1">
-                  <p className="section-label mb-2">{s.tag}</p>
-                  <h3 className="text-xl font-bold font-['Space_Grotesk'] mb-3">{s.title}</h3>
-                  <p className="text-[#8892a0] text-sm leading-relaxed mb-4">{s.desc}</p>
-                  <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 space-y-2">
-                    {s.details.map(d => (
-                      <div key={d.l} className="flex justify-between text-sm border-b border-[#1e2530] pb-2 last:border-0 last:pb-0">
-                        <span className="text-[#8892a0]">{d.l}</span>
-                        <span className="text-[#00D4FF] font-semibold">{d.v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
+                <Card className="flex-1 p-5 hover:border-[#00D4FF]/30 transition-all">
+                  <p className="font-bold font-['Space_Grotesk'] text-white text-sm mb-2">{s.title}</p>
+                  <p className="text-sm text-[#8892a0] leading-relaxed">{s.desc}</p>
+                </Card>
+              </div>
             ))}
           </div>
+        </div>
 
-          {/* FAQ */}
-          <div className="mt-16">
-            <h2 className="text-2xl font-bold font-['Space_Grotesk'] text-center mb-3">Frequently asked questions</h2>
-            <p className="text-center text-[#8892a0] text-sm mb-8">Everything you need to know about Paragon Finance</p>
-            <div className="space-y-3">
-              {faqs.map(f => (
-                <Card key={f.q} className="p-5">
-                  <p className="font-semibold font-['Space_Grotesk'] text-sm mb-2">{f.q}</p>
-                  <p className="text-[#8892a0] text-sm leading-relaxed">{f.a}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
+        {/* ── CORE USE CASES ── */}
+        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
+          <div className="max-w-6xl mx-auto">
+            <SectionLabel>WHAT YOU CAN DO</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              Core use cases
+            </h2>
+            <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+              Paragon is built as financial infrastructure rather than a single-purpose app.
+              Remittance is one thing it does well, not the whole of what it is.
+            </p>
 
-          {/* CTA */}
-          <div className="mt-12 text-center">
-            {/* Send Money CTA — disabled until Arc mainnet launches */}
-            <button
-              disabled
-              title="Arc Network mainnet has not launched yet"
-              className="inline-flex items-center gap-2 bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold text-base px-10 py-4 rounded-xl cursor-not-allowed mb-3"
-            >
-              Send money (🔒 Mainnet Coming Soon)
-            </button>
-            <div>
-              <Link to="/testnet" className="text-sm text-[#00D4FF] hover:underline">
-                Try the live testnet now →
-              </Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[
+                {
+                  icon: '🔄',
+                  title: 'DeFi swaps',
+                  desc: 'Swap supported assets through aggregated liquidity. Pricing is transparent, execution is routed for the best available fill, and slippage tolerance is yours to set.',
+                },
+                {
+                  icon: '🌊',
+                  title: 'Liquidity aggregation',
+                  desc: 'Rather than relying on one pool, Paragon routes across available liquidity sources. That means deeper books, better pricing, and less slippage — particularly on larger trades.',
+                },
+                {
+                  icon: '💵',
+                  title: 'Stablecoin finance',
+                  desc: 'Hold, convert and move USDC, EURC and cirBTC. Use them for payments, treasury, FX, or as the settlement asset for anything else on the platform.',
+                },
+                {
+                  icon: '🔗',
+                  title: 'Cross-chain DeFi',
+                  desc: 'Bring liquidity in from Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and more. Bridging happens through Circle CCTP, so the USDC that arrives is native, not wrapped.',
+                },
+                {
+                  icon: '🏛️',
+                  title: 'Treasury management',
+                  desc: 'Tools for organisations managing on-chain capital: stablecoin treasury, liquidity rebalancing, multi-asset positions, and cross-border movement between entities.',
+                },
+                {
+                  icon: '📈',
+                  title: 'Yield & DeFi integrations',
+                  desc: 'Access to lending protocols, liquidity markets and yield strategies. Which integrations ship depends on protocol availability, risk parameters and security review — we would rather be slow than sorry here.',
+                },
+                {
+                  icon: '🌍',
+                  title: 'Cross-border payments',
+                  desc: 'Diaspora transfers, business settlements, merchant payments, freelancer payouts. The rails that make remittance cheap are the same rails that make any cross-border payment cheap.',
+                },
+                {
+                  icon: '🏪',
+                  title: 'Merchant & business finance',
+                  desc: 'Accept stablecoin settlements, pay suppliers, move treasury between markets, and manage digital assets — without a correspondent bank in the middle taking a cut and a week.',
+                },
+              ].map(u => <InfoCard key={u.title} {...u} />)}
             </div>
           </div>
         </div>
+
+        {/* ── WHO IT'S FOR ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>WHO IT'S FOR</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
+            Built for people who move money
+          </h2>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { icon: '👨‍👩‍👧', label: 'Diaspora senders' },
+              { icon: '🏢', label: 'Businesses' },
+              { icon: '🏪', label: 'Merchants' },
+              { icon: '💻', label: 'Freelancers' },
+              { icon: '🎨', label: 'Creators' },
+              { icon: '⚡', label: 'DeFi users' },
+              { icon: '🛠️', label: 'Developers' },
+              { icon: '📊', label: 'Treasury managers' },
+              { icon: '🏦', label: 'Institutions' },
+              { icon: '🌍', label: 'Everyone else' },
+            ].map(a => (
+              <div key={a.label} className="bg-[#0f1822] border border-[#1e2530] rounded-xl p-4 text-center hover:border-[#00D4FF]/30 transition-all">
+                <div className="text-2xl mb-2">{a.icon}</div>
+                <p className="text-xs text-[#8892a0]">{a.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── COMPARISON ── */}
+        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
+          <div className="max-w-6xl mx-auto">
+            <SectionLabel>THE DIFFERENCE</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
+              Sending $100 across borders
+            </h2>
+
+            <Card className="overflow-hidden">
+              <div className="divide-y divide-[#1e2530]">
+                {COMPETITORS.map(r => (
+                  <div key={r.name} className={'flex justify-between items-center px-5 py-4 text-sm ' + (r.badge === 'best' ? 'bg-[#0a2030]' : '')}>
+                    <span className={r.badge === 'best' ? "text-white font-semibold font-['Space_Grotesk']" : 'text-[#8892a0]'}>
+                      {r.name}
+                    </span>
+                    <div className="flex gap-6 sm:gap-10">
+                      <span className={r.badge === 'best' ? 'text-[#00D4FF] font-bold' : 'text-red-400'}>{r.fee}</span>
+                      <span className={r.badge === 'best' ? 'text-green-400' : 'text-[#556]'}>{r.time}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        {/* ── CTA ── */}
+        <div className="max-w-6xl mx-auto px-6 py-16 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+            Try it on testnet
+          </h2>
+          <p className="text-[#8892a0] text-sm mb-8 max-w-lg mx-auto">
+            Send, bridge and swap on Arc Testnet with free USDC from Circle's faucet.
+            Everything works exactly as it will on mainnet.
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <Link to="/testnet/send"
+              className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
+              Launch testnet →
+            </Link>
+            <Link to="/docs"
+              className="border border-[#1e2530] text-[#8892a0] text-sm px-6 py-3 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
+              Read the docs
+            </Link>
+          </div>
+        </div>
+
       </div>
       <Footer />
     </>
   )
 }
 
-// ─── COUNTRIES PAGE ──────────────────────────────────────────────────
 export function CountriesPage() {
   const [activeRegion, setActiveRegion] = useState('All')
   const live = COUNTRIES.filter(c => c.status === 'live' && (activeRegion === 'All' || c.region === activeRegion))
@@ -108,7 +256,6 @@ export function CountriesPage() {
 
   return (
     <>
-      <Navbar />
       <div className="bg-[#0D1117] min-h-screen">
         <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 text-center">
           <Badge>GLOBAL REACH</Badge>
@@ -210,6 +357,7 @@ export function CountriesPage() {
 }
 
 // ─── RATES PAGE ──────────────────────────────────────────────────────
+
 export function RatesPage() {
   const [sendAmount, setSendAmount] = useState(100)
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
@@ -217,7 +365,6 @@ export function RatesPage() {
 
   return (
     <>
-      <Navbar />
       <div className="bg-[#0D1117] min-h-screen">
         <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 text-center">
           <Badge>TRANSPARENT PRICING</Badge>
@@ -321,161 +468,285 @@ export function RatesPage() {
 }
 
 // ─── ABOUT PAGE ──────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ABOUT
+// The why: what's broken, what we're building, who's building it. The how
+// lives in Docs.
+// ═══════════════════════════════════════════════════════════════════════════
 export function AboutPage() {
   return (
     <>
-      <Navbar />
       <div className="bg-[#0D1117] min-h-screen">
 
-        {/* Hero */}
-        <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div>
-            <Badge>OUR STORY</Badge>
-            <h1 className="text-4xl font-bold mt-5 mb-4 font-['Space_Grotesk']">
-              Designed by Developers, for <span className="gradient-text">for Real-World Needs</span>
-            </h1>
-            <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
-              Paragon Finance was born from a simple frustration — watching family members receive less money than was sent, eaten up by fees and delays from legacy remittance providers.
-            </p>
-            <p className="text-[#8892a0] leading-relaxed text-sm">
-              We built Paragon Finance on Arc Network because it is the most direct and honest infrastructure for moving value across borders. Near-zero fees. Sub-second finality. USDC backed 1:1 by US dollars.
-            </p>
+        {/* ── HERO ── */}
+        <div className="relative overflow-hidden border-b border-[#1e2530]">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 right-0 w-[600px] h-[400px] rounded-full bg-[#00D4FF] opacity-[0.05] blur-[120px]" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[300px] rounded-full bg-[#0055FF] opacity-[0.04] blur-[100px]" />
           </div>
-          <Card glow className="p-6">
-            <p className="section-label mb-3">OUR MISSION</p>
-            <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
-              More money should reach the family, not the middleman. Building instant, borderless remittances with stablecoins — predictable fees, zero delays. The new way to send money home.
-            </p>
-          </Card>
+          <div className="max-w-6xl mx-auto px-6 pt-16 pb-12 grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative">
+            <div>
+              <Badge>OUR STORY</Badge>
+              <h1 className="text-4xl font-bold mt-5 mb-4 font-['Space_Grotesk']">
+                Financial infrastructure,{' '}
+                <span className="gradient-text">built for how money actually moves</span>
+              </h1>
+              <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
+                Paragon Finance started from a frustration most people in this part of the world
+                know first-hand: watching money sent home arrive smaller than it left, days later
+                than promised, with no way to see where it went in between.
+              </p>
+              <p className="text-[#8892a0] leading-relaxed text-sm">
+                Fixing that meant building on rails that settle in seconds and cost fractions of a
+                cent. But once those rails exist, they don't only carry remittances. They carry
+                swaps, treasury movement, merchant settlement, and everything else that has been
+                waiting on infrastructure this cheap and this fast.
+              </p>
+            </div>
+            <Card glow className="p-6">
+              <SectionLabel>OUR MISSION</SectionLabel>
+              <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
+                To provide accessible, transparent, and programmable financial infrastructure that
+                lets people and businesses interact with stablecoins, liquidity, DeFi, and
+                cross-border finance through a single platform.
+              </p>
+            </Card>
+          </div>
         </div>
 
-        {/* Problem */}
-        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6 mb-14">
+        {/* ── THE PROBLEM ── */}
+        <div className="bg-[#0f1822] border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <p className="section-label text-center mb-3">THE OPPORTUNITY</p>
-            <h2 className="text-2xl font-bold text-center mb-3 font-['Space_Grotesk']">
-              Global remittance is broken
+            <SectionLabel>THE PROBLEM</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              On-chain finance works. Getting to it doesn't.
             </h2>
-            <p className="text-center text-[#8892a0] text-sm max-w-xl mx-auto mb-10">
-              Billions of people send money across borders every year, but the system is slow, expensive, and built for banks — not people. Paragon Finance changes that with near-zero fees and instant settlement.
+            <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+              Decentralised finance created real opportunities, but reaching them is fragmented.
+              To do anything meaningful, people end up juggling separate applications for each
+              step — and liquidity is scattered across protocols and networks in the same way.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
               {[
-                { num: '$800B', title: 'Sent globally in remittances annually', desc: 'Over $800 billion moves across borders every year — most of it eaten by fees and delays.' },
-                { num: '8%', title: 'Average remittance fee to Africa', desc: 'Nearly 3x what it costs using stablecoins on Arc Network.' },
-                { num: '$0.003', title: 'Paragon Finance fee per transaction', desc: 'Fractions of a cent — regardless of whether you send $10 or $10,000.' },
-              ].map(s => (
-                <Card key={s.num} className="p-6">
-                  <div className="text-3xl font-bold text-[#00D4FF] font-['Space_Grotesk'] mb-2">{s.num}</div>
-                  <p className="font-semibold font-['Space_Grotesk'] mb-2 text-sm">{s.title}</p>
-                  <p className="text-xs text-[#8892a0] leading-relaxed">{s.desc}</p>
-                </Card>
-              ))}
+                {
+                  icon: '🧩',
+                  title: 'Fragmented tools',
+                  desc: 'Swap on one platform, bridge on another, find liquidity on a third, handle payments somewhere else entirely. Each with its own wallet connection, its own fees, and its own way of going wrong.',
+                },
+                {
+                  icon: '🌊',
+                  title: 'Fragmented liquidity',
+                  desc: 'Liquidity split across protocols and chains means worse execution, higher slippage, and costs that only become visible after the transaction has gone through.',
+                },
+                {
+                  icon: '💸',
+                  title: 'Expensive rails',
+                  desc: 'Traditional cross-border transfer averages 6 to 8 percent, and sending $100 by bank wire can cost $25 before the exchange rate markup is counted.',
+                },
+                {
+                  icon: '🚫',
+                  title: 'Access gaps',
+                  desc: 'For Global users and businesses, all of the above compounds: limited access to global financial infrastructure, fragmented payment systems, and conversion friction at every border.',
+                },
+              ].map(p => <InfoCard key={p.title} {...p} />)}
+            </div>
+
+            <Card className="p-6">
+              <p className="text-sm leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
+                Paragon exists to collapse that. Instead of requiring people to move between
+                disconnected applications, it aims to be a single gateway to stablecoin-powered
+                finance.
+              </p>
+            </Card>
+          </div>
+        </div>
+
+        {/* ── VISION & MISSION ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>VISION &amp; MISSION</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
+            Where this is going
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Card className="p-6">
+              <SectionLabel>VISION</SectionLabel>
+              <p className="text-white font-['Space_Grotesk'] font-semibold text-sm leading-relaxed">
+                To become a leading global-focused DeFi and stablecoin platform, connecting users,
+                businesses, liquidity, and decentralised financial infrastructure — and making
+                on-chain finance usable for everyday financial activity, not just for traders.
+              </p>
+            </Card>
+            <Card glow className="p-6">
+              <SectionLabel>MISSION</SectionLabel>
+              <p className="text-white font-['Space_Grotesk'] font-semibold text-sm leading-relaxed">
+                To provide accessible, transparent, and programmable financial infrastructure that
+                enables users and businesses to interact with DeFi, stablecoins, liquidity, and
+                cross-border finance through a unified platform.
+              </p>
+            </Card>
+          </div>
+        </div>
+
+        {/* ── WHY ARC ── */}
+        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
+          <div className="max-w-6xl mx-auto">
+            <SectionLabel>WHY ARC NETWORK</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              Built on infrastructure designed for money
+            </h2>
+            <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+              Arc is built around stablecoin-native financial activity rather than general-purpose
+              computation. That focus is the reason Paragon can offer predictable costs and
+              sub-second settlement without asking users to understand any of it.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+              {[
+                { icon: '💵', title: 'Stablecoin gas', desc: 'Arc uses USDC to pay for transactions. Costs are predictable and quoted in the same unit users are already holding — no separate gas token to acquire first.' },
+                { icon: '⚡', title: 'Fast finality', desc: 'Transactions finalise in under a second, with no challenge period. The settlement is final the moment it happens.' },
+                { icon: '🔗', title: 'EVM compatible', desc: 'Solidity contracts, existing Ethereum tooling, and wallet integrations all work — which means less bespoke infrastructure and fewer places for things to break.' },
+                { icon: '🌐', title: 'Cross-chain native', desc: 'Circle CCTP connects Arc to Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and more, so liquidity can come from wherever it already sits.' },
+                { icon: '🏛️', title: 'Institutional backing', desc: 'Arc is built by Circle and backed by Goldman Sachs, Mastercard and Visa — the institutions behind existing global payments infrastructure.' },
+                { icon: '✅', title: 'Compliance-ready', desc: 'Enterprise-grade infrastructure supporting regulated payment flows, transparent auditing, and institutional financial tooling.' },
+              ].map(f => <InfoCard key={f.title} {...f} />)}
+            </div>
+
+            <div className="bg-[#0a2030] border-2 border-[#00D4FF] rounded-2xl p-8">
+              <div className="flex items-center gap-4 mb-6 flex-wrap">
+                <div className="bg-[#0D1117] border border-[#00D4FF] rounded-lg px-4 py-2 text-[#00D4FF] font-bold text-sm">
+                  Arc Network
+                </div>
+                <div>
+                  <p className="font-bold font-['Space_Grotesk']">Built on Arc — powered by Circle</p>
+                  <p className="text-xs text-[#8892a0] mt-0.5">
+                    Stablecoin-native Layer-1 · Backed by Goldman Sachs, Mastercard &amp; Visa
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { v: '$0.003', l: 'AVG FEE PER TX' },
+                  { v: '<1s', l: 'FINALITY' },
+                  { v: '100%', l: 'USDC BACKED' },
+                  { v: 'EVM', l: 'COMPATIBLE' },
+                ].map(s => (
+                  <div key={s.l} className="text-center bg-[#0D1117] border border-[#1e2530] rounded-xl p-4">
+                    <p className="text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{s.v}</p>
+                    <p className="text-[10px] text-[#8892a0] tracking-widest mt-1">{s.l}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Team */}
-        <div className="max-w-6xl mx-auto px-6 mb-14">
-          <p className="section-label mb-3">THE BUILDERS</p>
-          <h2 className="text-2xl font-bold mb-8 font-['Space_Grotesk']">Who's behind Paragon Finance</h2>
+        {/* ── TEAM ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>THE BUILDERS</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
+            Who's behind Paragon Finance
+          </h2>
 
           <div className="space-y-5">
-
-            {/* Julius — Founder */}
-            <Card className="p-7 flex flex-col md:flex-row gap-6 items-start">
-  <div className="w-16 h-16 rounded-2xl bg-[#0a2030] border-2 border-[#00D4FF] flex items-center justify-center text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk'] flex-shrink-0">
-    EJ
-  </div>
-
-  <div className="flex-1">
-    <div className="flex flex-wrap items-center gap-3 mb-1">
-      <h3 className="text-xl font-bold font-['Space_Grotesk']">Eze J.</h3>
-      <span className="text-xs text-[#556] font-mono">@6figuresdev33</span>
-    </div>
-
-    <p className="text-sm text-[#00D4FF] mb-3">
-      Founder of <span className="font-bold">@ParagonFinance</span> | Solidity Developer
-    </p>
-
-    <p className="text-sm text-[#8892a0] leading-relaxed mb-4">
-      Eze Julius is a Solidity and Web3 developer with over 6 years of experience building decentralized applications and blockchain-powered financial systems. He is the founder of @ParagonFinance, a stablecoin-powered cross-border payment and remittance platform built on Arc, designed to make global money transfers faster, cheaper, and more accessible using blockchain technology.
-    </p>
-
-    <div className="flex gap-2 flex-wrap">
-      {[
-        'Solidity',
-        'Ethereum',
-        'Smart Contracts',
-        'Web3',
-        'DeFi',
-        'Founder @ParagonFinance'
-      ].map(t => (
-        <span key={t} className="text-xs border border-[#1e2530] text-[#8892a0] px-3 py-1 rounded-full">
-          {t}
-        </span>
-      ))}
-    </div>
-  </div>
-</Card>
-
-            {/* David — Co-Founder */}
             <Card className="p-7 flex flex-col md:flex-row gap-6 items-start">
               <div className="w-16 h-16 rounded-2xl bg-[#0a2030] border-2 border-[#00D4FF] flex items-center justify-center text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk'] flex-shrink-0">
-                DE
+                EJ
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-3 mb-1">
-                  <h3 className="text-xl font-bold font-['Space_Grotesk']">David E.</h3>
-                  <span className="text-xs text-[#556] font-mono">@daviwork</span>
+                  <h3 className="text-xl font-bold font-['Space_Grotesk']">Eze Julius</h3>
+                  <span className="text-xs text-[#556] font-mono">@6figuresdev33</span>
                 </div>
                 <p className="text-sm text-[#00D4FF] mb-3">
-                  Co-Founder of <span className="font-bold">@ParagonFinance</span> | Fullstack Developer
+                  Founder of <span className="font-bold">Paragon Finance</span> | Fullstack Developer
                 </p>
                 <p className="text-sm text-[#8892a0] leading-relaxed mb-4">
-                  David is a MERN stack developer with over 5 years of experience building production-grade web applications. He studied Computer Statistics at the University of Nigeria, Nsukka, and currently works as a Fullstack Developer at Enzo Solution Network while co-founding Paragon Finance as an open contribution to borderless financial infrastructure.
+                  Eze Julius is a MERN stack developer and builder with over 4 years of
+                  experience building scalable web applications and digital products. He founded
+                  Paragon Finance to make stablecoin-powered financial infrastructure accessible to
+                  users and businesses across Africa and beyond.
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  {['React.js', 'Node.js', 'MongoDB', 'Tailwind CSS', 'Web3', 'Enugu, Nigeria 🇳🇬'].map(t => (
+                  {['React.js', 'Node.js', 'MongoDB', 'Tailwind CSS', 'Web3', 'Founder'].map(t => (
                     <span key={t} className="text-xs border border-[#1e2530] text-[#8892a0] px-3 py-1 rounded-full">{t}</span>
                   ))}
                 </div>
               </div>
             </Card>
 
+            <Card className="p-7 flex flex-col md:flex-row gap-6 items-start">
+              <div className="w-16 h-16 rounded-2xl bg-[#0a2030] border-2 border-[#00D4FF] flex items-center justify-center text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk'] flex-shrink-0">
+                DE
+              </div>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <h3 className="text-xl font-bold font-['Space_Grotesk']">David Emeremgini</h3>
+                  <span className="text-xs text-[#556] font-mono">@Tochimmxm</span>
+                </div>
+                <p className="text-sm text-[#00D4FF] mb-3">
+                  Co-Founder of <span className="font-bold">Paragon Finance</span> | Fullstack Developer
+                </p>
+                <p className="text-sm text-[#8892a0] leading-relaxed mb-4">
+                  David is a full-stack developer with 5+ years of experience building modern web applications.
+                   He is also a co-founder and developer at Paragon Finance, focused on creating simpler solutions 
+                   for global payments.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {['React.js', 'Node.js', 'MongoDB', 'Tailwind CSS', 'Web3', 'Co-Founder'].map(t => (
+                    <span key={t} className="text-xs border border-[#1e2530] text-[#8892a0] px-3 py-1 rounded-full">{t}</span>
+                  ))}
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
 
-        {/* Arc Banner */}
-        <div className="max-w-6xl mx-auto px-6 mb-16">
-          <div className="bg-[#0a2030] border-2 border-[#00D4FF] rounded-2xl p-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="bg-[#0D1117] border border-[#00D4FF] rounded-lg px-4 py-2 text-[#00D4FF] font-bold text-sm">
-                Arc Network
-              </div>
+        {/* ── LONG-TERM VISION ── */}
+        <div className="bg-[#0f1822] border-t border-[#1e2530] py-14 px-6">
+          <div className="max-w-6xl mx-auto">
+            <SectionLabel>LONG-TERM VISION</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-6 font-['Space_Grotesk']">
+              Beyond a single-purpose app
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
               <div>
-                <p className="font-bold font-['Space_Grotesk']">Built on Arc — powered by Circle</p>
-                <p className="text-xs text-[#8892a0] mt-0.5">
-                  Stablecoin-native Layer-1 · Backed by Goldman Sachs, Mastercard &amp; Visa
+                <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
+                  Financial infrastructure is moving on-chain, and the shape it's taking is
+                  stablecoin-powered, programmable, interoperable and global. Paragon aims to be the
+                  layer that connects people and businesses to it.
+                </p>
+                <p className="text-[#8892a0] leading-relaxed text-sm">
+                  From swapping assets and accessing liquidity to managing treasury capital and
+                  moving money across borders — the objective is to make decentralised financial
+                  infrastructure something people can actually use, without needing to understand
+                  what's underneath.
                 </p>
               </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-              {[
-                { v: '$0.003', l: 'AVG FEE PER TX' },
-                { v: '<1s', l: 'FINALITY' },
-                { v: '100%', l: 'USDC BACKED' },
-                { v: 'EVM', l: 'COMPATIBLE' },
-              ].map(s => (
-                <div key={s.l} className="text-center bg-[#0D1117] border border-[#1e2530] rounded-xl p-4">
-                  <p className="text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{s.v}</p>
-                  <p className="text-[10px] text-[#8892a0] tracking-widest mt-1">{s.l}</p>
+              <Card glow className="p-6">
+                <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4 mb-5">
+                  Remittance remains an important application. It is no longer the limit of the
+                  platform.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <Link to="/testnet/send"
+                    className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
+                    Launch app →
+                  </Link>
+                  <Link to="/docs"
+                    className="border border-[#1e2530] text-[#8892a0] text-sm px-5 py-2.5 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
+                    Read the docs
+                  </Link>
                 </div>
-              ))}
+              </Card>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {['Goldman Sachs', 'Mastercard', 'Visa', 'Circle (USDC)', 'CCTP'].map(b => (
-                <span key={b} className="text-xs bg-[#13181f] border border-[#1e2530] px-3 py-1.5 rounded-lg text-[#8892a0]">{b}</span>
+
+            <div className="flex gap-2 flex-wrap justify-center mt-10">
+              {['Built on Arc', 'Powered by stablecoins', 'Connected to DeFi'].map(t => (
+                <span key={t} className="text-xs bg-[#0D1117] border border-[#1e2530] px-4 py-2 rounded-full text-[#8892a0]">
+                  {t}
+                </span>
               ))}
             </div>
           </div>
@@ -487,292 +758,404 @@ export function AboutPage() {
   )
 }
 
-
-// ─── DOCS PAGE ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// DOCS
+// The whitepaper: architecture, infrastructure, security, roadmap. The
+// narrative lives in About; the practical guide lives in How It Works.
+// ═══════════════════════════════════════════════════════════════════════════
 export function DocsPage() {
   return (
     <>
-      <Navbar />
       <div className="bg-[#0D1117] min-h-screen">
 
         {/* ── HERO ── */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden border-b border-[#1e2530]">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-0 right-0 w-[600px] h-[400px] rounded-full bg-[#00D4FF] opacity-[0.05] blur-[120px]" />
             <div className="absolute bottom-0 left-0 w-[400px] h-[300px] rounded-full bg-[#0055FF] opacity-[0.04] blur-[100px]" />
           </div>
-          <div className="max-w-6xl mx-auto px-6 pt-16 pb-12 grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative">
-            <div>
-              <Badge>WHITE PAPER v1.0</Badge>
-              <h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4 font-['Space_Grotesk']">
-                Paragon Finance <span className="gradient-text">Documentation</span>
-              </h1>
-              <p className="text-[#8892a0] leading-relaxed mb-2 text-sm">
-                Borderless Money Infrastructure Built on Arc Network.
-              </p>
-              <p className="text-[#8892a0] leading-relaxed mb-6 text-sm">
-                This document covers the full architecture, use cases, security model, and roadmap of the Paragon Finance protocol.
-              </p>
-              <div className="flex gap-3 flex-wrap">
-                {/* <a href="/testnet/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
-                  Launch App →
-                </a> */}
-                <a href="https://www.arc.network" target="_blank" rel="noreferrer"
-                  className="border border-[#1e2530] text-[#8892a0] text-sm px-6 py-3 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
-                  Arc Network ↗
-                </a>
-              </div>
+          <div className="max-w-6xl mx-auto px-6 pt-16 pb-12 relative">
+            <div className="flex items-center gap-2 text-xs text-[#8892a0] mb-5">
+              <Link to="/" className="hover:text-white transition-colors">Home</Link>
+              <span>/</span>
+              <span className="text-[#00D4FF]">Documentation</span>
             </div>
-            <Card glow className="p-6">
-              <p className="section-label mb-3">CORE TAGLINE</p>
-              <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4 mb-5">
-                "Move money faster. Move money cheaper. Move money globally. Built on Arc. Powered by Stablecoins."
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { v: '<1s', l: 'Settlement' },
-                  { v: '$0.003', l: 'Avg Fee' },
-                  { v: 'EVM', l: 'Compatible' },
-                  { v: '8', l: 'Destinations' },
-                ].map(s => (
-                  <div key={s.l} className="bg-[#0D1117] border border-[#1e2530] rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold text-[#00D4FF] font-['Space_Grotesk']">{s.v}</p>
-                    <p className="text-[10px] text-[#8892a0] tracking-widest mt-0.5">{s.l}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <Badge>WHITE PAPER v2.0</Badge>
+            <h1 className="text-4xl md:text-5xl font-bold font-['Space_Grotesk'] mt-5 mb-4">
+              Paragon Finance <span className="gradient-text">Documentation</span>
+            </h1>
+            <p className="text-[#8892a0] text-base leading-relaxed max-w-2xl mb-8">
+              Global all-in-one financial infrastructure, built on Arc Network. This document covers
+              the architecture, infrastructure, security model and roadmap of the Paragon protocol.
+            </p>
+            <div className="flex gap-3 flex-wrap">
+              <Link to="/testnet/send"
+                className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
+                Launch app →
+              </Link>
+              <a href="https://docs.arc.io" target="_blank" rel="noreferrer"
+                className="border border-[#1e2530] text-[#8892a0] text-sm px-6 py-3 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
+                Arc Network docs ↗
+              </a>
+            </div>
           </div>
         </div>
 
         {/* ── EXECUTIVE SUMMARY ── */}
-        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
-          <div className="max-w-6xl mx-auto">
-            <p className="section-label text-center mb-3">EXECUTIVE SUMMARY</p>
-            <h2 className="text-2xl font-bold text-center mb-3 font-['Space_Grotesk']">What Paragon Finance is building</h2>
-            <p className="text-center text-[#8892a0] text-sm max-w-2xl mx-auto mb-10 leading-relaxed">
-              Paragon Finance is a stablecoin-powered cross-border payment and remittance infrastructure designed to transform how money moves globally built natively on Arc Network, leveraging programmable stablecoin rails for instant, low-cost, and transparent financial transactions.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
-              {[
-                { icon: '⚡', title: 'Stablecoin-native settlement', desc: 'USDC transfers settled directly on-chain instant, final, and publicly verifiable on ArcScan.' },
-                { icon: '💰', title: 'Predictable $0.003 fee', desc: 'Fixed, USDC-denominated cost per transaction. Never volatile, never a surprise regardless of amount sent.' },
-                { icon: '🔗', title: 'Crosschain interoperability', desc: 'Send from Ethereum, Base, Arbitrum, or Solana all routed through Circle CCTP and settled on Arc.' },
-                { icon: '🌍', title: 'Real-time payments', desc: '8 live destinations with exchange rates refreshed every 60 seconds from live market data.' },
-                { icon: '⚙️', title: 'EVM-compatible', desc: 'Solidity smart contracts on Arc  proven, auditable infrastructure built for financial activity.' },
-                { icon: '📄', title: 'On-chain receipts', desc: 'Auto-generated receipts for every transfer downloadable as PDF and shareable via WhatsApp.' },
-              ].map(f => (
-                <Card key={f.title} className="p-5 flex gap-4 hover:border-[#00D4FF]/40 transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-[#0a2030] border border-[#00D4FF]/30 flex items-center justify-center flex-shrink-0 text-lg">
-                    {f.icon}
-                  </div>
-                  <div>
-                    <p className="font-semibold font-['Space_Grotesk'] text-sm mb-1">{f.title}</p>
-                    <p className="text-xs text-[#8892a0] leading-relaxed">{f.desc}</p>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── VISION & MISSION ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <p className="section-label mb-3">VISION & MISSION</p>
-          <h2 className="text-2xl font-bold mb-8 font-['Space_Grotesk']">Why we exist</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-            <Card className="p-6">
-              <p className="section-label mb-3">VISION</p>
-              <p className="text-white font-['Space_Grotesk'] font-semibold text-sm leading-relaxed">
-                To become the leading stablecoin-powered financial infrastructure layer for borderless payments and programmable money movement starting with the most underserved remittance corridors in the world.
+          <SectionLabel>EXECUTIVE SUMMARY</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-5 font-['Space_Grotesk']">
+            What Paragon is building
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start mb-10">
+            <div>
+              <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
+                Paragon Finance is a stablecoin-native DeFi platform built on Arc Network, designed
+                to give users and businesses access to decentralised financial infrastructure
+                through a single ecosystem.
               </p>
-            </Card>
+              <p className="text-[#8892a0] leading-relaxed text-sm">
+                It brings together swaps, liquidity aggregation, stablecoin finance, cross-chain
+                infrastructure, treasury tools and cross-border payments — improving liquidity,
+                execution, transparency and accessibility for users across Africa and globally.
+              </p>
+            </div>
             <Card glow className="p-6">
-              <p className="section-label mb-3">MISSION</p>
-              <p className="text-white font-['Space_Grotesk'] font-semibold text-sm leading-relaxed">
-                To provide instant, affordable, transparent, and secure cross-border financial services powered by blockchain infrastructure accessible to anyone with a crypto wallet.
+              <SectionLabel>POSITIONING</SectionLabel>
+              <p className="text-white font-['Space_Grotesk'] font-semibold text-base italic border-l-2 border-[#00D4FF] pl-4 leading-relaxed">
+                "Built on Arc. Powered by stablecoins. Connected to DeFi."
               </p>
+              <div className="flex gap-2 flex-wrap mt-4">
+                {['<1s Settlement', '$0.003 Fee', 'EVM Compatible', 'Multi-chain'].map(t => (
+                  <span key={t} className="text-[11px] border border-[#1e2530] text-[#8892a0] px-2.5 py-1 rounded-full">{t}</span>
+                ))}
+              </div>
             </Card>
           </div>
-          <Card className="p-6">
-            <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
-              "More money should reach the family, not the middleman. Building instant, borderless remittances with stablecoins  predictable fees, zero delays. The new way to send money home."
-            </p>
-          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {[
+              { icon: '💵', title: 'Stablecoin-native settlement', desc: 'USDC transfers settle directly on-chain — instant, final and verifiable.' },
+              { icon: '📊', title: 'Predictable costs', desc: 'Fees denominated in USDC. Never volatile, never a surprise at signing time.' },
+              { icon: '🔗', title: 'Crosschain interoperability', desc: 'Liquidity from Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and more.' },
+              { icon: '⚙️', title: 'EVM-compatible', desc: 'Solidity contracts on proven, auditable infrastructure with existing tooling.' },
+              { icon: '🌊', title: 'Liquidity aggregation', desc: 'Routing across multiple sources rather than depending on any single pool.' },
+              { icon: '📄', title: 'On-chain receipts', desc: 'Every transaction publicly verifiable on ArcScan — no reference numbers to chase.' },
+            ].map(f => <InfoCard key={f.title} {...f} />)}
+          </div>
         </div>
 
-        {/* ── PROBLEM STATEMENT ── */}
+        {/* ── ARC INFRASTRUCTURE ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <p className="section-label text-center mb-3">THE PROBLEM</p>
-            <h2 className="text-2xl font-bold text-center mb-3 font-['Space_Grotesk']">The remittance system is broken</h2>
-            <p className="text-center text-[#8892a0] text-sm max-w-xl mx-auto mb-10 leading-relaxed">
-              Every year, billions of dollars flow across borders through remittances. Yet the current ecosystem remains expensive, slow, fragmented, and highly dependent on intermediaries.
+            <SectionLabel>CORE INFRASTRUCTURE</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              Arc infrastructure powering Paragon
+            </h2>
+            <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+              Arc is purpose-built for real-world financial activity rather than generalised
+              computation. Each property below maps to something Paragon could not otherwise offer.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+
+            <div className="space-y-4">
               {[
-                { icon: '💸', title: 'High Fees', desc: 'Transfer fees erode remittance value, hitting recipients hardest. Average global fee sits at 6–8% per transaction sending $100 via bank wire costs up to $25 in fees alone.' },
-                { icon: '⏳', title: 'Slow Settlement', desc: 'Settlements take 1–5 business days, creating uncertainty for families and businesses that need money now not next week.' },
-                { icon: '📉', title: 'Poor FX Rates', desc: 'Currency conversion markups add hidden costs on top of the stated fee. Recipients often receive far less than the sender intended.' },
-                { icon: '🚫', title: 'Limited Access', desc: 'Banking restrictions and infrastructure gaps exclude millions from the financial system entirely no bank account means no transfer.' },
-              ].map(p => (
-                <Card key={p.title} className="p-6">
-                  <div className="text-2xl mb-3">{p.icon}</div>
-                  <p className="font-semibold font-['Space_Grotesk'] text-sm mb-2">{p.title}</p>
-                  <p className="text-xs text-[#8892a0] leading-relaxed">{p.desc}</p>
-                </Card>
-              ))}
-            </div>
-            <Card className="overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#1e2530]">
-                <p className="text-[10px] tracking-widest text-[#8892a0] font-['Space_Grotesk']">SENDING $100 — ALL PROVIDERS COMPARED</p>
-              </div>
-              {[
-                { provider: 'Paragon Finance (Arc Network)', fee: '$0.003', time: '0.78 seconds', best: true },
-                { provider: 'Western Union', fee: '~$5.00', time: '1–5 business days', best: false },
-                { provider: 'Bank Wire', fee: '~$25.00', time: '2–5 business days', best: false },
-                { provider: 'PayPal', fee: '~$4.99', time: '3–5 days to withdraw', best: false },
-              ].map(r => (
-                <div key={r.provider} className={`flex justify-between items-center px-5 py-4 text-sm border-b border-[#1e2530] last:border-0 ${r.best ? 'bg-[#0a2030]' : ''}`}>
-                  <span className={r.best ? 'text-white font-semibold font-["Space_Grotesk"]' : 'text-[#8892a0]'}>{r.provider}</span>
-                  <div className="flex gap-10">
-                    <span className={r.best ? 'text-[#00D4FF] font-bold' : 'text-red-400'}>{r.fee}</span>
-                    <span className={r.best ? 'text-green-400' : 'text-[#556]'}>{r.time}</span>
+                {
+                  num: '5.1',
+                  name: 'Stablecoin-based gas',
+                  color: '#00D4FF',
+                  desc: 'Arc uses USDC as gas, giving predictable transaction costs and removing exposure to volatile gas pricing. For Paragon this means costs users can forecast, a simpler experience, and more reliable financial operations.',
+                },
+                {
+                  num: '5.2',
+                  name: 'Fast finality',
+                  color: '#00FFCC',
+                  desc: 'Transactions finalise in under a second with no challenge period. That supports rapid swaps, faster settlement, responsive DeFi applications, and payment execution that completes while the user is still watching.',
+                },
+                {
+                  num: '5.3',
+                  name: 'EVM compatibility',
+                  color: '#0080FF',
+                  desc: 'Solidity contracts and existing Ethereum-compatible infrastructure work directly. That enables contract deployment, DeFi protocol integrations, wallet support, developer tooling, and programmable financial applications.',
+                },
+                {
+                  num: '5.4',
+                  name: 'Cross-chain infrastructure',
+                  color: '#00D4FF',
+                  desc: 'Circle CCTP connects Arc to supported networks, enabling cross-chain asset movement, stablecoin bridging, access to external liquidity, and multi-chain DeFi integrations — with native USDC on arrival rather than a wrapped derivative.',
+                },
+                {
+                  num: '5.5',
+                  name: 'Financial infrastructure',
+                  color: '#00FFCC',
+                  desc: 'A foundation for transparent, programmable financial applications: DeFi products, treasury systems, payment infrastructure, liquidity systems and financial automation.',
+                },
+              ].map(l => (
+                <div key={l.num} className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 flex gap-5 hover:border-[#00D4FF]/30 transition-all">
+                  <div className="flex-shrink-0 w-12 h-10 rounded-lg flex items-center justify-center text-xs font-bold font-['Space_Grotesk']"
+                    style={{ background: l.color + '15', border: '1px solid ' + l.color + '40', color: l.color }}>
+                    {l.num}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold font-['Space_Grotesk'] text-white text-sm mb-1.5">{l.name}</p>
+                    <p className="text-xs text-[#8892a0] leading-relaxed">{l.desc}</p>
                   </div>
                 </div>
-              ))}
-            </Card>
-          </div>
-        </div>
-
-        {/* ── WHY ARC ── */}
-        <div className="max-w-6xl mx-auto px-6 py-14">
-          <p className="section-label mb-3">WHY ARC NETWORK</p>
-          <h2 className="text-2xl font-bold mb-3 font-['Space_Grotesk']">Built on the right infrastructure</h2>
-          <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            Paragon Finance is built on Arc because Arc is purpose-built for real world financial activity not speculation or generalized computation. Arc focuses entirely on stablecoin-native execution, making it the ideal foundation for a remittance product that real people depend on.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-            {[
-              { icon: '💵', title: 'Stablecoin-Based Gas Fees', desc: 'Arc uses USDC as gas eliminating volatile fees. For Paragon Finance this means always $0.003, reliable remittance pricing, and easy financial forecasting.' },
-              { icon: '⚡', title: 'Deterministic Finality', desc: 'Transactions finalize in under 1 second on Arc. Paragon Finance users send and receive instantly no uncertainty, no counterparty risk, no waiting.' },
-              { icon: '🔗', title: 'EVM Compatibility', desc: 'Arc is fully EVM-compatible. Paragon Finance deploys Solidity smart contracts and integrates Ethereum tooling on a proven, auditable foundation.' },
-                { icon: '🌐', title: 'Crosschain via CCTP', desc: "Arc integrates with Circle's CCTP bridge, enabling Paragon Finance to accept USDC from Ethereum, Base, Arbitrum, and Solana for settlement." },
-              { icon: '🏛️', title: 'Institutional Backing', desc: 'Backed by Goldman Sachs, Mastercard, and Visa the same institutions behind global payments infrastructure Paragon Finance is here to improve.' },
-              { icon: '✅', title: 'Compliance-Ready', desc: 'Arc provides enterprise grade infrastructure enabling regulated payment flows, transparent auditing, and institutional-grade financial tooling.' },
-            ].map(f => (
-              <Card key={f.title} className="p-5">
-                <div className="text-2xl mb-3">{f.icon}</div>
-                <p className="font-semibold font-['Space_Grotesk'] text-sm mb-2">{f.title}</p>
-                <p className="text-xs text-[#8892a0] leading-relaxed">{f.desc}</p>
-              </Card>
-            ))}
-          </div>
-          <div className="bg-[#0a2030] border-2 border-[#00D4FF] rounded-2xl p-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="bg-[#0D1117] border border-[#00D4FF] rounded-lg px-4 py-2 text-[#00D4FF] font-bold text-sm">Arc Network</div>
-              <div>
-                <p className="font-bold font-['Space_Grotesk']">Built on Arc — powered by Circle</p>
-                <p className="text-xs text-[#8892a0] mt-0.5">Stablecoin-native Layer-1 · Backed by Goldman Sachs, Mastercard &amp; Visa</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-              {[{ v: '$0.003', l: 'AVG FEE PER TX' }, { v: '<1s', l: 'FINALITY' }, { v: '100%', l: 'USDC BACKED' }, { v: 'EVM', l: 'COMPATIBLE' }].map(s => (
-                <div key={s.l} className="text-center bg-[#0D1117] border border-[#1e2530] rounded-xl p-4">
-                  <p className="text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{s.v}</p>
-                  <p className="text-[10px] text-[#8892a0] tracking-widest mt-1">{s.l}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {['Goldman Sachs', 'Mastercard', 'Visa', 'Circle (USDC)', 'CCTP'].map(b => (
-                <span key={b} className="text-xs bg-[#13181f] border border-[#1e2530] px-3 py-1.5 rounded-lg text-[#8892a0]">{b}</span>
               ))}
             </div>
           </div>
         </div>
 
         {/* ── ARCHITECTURE ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>ARCHITECTURE</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+            System architecture
+          </h2>
+          <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+            Paragon is a modular, layered stack. Each layer is separable, which matters because
+            liquidity sources, bridges and DeFi protocols all change faster than the platform
+            itself should.
+          </p>
+
+          <div className="space-y-4 mb-10">
+            {[
+              {
+                num: '01',
+                name: 'User & Application Layer',
+                stack: 'React · Tailwind · Vite',
+                color: '#00D4FF',
+                desc: 'The unified gateway: wallet connectivity, asset management, swaps, liquidity access, cross-chain transactions, payment management, transaction tracking and financial dashboards.',
+              },
+              {
+                num: '02',
+                name: 'Paragon Protocol Layer',
+                stack: 'Solidity · EVM',
+                color: '#00FFCC',
+                desc: 'Coordinates the platform: transaction routing, swap execution, liquidity aggregation, fee management, payment execution, treasury routing, DeFi integrations and automated financial operations.',
+              },
+              {
+                num: '03',
+                name: 'DeFi & Liquidity Layer',
+                stack: 'Multi-source routing',
+                color: '#0080FF',
+                desc: 'Connects Paragon to decentralised liquidity: aggregation, swap routing, stablecoin swaps, multi-source liquidity, protocol integrations, optimisation, yield and treasury liquidity. The objective is competitive execution without users hunting across venues manually.',
+              },
+              {
+                num: '04',
+                name: 'Cross-Chain Layer',
+                stack: 'Circle CCTP',
+                color: '#00D4FF',
+                desc: 'Connects supported networks and liquidity environments: stablecoin bridging, cross-chain swaps, liquidity movement, multi-chain DeFi access and cross-chain financial applications.',
+              },
+              {
+                num: '05',
+                name: 'Arc Settlement Layer',
+                stack: 'Arc Network · USDC',
+                color: '#00FFCC',
+                desc: 'The primary settlement environment: transaction settlement, stablecoin settlement, gas management, fast finality and smart contract execution.',
+              },
+            ].map(l => (
+              <div key={l.num} className="bg-[#0f1822] border border-[#1e2530] rounded-xl p-5 flex gap-5 hover:border-[#00D4FF]/30 transition-all">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-['Space_Grotesk']"
+                  style={{ background: l.color + '15', border: '1px solid ' + l.color + '40', color: l.color }}>
+                  {l.num}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
+                    <p className="font-semibold font-['Space_Grotesk'] text-white text-sm">{l.name}</p>
+                    <span className="text-[10px] text-[#556] bg-[#13181f] border border-[#1e2530] px-2 py-0.5 rounded-full font-mono">
+                      {l.stack}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8892a0] leading-relaxed">{l.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Contract suite */}
+          <SectionLabel>DEPLOYED CONTRACTS</SectionLabel>
+          <h3 className="text-lg font-bold mb-5 font-['Space_Grotesk']">
+            Paragon contract suite on Arc
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { name: 'ParagonPaymentRouter', desc: 'Processes sends. Splits the protocol fee to Treasury and forwards the remainder to the recipient, atomically in one transaction.' },
+              { name: 'ParagonBridgeRouter', desc: 'Handles bridge fee capture, verifying the source against the registry before routing.' },
+              { name: 'ParagonFeeManager', desc: 'Single source of fee configuration. Rates update here without redeploying the routers.' },
+              { name: 'ParagonTreasury', desc: 'Receives all protocol fees. Withdrawals restricted to the owner, with every deposit recorded on-chain.' },
+              { name: 'ParagonBridgeRegistry', desc: 'Whitelist of approved bridge partners, so funds only ever route through sources that have been explicitly vetted.' },
+            ].map(c => (
+              <Card key={c.name} className="p-5">
+                <p className="font-mono text-xs text-[#00D4FF] mb-2">{c.name}</p>
+                <p className="text-xs text-[#8892a0] leading-relaxed">{c.desc}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* ── LIQUIDITY STRATEGY ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <p className="section-label mb-3">ARCHITECTURE</p>
-            <h2 className="text-2xl font-bold mb-3 font-['Space_Grotesk']">System Architecture</h2>
+            <SectionLabel>LIQUIDITY &amp; EXECUTION</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              How routing works
+            </h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-              Paragon Finance is designed as a modular, layered infrastructure stack — each layer purpose-built for performance, security, and scalability.
+              Liquidity is the core of the infrastructure. Paragon connects multiple sources and
+              routes each transaction based on the conditions available at the moment it executes,
+              rather than defaulting to a single venue.
             </p>
-            <div className="space-y-4 mb-10">
-              {[
-                { num: '01', name: 'Frontend Layer', stack: 'React · Tailwind CSS · Vite · Wagmi · RainbowKit', desc: 'Mobile-first interface with fast onboarding, wallet connectivity, live rate calculator, payment management, send flow, transaction dashboard, and on-chain receipt generation.', color: '#00D4FF' },
-                { num: '02', name: 'API Layer', stack: 'Node.js · Express.js · MongoDB · Resend', desc: 'Backend REST API handling user sessions, transaction records, email receipts via Resend, exchange rate aggregation, and Arc Network RPC integration for on-chain data.', color: '#00FFCC' },
-                { num: '03', name: 'Smart Contract Layer', stack: 'Solidity · EVM · Arc Network', desc: 'EVM-compatible Solidity contracts handling USDC transfers, payment verification, fee management ($0.003 protocol fee), and cross-border settlements on Arc.', color: '#0080FF' },
-                { num: '04', name: 'Arc Settlement Layer', stack: 'Arc Network · USDC · Circle CCTP', desc: 'Arc primary settlement infrastructure providing sub-second finality, USDC-native gas, crosschain interoperability via CCTP, and stablecoin liquidity routing.', color: '#00D4FF' },
-              ].map(l => (
-                <Card key={l.num} className="p-5 flex gap-5 hover:border-[#00D4FF]/30 transition-all">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-['Space_Grotesk']"
-                    style={{ background: `${l.color}15`, border: `1px solid ${l.color}40`, color: l.color }}>
-                    {l.num}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1 flex-wrap">
-                      <p className="font-semibold font-['Space_Grotesk'] text-white text-sm">{l.name}</p>
-                      <span className="text-[10px] text-[#556] bg-[#13181f] border border-[#1e2530] px-2 py-0.5 rounded-full font-mono">{l.stack}</span>
-                    </div>
-                    <p className="text-xs text-[#8892a0] leading-relaxed">{l.desc}</p>
-                  </div>
-                </Card>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+              {['Price', 'Liquidity depth', 'Slippage', 'Transaction efficiency', 'Supported assets', 'Network conditions'].map(o => (
+                <div key={o} className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-center">
+                  <p className="text-sm text-white font-semibold font-['Space_Grotesk']">{o}</p>
+                </div>
               ))}
             </div>
-            <Card className="overflow-hidden">
-              <div className="px-5 py-3 border-b border-[#1e2530] flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-500 opacity-60" />
-                  <span className="w-3 h-3 rounded-full bg-amber-500 opacity-60" />
-                  <span className="w-3 h-3 rounded-full bg-green-500 opacity-60" />
-                </div>
-                <span className="text-[10px] text-[#556] font-mono ml-2">Paragon Finance — example transfer flow</span>
-              </div>
-              <div className="p-5">
-                <pre className="text-xs text-[#00D4FF] font-mono leading-relaxed overflow-x-auto">{`// User initiates transfer
-paragonfinance.transfer({
-  to: "0x8f2a...4e91",
-  amount: 100_000000,   // 100 USDC (6 decimals)
-  destinationChain: "arc-testnet",
-  currency: "NGN"
-})
 
-// Arc settles in < 1 second
-// Event: TransferComplete { txHash, amount, recipient, settlementTime }
-// Receipt auto-generated on-chain → downloadable PDF`}</pre>
-              </div>
+            <Card className="p-6">
+              <p className="text-sm leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4">
+                This lets Paragon function as an access layer between users and decentralised
+                liquidity — rather than as another venue competing for it.
+              </p>
             </Card>
           </div>
         </div>
 
-        {/* ── USE CASES ── */}
+        {/* ── SECURITY ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <p className="section-label mb-3">USE CASES</p>
-          <h2 className="text-2xl font-bold mb-3 font-['Space_Grotesk']">Core Use Cases</h2>
+          <SectionLabel>SECURITY</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+            Security framework
+          </h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            Paragon Finance is designed to power a wide range of real-world financial activity — from individual remittances to enterprise payments.
+            Security is treated as a property of every layer — application, contract, liquidity and
+            treasury — rather than something bolted on at the end. Paragon is non-custodial: user
+            funds are never held by the platform.
           </p>
-          <div className="space-y-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
             {[
-              { num: '01', icon: '💸', title: 'Diaspora Remittances', desc: 'Instantly send stablecoin-powered payments home with lower fees, faster settlement, transparent exchange rates, and borderless accessibility. Paragon Finance removes the friction that costs diaspora communities billions in unnecessary fees every year.' },
-              { num: '02', icon: '🏢', title: 'Cross-Border Business Payments', desc: 'Businesses operating across markets can pay suppliers instantly, settle invoices globally, reduce banking friction, and access stable digital payment rails — enabling the commercial velocity that modern economies demand.' },
-              { num: '03', icon: '👨‍💻', title: 'Freelance & Creator Payments', desc: 'Instant creator payouts, remote worker payments, and global freelance settlements. Stablecoin-powered income preserves value against local currency volatility — giving global talent fair and timely compensation.' },
-              { num: '04', icon: '🛒', title: 'Merchant Payments', desc: "Merchants can accept stablecoin payments, settle instantly, reduce processing costs, and access global customers — all through Paragon Finance's programmable payment infrastructure." },
-              { num: '05', icon: '💱', title: 'Stablecoin FX Infrastructure', desc: 'Onchain FX conversion, multi-currency liquidity routing, real-time exchange infrastructure, and transparent pricing systems — the stablecoin FX layer that modern global commerce needs.' },
-            ].map(u => (
-              <Card key={u.num} className="p-6 hover:border-[#00D4FF]/30 transition-all">
-                <div className="flex gap-5">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#0a2030] border border-[#00D4FF]/30 flex items-center justify-center text-lg">{u.icon}</div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] text-[#556] font-['Space_Grotesk']">{u.num}</span>
-                      <p className="font-bold font-['Space_Grotesk'] text-white text-sm">{u.title}</p>
+              { icon: '🔐', title: 'Non-custodial architecture', desc: 'Paragon never holds user funds. Transfers move peer-to-peer through smart contracts. Your keys, your money.' },
+              { icon: '✅', title: 'Audited smart contracts', desc: 'Contracts are independently audited before mainnet deployment, and verified on-chain so anyone can read what they actually do.' },
+              { icon: '🔑', title: 'Multi-signature treasury', desc: 'Protocol treasury protected by multi-signature approval, so no single key can move funds.' },
+              { icon: '👁️', title: 'Transaction monitoring', desc: 'On-chain monitoring and fraud detection running continuously across transfer activity.' },
+              { icon: '🛡️', title: 'Role-based permissions', desc: 'Backend protected with authentication, rate limiting and role-based access. Admin functions gated at the contract level.' },
+              { icon: '📄', title: 'Full transparency', desc: 'Every transaction publicly verifiable on ArcScan. On-chain receipts are immutable and permanently accessible.' },
+            ].map(s => <InfoCard key={s.title} {...s} />)}
+          </div>
+
+          <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl p-5">
+            <p className="text-xs text-[#8892a0] leading-relaxed">
+              <span className="text-white font-semibold">On stablecoin safety: </span>
+              Transfers are denominated in USDC and EURC — issued by Circle, backed 1:1 by reserves
+              held in regulated financial institutions, and independently audited. Protocol risk is
+              assessed before any DeFi integration ships, and integrations that don't clear that
+              review don't ship.
+            </p>
+          </div>
+        </div>
+
+        {/* ── SCALABILITY ── */}
+        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
+          <div className="max-w-6xl mx-auto">
+            <SectionLabel>SCALABILITY</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
+              Designed to grow
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div>
+                <p className="text-[10px] tracking-[2px] text-[#8892a0] mb-4">ADVANTAGES</p>
+                <div className="space-y-2">
+                  {['Arc fast finality', 'EVM-compatible infrastructure', 'Stablecoin-native settlement', 'Cross-chain interoperability', 'Modular protocol integrations', 'Liquidity aggregation'].map(a => (
+                    <div key={a} className="flex items-center gap-2.5 text-sm text-[#8892a0]">
+                      <span className="text-[#00D4FF]">→</span>{a}
                     </div>
-                    <p className="text-sm text-[#8892a0] leading-relaxed">{u.desc}</p>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] tracking-[2px] text-[#8892a0] mb-4">SUPPORTS</p>
+                <div className="space-y-2">
+                  {['Growing user activity', 'Higher transaction volumes', 'Additional DeFi integrations', 'Enterprise applications', 'Global financial infrastructure', 'Institutional integrations'].map(a => (
+                    <div key={a} className="flex items-center gap-2.5 text-sm text-[#8892a0]">
+                      <span className="text-[#00FFCC]">→</span>{a}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROADMAP ── */}
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <SectionLabel>ROADMAP</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+            Development roadmap
+          </h2>
+          <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
+            Four phases, each building on the last. Liquidity comes before DeFi expansion for a
+            reason — integrations are only as good as the execution underneath them.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[
+              {
+                phase: 'Phase 1',
+                title: 'DeFi Foundation',
+                status: 'In Progress',
+                color: '#00D4FF',
+                items: ['Paragon MVP — live at paragonfinance.xyz', 'Arc infrastructure integration', 'Core smart contracts deployed', 'Multi-wallet support', 'Stablecoin swaps', 'Initial liquidity integrations'],
+              },
+              {
+                phase: 'Phase 2',
+                title: 'Liquidity & Execution',
+                status: 'Upcoming',
+                color: '#00FFCC',
+                items: ['Multi-source liquidity routing', 'Swap aggregation', 'Cross-chain liquidity', 'Slippage optimisation', 'Expanded stablecoin support', 'Additional liquidity partners'],
+              },
+              {
+                phase: 'Phase 3',
+                title: 'DeFi Expansion',
+                status: 'Planned',
+                color: '#0080FF',
+                items: ['DeFi protocol integrations', 'Liquidity products', 'Yield integrations', 'Treasury management', 'Automated financial strategies', 'Expanded cross-chain functionality'],
+              },
+              {
+                phase: 'Phase 4',
+                title: 'Financial Ecosystem',
+                status: 'Future',
+                color: '#8892a0',
+                items: ['Cross-border payments at scale', 'Merchant infrastructure', 'Business financial tooling', 'Developer APIs', 'Enterprise integrations', 'Institutional infrastructure'],
+              },
+            ].map(p => (
+              <Card key={p.phase} className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-xs font-bold px-2 py-1 rounded-lg font-['Space_Grotesk'] inline-block"
+                      style={{ background: p.color + '15', color: p.color, border: '1px solid ' + p.color + '30' }}>
+                      {p.phase}
+                    </span>
+                    <p className="font-bold font-['Space_Grotesk'] text-white mt-2">{p.title}</p>
                   </div>
+                  <span className={
+                    'text-[10px] px-2 py-1 rounded-full font-semibold font-["Space_Grotesk"] ' +
+                    (p.status === 'In Progress' ? 'bg-green-900/20 border border-green-500 text-green-400' :
+                     p.status === 'Upcoming' ? 'bg-[#0a2030] border border-[#00D4FF] text-[#00D4FF]' :
+                     'bg-[#13181f] border border-[#1e2530] text-[#8892a0]')
+                  }>
+                    {p.status}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {p.items.map(item => (
+                    <div key={item} className="flex items-start gap-2 text-xs text-[#8892a0]">
+                      <span style={{ color: p.color }}>→</span>{item}
+                    </div>
+                  ))}
                 </div>
               </Card>
             ))}
@@ -782,148 +1165,73 @@ paragonfinance.transfer({
         {/* ── COMPETITIVE ADVANTAGE ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <p className="section-label text-center mb-3">COMPETITIVE ADVANTAGE</p>
-            <h2 className="text-2xl font-bold text-center mb-3 font-['Space_Grotesk']">What sets Paragon Finance apart</h2>
-            <p className="text-center text-[#8892a0] text-sm max-w-xl mx-auto mb-10 leading-relaxed">
-              Paragon Finance differentiates through purpose-built infrastructure and stablecoin-native architecture that legacy remittance providers simply cannot replicate.
+            <SectionLabel>COMPETITIVE ADVANTAGE</SectionLabel>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
+              What sets Paragon apart
+            </h2>
+            <p className="text-[#8892a0] text-sm max-w-2xl mb-8 leading-relaxed">
+              The differentiation isn't another swap interface or another payment app. It's
+              combining DeFi liquidity, stablecoins, cross-chain infrastructure and real-world
+              financial applications into one ecosystem, built first for users and
+              businesses.
             </p>
-            <Card className="p-5 max-w-2xl mx-auto">
+
+            <Card className="p-5">
               {[
-                'Stablecoin-native infrastructure built on Arc Network',
-                'Deterministic sub-second settlement — irreversible finality',
-                'Fixed $0.003 fee per transaction — never volatile',
-                'Non-custodial — users always control their own funds',
-                'EVM-compatible smart contract architecture',
-                'Crosschain support via Circle CCTP (ETH, Base, Arbitrum, Solana)',
-                'On-chain receipts — publicly verifiable on ArcScan',
-                'No bank account required — wallet is your identity',
-              ].map(f => (
-                <div key={f} className="flex items-center justify-between py-3 border-b border-[#1e2530] last:border-0 text-sm">
-                  <span className="text-[#8892a0]">{f}</span>
-                  <span className="text-green-400 font-bold flex items-center gap-1.5 flex-shrink-0 ml-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />Yes
-                  </span>
-                </div>
-              ))}
+                'Stablecoin-native infrastructure',
+                'Built on Arc Network',
+                'DeFi aggregation',
+                'Multi-source liquidity routing',
+                'Swap optimisation',
+                'Cross-chain infrastructure',
+                'Stablecoin FX',
+                'Treasury tools',
+                'Payments & remittance',
+                'Africa-focused',
+                'EVM-compatible architecture',
+                'Programmable financial infrastructure',
+              ].map(f => <CheckRow key={f} label={f} />)}
             </Card>
-          </div>
-        </div>
-
-        {/* ── SECURITY ── */}
-        <div className="max-w-6xl mx-auto px-6 py-14">
-          <p className="section-label mb-3">SECURITY</p>
-          <h2 className="text-2xl font-bold mb-3 font-['Space_Grotesk']">Security Framework</h2>
-          <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
-            Paragon Finance is built with a security-first mindset across every layer of the stack. We never hold user funds — all transfers are non-custodial and settled directly on Arc Network.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-            {[
-              { icon: '🔐', title: 'Non-Custodial Architecture', desc: 'Paragon Finance never holds user funds. All transfers are peer-to-peer via smart contracts on Arc Network. Your keys, your money.' },
-              { icon: '✅', title: 'Audited Smart Contracts', desc: 'Smart contracts independently audited by security firms before mainnet deployment. All code is open-source and publicly verifiable.' },
-              { icon: '🔑', title: 'Multi-Sig Treasury', desc: 'Protocol treasury is protected by multi-signature systems requiring multiple approvals for any fund movement.' },
-              { icon: '👁️', title: 'Real-Time Monitoring', desc: 'On-chain transaction monitoring and fraud detection systems running continuously across all transfer activity.' },
-              { icon: '🛡️', title: 'Secure API Architecture', desc: 'Backend API protected with authentication, rate limiting, and role-based access permissions across all infrastructure.' },
-              { icon: '📄', title: 'Full On-Chain Transparency', desc: 'Every transaction publicly verifiable on ArcScan. On-chain receipts are immutable, permanent, and shareable.' },
-            ].map(s => (
-              <Card key={s.title} className="p-5">
-                <div className="text-2xl mb-3">{s.icon}</div>
-                <p className="font-semibold font-['Space_Grotesk'] text-sm mb-2">{s.title}</p>
-                <p className="text-xs text-[#8892a0] leading-relaxed">{s.desc}</p>
-              </Card>
-            ))}
-          </div>
-          <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl p-5">
-            <p className="text-xs text-[#8892a0] leading-relaxed">
-              <span className="text-white font-semibold">USDC Safety: </span>
-              All Paragon Finance transfers are denominated in USDC — issued by Circle, backed 1:1 by US dollars held in regulated financial institutions, and fully audited monthly. USDC is the most trusted and regulated stablecoin for cross-border value transfer.
-            </p>
-          </div>
-        </div>
-
-        {/* ── ROADMAP ── */}
-        <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
-          <div className="max-w-6xl mx-auto">
-            <p className="section-label text-center mb-3">ROADMAP</p>
-            <h2 className="text-2xl font-bold text-center mb-3 font-['Space_Grotesk']">Development Roadmap</h2>
-            <p className="text-center text-[#8892a0] text-sm max-w-xl mx-auto mb-10 leading-relaxed">
-            Paragon Finance development is structured across four phases — each building on the last to deliver progressively greater capability and reach.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {[
-                {
-                  phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF',
-                  items: ['Frontend MVP — live at paragonfinance.xyz', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect, Coinbase)', 'Live rate calculator and full send flow', 'Dashboard with transaction history', 'On-chain receipt generation']
-                },
-                {
-                  phase: 'Phase 2', title: 'Payments Expansion', status: 'Upcoming', color: '#00FFCC',
-                  items: ['Backend API — Node.js + MongoDB', 'Real USDC transfers on Arc Testnet', 'Email receipts via Resend', 'Cashout partner integrations (Yellow Card, Mara)', 'Crosschain support via Circle CCTP', 'Arc Mainnet launch']
-                },
-                {
-                  phase: 'Phase 3', title: 'Infrastructure Expansion', status: 'Planned', color: '#0080FF',
-                  items: ['Merchant payment acceptance', 'Business cross-border settlements', 'Stablecoin FX routing', 'Expanded country coverage', 'Embedded finance APIs', 'Enterprise treasury tooling']
-                },
-                {
-                  phase: 'Phase 4', title: 'Financial Ecosystem Layer', status: 'Future', color: '#8892a0',
-                  items: ['AI-powered financial tooling', 'Programmable payment automation', 'Advanced treasury systems', 'Developer APIs and SDK', 'Institutional integrations', 'Ecosystem-wide expansion']
-                },
-              ].map(p => (
-                <Card key={p.phase} className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <span className="text-xs font-bold px-2 py-1 rounded-lg font-['Space_Grotesk'] mb-2 inline-block"
-                        style={{ background: `${p.color}15`, color: p.color, border: `1px solid ${p.color}30` }}>
-                        {p.phase}
-                      </span>
-                      <p className="font-bold font-['Space_Grotesk'] text-white mt-1">{p.title}</p>
-                    </div>
-                    <span className={`text-[10px] px-2 py-1 rounded-full font-semibold font-['Space_Grotesk'] ${
-                      p.status === 'In Progress' ? 'bg-green-900/20 border border-green-500 text-green-400' :
-                      p.status === 'Upcoming' ? 'bg-[#0a2030] border border-[#00D4FF] text-[#00D4FF]' :
-                      'bg-[#13181f] border border-[#1e2530] text-[#8892a0]'
-                    }`}>{p.status}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {p.items.map(item => (
-                      <div key={item} className="flex items-center gap-2 text-xs text-[#8892a0]">
-                        <span style={{ color: p.color }}>→</span>{item}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              ))}
-            </div>
           </div>
         </div>
 
         {/* ── CONCLUSION ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <SectionLabel>CONCLUSION</SectionLabel>
+          <h2 className="text-2xl md:text-3xl font-bold mb-6 font-['Space_Grotesk']">
+            Bridging DeFi and everyday finance
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center mb-10">
             <div>
-              <p className="section-label mb-3">CONCLUSION</p>
-              <h2 className="text-2xl font-bold mb-4 font-['Space_Grotesk']">The future of money movement</h2>
               <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
-            Paragon Finance combines stablecoin infrastructure, Arc Network enterprise-grade blockchain architecture, and financial innovation to redefine cross-border payments — delivering a new standard for how money moves globally.
+                Paragon Finance combines stablecoin infrastructure, DeFi liquidity, cross-chain
+                connectivity and financial applications into a unified platform on Arc Network.
               </p>
               <p className="text-[#8892a0] leading-relaxed text-sm">
-                Paragon Finance is not just a remittance platform. It is building the financial infrastructure layer for the next generation of economic coordination — instant, borderless, stablecoin-powered, and globally accessible.
+                The broader mission is an accessible financial infrastructure layer where users and
+                businesses can swap, access liquidity, manage stablecoins, interact with DeFi, and
+                move money globally — from one place.
               </p>
             </div>
             <Card glow className="p-6">
-              <p className="section-label mb-3">GET STARTED</p>
               <p className="text-base leading-relaxed text-white italic border-l-2 border-[#00D4FF] pl-4 mb-5">
-                "Move money faster. Move money cheaper. Move money globally. Built on Arc. Powered by Stablecoins."
+                Built on Arc. Powered by stablecoins. Connected to DeFi.
               </p>
-              <div className="flex gap-3 flex-wrap mb-4">
-                {/* <a href="/testnet/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
-                  Launch App →
-                </a> */}
-                <a href="/about" className="border border-[#1e2530] text-[#8892a0] text-sm px-5 py-2.5 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
-                  About Paragon Finance
-                </a>
+              <div className="flex gap-3 flex-wrap">
+                <Link to="/testnet/send"
+                  className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
+                  Launch app →
+                </Link>
+                <Link to="/about"
+                  className="border border-[#1e2530] text-[#8892a0] text-sm px-5 py-2.5 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
+                  About Paragon
+                </Link>
               </div>
-              <p className="text-[10px] text-[#556]">Confidential — For informational purposes only. Not an offer to sell securities.</p>
             </Card>
           </div>
+          <p className="text-xs text-[#556] text-center">
+            Confidential — for informational purposes only. Not an offer to sell securities.
+          </p>
         </div>
 
       </div>
