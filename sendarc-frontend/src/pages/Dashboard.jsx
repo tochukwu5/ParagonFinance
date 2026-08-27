@@ -148,10 +148,8 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk']">Dashboard</h1>
             <p className="text-[#8892a0] text-sm mt-1">
-              Welcome back — here's your testnet activity
-              {backendOnline && (
-                <span className="ml-2 text-green-400 text-[10px] font-semibold">● Live from MongoDB</span>
-              )}
+              Welcome back here's your testnet activity
+      
             </p>
           </div>
           <div className="flex items-center gap-2">
