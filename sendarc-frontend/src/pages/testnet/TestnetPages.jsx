@@ -151,7 +151,7 @@ export function TestnetTransactions() {
           {/* Not connected state */}
           {!isConnected ? (
             <Card className="p-12 text-center">
-              <div className="text-4xl mb-4">🦊</div>
+              {/* <div className="text-4xl mb-4">🦊</div> */}
               <p className="font-semibold font-['Space_Grotesk'] mb-2">Connect your wallet to view transactions</p>
               <p className="text-[#8892a0] text-sm mb-6">
                 Your transaction history is saved to MongoDB using your wallet address as your unique identifier.

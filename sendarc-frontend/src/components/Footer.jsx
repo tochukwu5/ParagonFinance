@@ -13,7 +13,9 @@ export default function Footer() {
               <span className="font-['Space_Grotesk'] text-xl font-bold text-[#00D4FF] -ml-1.5">Finance</span>
             </div>
             <p className="text-sm text-[#8892a0] leading-relaxed max-w-xs mb-4">
-              More money should reach the family, not the middleman. Instant USDC remittances to the World — powered by Arc Network.
+             Your money should work across borders, not be limited by them.
+              Send, receive, swap, and access DeFi with USDC  all through one global financial
+               infrastructure, powered by Arc.
             </p>
             <div className="flex items-center gap-2 bg-[#0f1822] border border-[#1e2530] rounded-lg px-3 py-2 w-fit">
               <span className="text-xs text-[#8892a0]">Built on</span>

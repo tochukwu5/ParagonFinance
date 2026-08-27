@@ -6,6 +6,7 @@ import { useArcTestnet } from './hooks/useArcTestnet'
 import { useTestnet } from './context/TestnetContext'
 
 import Sidebar from './components/Sidebar'
+import { ScrollToTop } from './components/Reveal'
 import Footer from './components/Footer'
 
 import Home from './pages/Home'
@@ -62,7 +63,8 @@ export default function App() {
     <WalletProvider>
       <TestnetProvider>
         <BrowserRouter>
-          {/* Must sit inside BrowserRouter and TestnetProvider */}
+          {/* Both must sit inside BrowserRouter — they read router state. */}
+          <ScrollToTop />
           <WalletBridge />
           <Routes>
 

@@ -8,10 +8,34 @@ import { shortAddr } from '../utils/arcTestnet'
 // dependency, and these inherit currentColor so the active state works
 // without per-icon overrides.
 const Icon = {
+  home: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+    </svg>
+  ),
   dashboard: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
       <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  transactions: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M4 7h13M14 4l3 3-3 3" /><path d="M20 17H7M10 20l-3-3 3-3" />
+    </svg>
+  ),
+  wallet: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" />
+      <path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" />
+      <path d="M20 9v6h-4a3 3 0 0 1 0-6h4z" />
+    </svg>
+  ),
+  bell: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
     </svg>
   ),
   howItWorks: (p) => (
@@ -66,13 +90,22 @@ const Icon = {
 }
 
 const MENU = [
+  { to: '/',             label: 'Home',         icon: 'home' },
   { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
   { to: '/testnet/send', label: 'Testnet', icon: 'testnet' },
-  { to: '/about',        label: 'About',        icon: 'about' },
   { to: '/how-it-works', label: 'How it works', icon: 'howItWorks' },
-  // { to: '/countries',    label: 'Countries',    icon: 'countries' },
-  // { to: '/rates',        label: 'Rates',        icon: 'rates' },
+  { to: '/about',        label: 'About',        icon: 'about' },
   { to: '/docs',         label: 'Docs',         icon: 'docs' },
+]
+
+// Everything that belongs to the connected wallet rather than the site.
+// Notifications joins them — it was the odd one left in MENU otherwise,
+// and it's account state like the rest.
+const ACCOUNT = [
+  { to: '/dashboard/transactions',  label: 'Transactions',  icon: 'transactions' },
+  { to: '/dashboard/wallet',        label: 'Wallet',        icon: 'wallet' },
+  { to: '/dashboard/notifications', label: 'Notifications', icon: 'bell' },
+  { to: '/dashboard/settings',      label: 'Settings',      icon: 'settings' },
 ]
 
 export default function Sidebar() {
@@ -102,7 +135,10 @@ export default function Sidebar() {
   // /dashboard/wallet) have their own entries, and a prefix match would
   // light up Dashboard whenever any of them were open.
   const isActive = (to) => {
-    if (to === '/dashboard') return pathname === '/dashboard'
+    // Exact matches only for these two. '/' prefixes every route, and
+    // '/dashboard' prefixes its own child pages — a startsWith check would
+    // light both up almost everywhere.
+    if (to === '/' || to === '/dashboard') return pathname === to
     return pathname === to || pathname.startsWith(to + '/')
   }
 
@@ -176,11 +212,9 @@ export default function Sidebar() {
           destination people browse to. */}
       <SectionLabel expanded={expanded}>ACCOUNT</SectionLabel>
       <nav className="space-y-1">
-        <Row
-          item={{ to: '/dashboard/settings', label: 'Settings', icon: 'settings' }}
-          expanded={expanded}
-          onClick={onNavigate}
-        />
+        {ACCOUNT.map(item => (
+          <Row key={item.to} item={item} expanded={expanded} onClick={onNavigate} />
+        ))}
       </nav>
 
       {/* Wallet block. Only meaningful once connected, so the whole thing

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { COMPETITORS } from '../data/constants'
 import { Badge, Card } from '../components/UI'
+import { Reveal } from '../components/Reveal'
 import Footer from '../components/Footer'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────
@@ -12,13 +13,15 @@ function SectionLabel({ children }) {
   )
 }
 
-function InfoCard({ icon, title, desc }) {
+function InfoCard({ icon, title, desc, delay = 0 }) {
   return (
-    <div className="bg-[#0f1822] border border-[#1e2530] rounded-xl p-5 hover:border-[#00D4FF]/40 transition-all">
-      {icon && <div className="text-2xl mb-3">{icon}</div>}
-      <p className="font-semibold font-['Space_Grotesk'] text-white text-sm mb-2">{title}</p>
-      <p className="text-xs text-[#8892a0] leading-relaxed">{desc}</p>
-    </div>
+    <Reveal delay={delay} className="h-full">
+      <div className="bg-[#0f1822] border border-[#1e2530] rounded-xl p-5 h-full hover:border-[#00D4FF]/40 transition-all">
+        {icon && <div className="text-2xl mb-3">{icon}</div>}
+        <p className="font-semibold font-['Space_Grotesk'] text-white text-sm mb-2">{title}</p>
+        <p className="text-xs text-[#8892a0] leading-relaxed">{desc}</p>
+      </div>
+    </Reveal>
   )
 }
 
@@ -63,14 +66,14 @@ export function HowItWorks() {
 
         {/* ── THE FLOW ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>THE FLOW</SectionLabel>
+          <Reveal><SectionLabel>THE FLOW</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
             Four steps, under two minutes
           </h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
             The same shape whether you're swapping stablecoins, bridging across chains,
             or sending money to family.
-          </p>
+          </p></Reveal>
 
           <div className="space-y-5">
             {[
@@ -111,14 +114,14 @@ export function HowItWorks() {
         {/* ── CORE USE CASES ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>WHAT YOU CAN DO</SectionLabel>
+            <Reveal><SectionLabel>WHAT YOU CAN DO</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               Core use cases
             </h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
               Paragon is built as financial infrastructure rather than a single-purpose app.
               Remittance is one thing it does well, not the whole of what it is.
-            </p>
+            </p></Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[
@@ -162,17 +165,17 @@ export function HowItWorks() {
                   title: 'Merchant & business finance',
                   desc: 'Accept stablecoin settlements, pay suppliers, move treasury between markets, and manage digital assets — without a correspondent bank in the middle taking a cut and a week.',
                 },
-              ].map(u => <InfoCard key={u.title} {...u} />)}
+              ].map((u, i) => <InfoCard key={u.title} delay={Math.min(i * 80, 400)} {...u} />)}
             </div>
           </div>
         </div>
 
         {/* ── WHO IT'S FOR ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>WHO IT'S FOR</SectionLabel>
+          <Reveal><SectionLabel>WHO IT'S FOR</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
             Built for people who move money
-          </h2>
+          </h2></Reveal>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {[
@@ -198,10 +201,10 @@ export function HowItWorks() {
         {/* ── COMPARISON ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>THE DIFFERENCE</SectionLabel>
+            <Reveal><SectionLabel>THE DIFFERENCE</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
               Sending $100 across borders
-            </h2>
+            </h2></Reveal>
 
             <Card className="overflow-hidden">
               <div className="divide-y divide-[#1e2530]">
@@ -223,6 +226,7 @@ export function HowItWorks() {
 
         {/* ── CTA ── */}
         <div className="max-w-6xl mx-auto px-6 py-16 text-center">
+          <Reveal>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
             Try it on testnet
           </h2>
@@ -240,6 +244,7 @@ export function HowItWorks() {
               Read the docs
             </Link>
           </div>
+          </Reveal>
         </div>
 
       </div>
@@ -292,7 +297,7 @@ export function AboutPage() {
         {/* ── THE PROBLEM ── */}
         <div className="bg-[#0f1822] border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>THE PROBLEM</SectionLabel>
+            <Reveal><SectionLabel>THE PROBLEM</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               On-chain finance works. Getting to it doesn't.
             </h2>
@@ -300,7 +305,7 @@ export function AboutPage() {
               Decentralised finance created real opportunities, but reaching them is fragmented.
               To do anything meaningful, people end up juggling separate applications for each
               step — and liquidity is scattered across protocols and networks in the same way.
-            </p>
+            </p></Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
               {[
@@ -324,7 +329,7 @@ export function AboutPage() {
                   title: 'Access gaps',
                   desc: 'For African users and businesses, all of the above compounds: limited access to global financial infrastructure, fragmented payment systems, and conversion friction at every border.',
                 },
-              ].map(p => <InfoCard key={p.title} {...p} />)}
+              ].map((p, i) => <InfoCard key={p.title} delay={Math.min(i * 80, 400)} {...p} />)}
             </div>
 
             <Card className="p-6">
@@ -339,10 +344,10 @@ export function AboutPage() {
 
         {/* ── VISION & MISSION ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>VISION &amp; MISSION</SectionLabel>
+          <Reveal><SectionLabel>VISION &amp; MISSION</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
             Where this is going
-          </h2>
+          </h2></Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Card className="p-6">
               <SectionLabel>VISION</SectionLabel>
@@ -366,7 +371,7 @@ export function AboutPage() {
         {/* ── WHY ARC ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>WHY ARC NETWORK</SectionLabel>
+            <Reveal><SectionLabel>WHY ARC NETWORK</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               Built on infrastructure designed for money
             </h2>
@@ -374,7 +379,7 @@ export function AboutPage() {
               Arc is built around stablecoin-native financial activity rather than general-purpose
               computation. That focus is the reason Paragon can offer predictable costs and
               sub-second settlement without asking users to understand any of it.
-            </p>
+            </p></Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
               {[
@@ -384,7 +389,7 @@ export function AboutPage() {
                 { icon: '🌐', title: 'Cross-chain native', desc: 'Circle CCTP connects Arc to Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and more, so liquidity can come from wherever it already sits.' },
                 { icon: '🏛️', title: 'Institutional backing', desc: 'Arc is built by Circle and backed by Goldman Sachs, Mastercard and Visa — the institutions behind existing global payments infrastructure.' },
                 { icon: '✅', title: 'Compliance-ready', desc: 'Enterprise-grade infrastructure supporting regulated payment flows, transparent auditing, and institutional financial tooling.' },
-              ].map(f => <InfoCard key={f.title} {...f} />)}
+              ].map((f, i) => <InfoCard key={f.title} delay={Math.min(i * 80, 400)} {...f} />)}
             </div>
 
             <div className="bg-[#0a2030] border-2 border-[#00D4FF] rounded-2xl p-8">
@@ -418,10 +423,10 @@ export function AboutPage() {
 
         {/* ── TEAM ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>THE BUILDERS</SectionLabel>
+          <Reveal><SectionLabel>THE BUILDERS</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
             Who's behind Paragon Finance
-          </h2>
+          </h2></Reveal>
 
           <div className="space-y-5">
             <Card className="p-7 flex flex-col md:flex-row gap-6 items-start">
@@ -481,10 +486,10 @@ export function AboutPage() {
         {/* ── LONG-TERM VISION ── */}
         <div className="bg-[#0f1822] border-t border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>LONG-TERM VISION</SectionLabel>
+            <Reveal><SectionLabel>LONG-TERM VISION</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-6 font-['Space_Grotesk']">
               Beyond a single-purpose app
-            </h2>
+            </h2></Reveal>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
               <div>
                 <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
@@ -578,10 +583,10 @@ export function DocsPage() {
 
         {/* ── EXECUTIVE SUMMARY ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>EXECUTIVE SUMMARY</SectionLabel>
+          <Reveal><SectionLabel>EXECUTIVE SUMMARY</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-5 font-['Space_Grotesk']">
             What Paragon is building
-          </h2>
+          </h2></Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start mb-10">
             <div>
               <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">
@@ -616,21 +621,21 @@ export function DocsPage() {
               { icon: '⚙️', title: 'EVM-compatible', desc: 'Solidity contracts on proven, auditable infrastructure with existing tooling.' },
               { icon: '🌊', title: 'Liquidity aggregation', desc: 'Routing across multiple sources rather than depending on any single pool.' },
               { icon: '📄', title: 'On-chain receipts', desc: 'Every transaction publicly verifiable on ArcScan — no reference numbers to chase.' },
-            ].map(f => <InfoCard key={f.title} {...f} />)}
+            ].map((f, i) => <InfoCard key={f.title} delay={Math.min(i * 80, 400)} {...f} />)}
           </div>
         </div>
 
         {/* ── ARC INFRASTRUCTURE ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>CORE INFRASTRUCTURE</SectionLabel>
+            <Reveal><SectionLabel>CORE INFRASTRUCTURE</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               Arc infrastructure powering Paragon
             </h2>
             <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
               Arc is purpose-built for real-world financial activity rather than generalised
               computation. Each property below maps to something Paragon could not otherwise offer.
-            </p>
+            </p></Reveal>
 
             <div className="space-y-4">
               {[
@@ -682,7 +687,7 @@ export function DocsPage() {
 
         {/* ── ARCHITECTURE ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>ARCHITECTURE</SectionLabel>
+          <Reveal><SectionLabel>ARCHITECTURE</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
             System architecture
           </h2>
@@ -690,7 +695,7 @@ export function DocsPage() {
             Paragon is a modular, layered stack. Each layer is separable, which matters because
             liquidity sources, bridges and DeFi protocols all change faster than the platform
             itself should.
-          </p>
+          </p></Reveal>
 
           <div className="space-y-4 mb-10">
             {[
@@ -772,7 +777,7 @@ export function DocsPage() {
         {/* ── LIQUIDITY STRATEGY ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>LIQUIDITY &amp; EXECUTION</SectionLabel>
+            <Reveal><SectionLabel>LIQUIDITY &amp; EXECUTION</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               How routing works
             </h2>
@@ -780,7 +785,7 @@ export function DocsPage() {
               Liquidity is the core of the infrastructure. Paragon connects multiple sources and
               routes each transaction based on the conditions available at the moment it executes,
               rather than defaulting to a single venue.
-            </p>
+            </p></Reveal>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
               {['Price', 'Liquidity depth', 'Slippage', 'Transaction efficiency', 'Supported assets', 'Network conditions'].map(o => (
@@ -801,7 +806,7 @@ export function DocsPage() {
 
         {/* ── SECURITY ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>SECURITY</SectionLabel>
+          <Reveal><SectionLabel>SECURITY</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
             Security framework
           </h2>
@@ -809,7 +814,7 @@ export function DocsPage() {
             Security is treated as a property of every layer — application, contract, liquidity and
             treasury — rather than something bolted on at the end. Paragon is non-custodial: user
             funds are never held by the platform.
-          </p>
+          </p></Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
             {[
@@ -819,7 +824,7 @@ export function DocsPage() {
               { icon: '👁️', title: 'Transaction monitoring', desc: 'On-chain monitoring and fraud detection running continuously across transfer activity.' },
               { icon: '🛡️', title: 'Role-based permissions', desc: 'Backend protected with authentication, rate limiting and role-based access. Admin functions gated at the contract level.' },
               { icon: '📄', title: 'Full transparency', desc: 'Every transaction publicly verifiable on ArcScan. On-chain receipts are immutable and permanently accessible.' },
-            ].map(s => <InfoCard key={s.title} {...s} />)}
+            ].map((s, i) => <InfoCard key={s.title} delay={Math.min(i * 80, 400)} {...s} />)}
           </div>
 
           <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl p-5">
@@ -836,10 +841,10 @@ export function DocsPage() {
         {/* ── SCALABILITY ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>SCALABILITY</SectionLabel>
+            <Reveal><SectionLabel>SCALABILITY</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-8 font-['Space_Grotesk']">
               Designed to grow
-            </h2>
+            </h2></Reveal>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div>
                 <p className="text-[10px] tracking-[2px] text-[#8892a0] mb-4">ADVANTAGES</p>
@@ -867,14 +872,14 @@ export function DocsPage() {
 
         {/* ── ROADMAP ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>ROADMAP</SectionLabel>
+          <Reveal><SectionLabel>ROADMAP</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
             Development roadmap
           </h2>
           <p className="text-[#8892a0] text-sm max-w-2xl mb-10 leading-relaxed">
             Four phases, each building on the last. Liquidity comes before DeFi expansion for a
             reason — integrations are only as good as the execution underneath them.
-          </p>
+          </p></Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {[
@@ -940,7 +945,7 @@ export function DocsPage() {
         {/* ── COMPETITIVE ADVANTAGE ── */}
         <div className="bg-[#0f1822] border-t border-b border-[#1e2530] py-14 px-6">
           <div className="max-w-6xl mx-auto">
-            <SectionLabel>COMPETITIVE ADVANTAGE</SectionLabel>
+            <Reveal><SectionLabel>COMPETITIVE ADVANTAGE</SectionLabel>
             <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
               What sets Paragon apart
             </h2>
@@ -949,7 +954,7 @@ export function DocsPage() {
               combining DeFi liquidity, stablecoins, cross-chain infrastructure and real-world
               financial applications into one ecosystem, built first for African users and
               businesses.
-            </p>
+            </p></Reveal>
 
             <Card className="p-5">
               {[
@@ -972,10 +977,10 @@ export function DocsPage() {
 
         {/* ── CONCLUSION ── */}
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <SectionLabel>CONCLUSION</SectionLabel>
+          <Reveal><SectionLabel>CONCLUSION</SectionLabel>
           <h2 className="text-2xl md:text-3xl font-bold mb-6 font-['Space_Grotesk']">
             Bridging DeFi and everyday finance
-          </h2>
+          </h2></Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center mb-10">
             <div>
               <p className="text-[#8892a0] leading-relaxed mb-4 text-sm">

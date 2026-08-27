@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +10,33 @@
   --cyan: #00D4FF;
   --mint: #00FFCC;
   --muted: #8892a0;
+
+  /* One place to swap the typeface later, rather than hunting through rules. */
+  --font-sora: 'Sora', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Shim: components use font-['Space_Grotesk'] inline in roughly 200 places,
+   and those inline styles override everything below. Rather than a 200-site
+   find-and-replace, this maps the old family name onto Sora — local() works
+   because the @import above has already loaded it.
+   
+   Worth removing once you've run the replace in VS Code:
+     Find: font-['Space_Grotesk']   Replace: font-['Sora']
+   A name that resolves to a different typeface is the kind of thing that
+   confuses whoever reads this next. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: local('Sora'), local('Sora-Regular');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: local('Sora'), local('Sora-Regular');
+  font-weight: 100 900;
+  font-display: swap;
 }
 
 * { box-sizing: border-box; }
@@ -17,12 +44,26 @@
 body {
   background: var(--bg);
   color: #fff;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-sora);
+  /* Sora runs slightly wide at body size. A touch of negative tracking is
+     what gives it the tight, settled feel in the reference. */
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5 {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: var(--font-sora);
+  /* Tighter as size grows — large text needs less room between letters
+     than small text does. */
+  letter-spacing: -0.028em;
+}
+
+h1 { letter-spacing: -0.034em; }
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
 }
 
 ::-webkit-scrollbar { width: 4px; }
@@ -56,7 +97,7 @@ h1, h2, h3, h4, h5 {
   font-size: 11px;
   letter-spacing: 2px;
   color: var(--cyan);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-sora);
   font-weight: 600;
 }
 
@@ -64,4 +105,98 @@ h1, h2, h3, h4, h5 {
   background-image: linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 40px 40px;
+}
+
+/* ─── Hero light sweep ──────────────────────────────────────────────────
+   A band of light crossing the hero every few seconds. Deliberately faint
+   — at higher opacity it reads as a rendering glitch rather than an accent.
+
+   Animated with transform only (never `left` or `background-position`),
+   so it runs on the compositor and doesn't force layout on each frame.
+
+   6s cycle: the sweep itself takes ~2s, then rests. A continuous sweep
+   with no pause is distracting on a page people are trying to read. */
+.hero-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hero-sweep::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(0, 212, 255, 0.00) 20%,
+    rgba(0, 212, 255, 0.07) 45%,
+    rgba(0, 255, 204, 0.10) 50%,
+    rgba(0, 212, 255, 0.07) 55%,
+    rgba(0, 212, 255, 0.00) 80%,
+    transparent 100%
+  );
+  transform: translateX(0) rotate(12deg);
+  animation: heroSweep 6s ease-in-out infinite;
+  filter: blur(24px);
+}
+
+@keyframes heroSweep {
+  0%   { transform: translateX(0) rotate(12deg); opacity: 0; }
+  8%   { opacity: 1; }
+  40%  { transform: translateX(420%) rotate(12deg); opacity: 1; }
+  48%  { transform: translateX(420%) rotate(12deg); opacity: 0; }
+  100% { transform: translateX(420%) rotate(12deg); opacity: 0; }
+}
+
+/* Content sits above the sweep. Without this the sweep would wash over the
+   text rather than passing behind it. */
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* A slower, subtler version for section backgrounds that aren't the hero. */
+.sweep-slow::before {
+  animation-duration: 11s;
+}
+
+/* ─── Typewriter caret ──────────────────────────────────────────────────
+   Sized in em so it tracks the heading it sits in rather than needing a
+   separate rule per font size. */
+.tw-caret {
+  display: inline-block;
+  width: 0.06em;
+  height: 0.9em;
+  margin-left: 0.06em;
+  vertical-align: -0.08em;
+  background: var(--cyan, #00D4FF);
+  animation: twBlink 1.05s steps(1, end) infinite;
+}
+
+/* steps() rather than a fade — a real cursor snaps on and off, and an
+   eased blink reads as a pulsing bar instead. */
+@keyframes twBlink {
+  0%, 50%   { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/* Anyone who has asked their OS for less motion gets none of this. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-sweep::before {
+    animation: none;
+    opacity: 0;
+  }
+  .live-dot {
+    animation: none;
+  }
+  .tw-caret {
+    animation: none;
+    opacity: 0;
+  }
 }

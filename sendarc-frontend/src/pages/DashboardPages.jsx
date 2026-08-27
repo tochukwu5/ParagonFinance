@@ -47,7 +47,6 @@ export function Transactions() {
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <Sidebar active="transactions" />
       <main className="flex-1 p-8">
         <div className="flex justify-between items-start mb-8">
           <div>
@@ -133,7 +132,7 @@ export function Transactions() {
         {/* Not connected */}
         {!isConnected ? (
           <Card className="p-12 text-center">
-            <div className="text-4xl mb-4">🦊</div>
+            {/* <div className="text-4xl mb-4">🦊</div> */}
             <p className="font-semibold font-['Space_Grotesk'] mb-2">Connect your wallet to view transactions</p>
             <p className="text-[#8892a0] text-sm mb-6">
               Your transaction history is saved to MongoDB using your wallet address as your unique identifier.
@@ -245,7 +244,6 @@ export function WalletPage() {
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <Sidebar active="wallet" />
       <main className="flex-1 p-8 max-w-2xl">
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Wallet</h1>
         <p className="text-[#8892a0] text-sm mb-8">Your connected wallet and USDC balance</p>
@@ -356,7 +354,6 @@ export function Notifications() {
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <Sidebar active="notifications" />
       <main className="flex-1 p-8 max-w-2xl">
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -410,32 +407,12 @@ export function Settings() {
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <Sidebar active="settings" />
+      {/* <Sidebar active="settings" /> */}
       <main className="flex-1 p-8 max-w-2xl">
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Settings</h1>
         <p className="text-[#8892a0] text-sm mb-8">Manage your Paragon Finance preferences</p>
 
-        <Card className="p-5 mb-4">
-          <p className="text-[10px] tracking-widests text-[#8892a0] mb-4">PREFERENCES</p>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-semibold">Default Country</p>
-                <p className="text-xs text-[#8892a0]">Pre-select destination country</p>
-              </div>
-              <select
-                value={defaultCountry}
-                onChange={e => setDefaultCountry(e.target.value)}
-                className="bg-[#0D1117] border border-[#1e2530] text-white text-sm rounded-lg px-3 py-1.5 outline-none focus:border-[#00D4FF]"
-              >
-                <option value="NG">🇳🇬 Nigeria</option>
-                <option value="GH">🇬🇭 Ghana</option>
-                <option value="KE">🇰🇪 Kenya</option>
-                <option value="ZA">🇿🇦 South Africa</option>
-              </select>
-            </div>
-          </div>
-        </Card>
+      
 
         <Card className="p-5 mb-4">
           <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">NOTIFICATIONS</p>
