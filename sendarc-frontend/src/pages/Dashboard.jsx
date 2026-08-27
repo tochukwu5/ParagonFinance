@@ -140,7 +140,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <Sidebar active="dashboard" />
+      {/* <Sidebar active="dashboard" /> */}
       <main className="flex-1 p-8">
 
         {/* Header */}

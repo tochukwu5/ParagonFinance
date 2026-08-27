@@ -28,8 +28,6 @@ export default function Footer() {
             <div className="flex flex-col gap-3">
               {[
                 { to: '/how-it-works', label: 'How it works' },
-                { to: '/countries', label: 'Countries' },
-                { to: '/rates', label: 'Rates' },
                 { to: '/features', label: 'Features' },
               ].map(l => (
                 <Link key={l.to} to={l.to} className="text-sm text-[#8892a0] hover:text-white transition-colors">{l.label}</Link>

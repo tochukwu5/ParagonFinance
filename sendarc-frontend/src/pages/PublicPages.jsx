@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { COUNTRIES, COMPETITORS, REGIONS } from '../data/constants'
-import { Badge, Card, StatCard, LiveBadge } from '../components/UI'
+import { COMPETITORS } from '../data/constants'
+import { Badge, Card } from '../components/UI'
 import Footer from '../components/Footer'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────
@@ -249,231 +248,6 @@ export function HowItWorks() {
   )
 }
 
-export function CountriesPage() {
-  const [activeRegion, setActiveRegion] = useState('All')
-  const live = COUNTRIES.filter(c => c.status === 'live' && (activeRegion === 'All' || c.region === activeRegion))
-  const soon = COUNTRIES.filter(c => c.status === 'soon')
-
-  return (
-    <>
-      <div className="bg-[#0D1117] min-h-screen">
-        <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 text-center">
-          <Badge>GLOBAL REACH</Badge>
-          <h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4">Send to <span className="gradient-text">18+ Countries Worldwide</span></h1>
-          <p className="text-[#8892a0] text-base max-w-xl mx-auto leading-relaxed">
-            Instant USDC transfers across every continent with live exchange rates updated every 60 seconds from Arc Network.
-          </p>
-          <div className="flex items-center justify-center gap-2 mt-5 text-sm text-[#8892a0]">
-            <span className="live-dot" />
-            Rates live · Updated 12 seconds ago
-          </div>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-6 pb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            {[{ v: '18+', l: 'COUNTRIES' }, { v: '<1s', l: 'SETTLEMENT' }, { v: '$0.003', l: 'AVG FEE' }, { v: '24/7', l: 'ALWAYS OPEN' }].map(s => (
-              <StatCard key={s.l} value={s.v} label={s.l} />
-            ))}
-          </div>
-
-          <div className="flex gap-2 flex-wrap mb-8">
-            {REGIONS.map(r => (
-              <button
-                key={r}
-                onClick={() => setActiveRegion(r)}
-                className={"px-4 py-2 rounded-xl text-sm font-semibold border transition-all " + (
-                  activeRegion === r
-                    ? "bg-[#0a2030] border-[#00D4FF] text-[#00D4FF]"
-                    : "border-[#1e2530] text-[#8892a0] hover:border-[#00D4FF]/50 hover:text-white"
-                )}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
-          <p className="section-label mb-6">LIVE DESTINATIONS</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-14">
-            {live.map(c => (
-              <Card key={c.code} className="p-6 hover:border-[#00D4FF] transition-all">
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{c.flag}</span>
-                    <div>
-                      <p className="font-bold font-[\'Space_Grotesk\'] text-lg">{c.name}</p>
-                      <p className="text-xs text-[#8892a0]">{c.currency} · {c.symbol} · {c.region}</p>
-                    </div>
-                  </div>
-                  <LiveBadge />
-                </div>
-                <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 mb-4">
-                  <p className="text-2xl font-bold text-[#00D4FF] font-[\'Space_Grotesk\']">{c.symbol}{c.rate.toLocaleString()} / USDC</p>
-                  <p className="text-xs text-[#8892a0] mt-1">1 USDC = {c.symbol}{c.rate.toLocaleString()} · Updated 12s ago</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {[{ l: 'AVG FEE', v: '$0.003' }, { l: 'SETTLEMENT', v: '< 1 second' }, { l: 'MIN SEND', v: '$1 USDC' }, { l: 'MAX SEND', v: '$50,000 USDC' }].map(d => (
-                    <div key={d.l} className="bg-[#13181f] rounded-lg p-2.5">
-                      <p className="text-[10px] text-[#8892a0] mb-1">{d.l}</p>
-                      <p className="text-sm font-semibold font-[\'Space_Grotesk\']">{d.v}</p>
-                    </div>
-                  ))}
-                </div>
-                {c.cashout.length > 0 && (
-                  <div>
-                    <p className="text-[10px] tracking-widests text-[#8892a0] mb-2">CASHOUT OPTIONS</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {c.cashout.map(co => (
-                        <span key={co} className="text-[10px] border border-[#1e2530] text-[#8892a0] px-2 py-0.5 rounded-full">{co}</span>
-                      ))}
-                      <span className="text-[10px] border border-[#1e2530] text-[#8892a0] px-2 py-0.5 rounded-full">Hold USDC</span>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            ))}
-            {live.length === 0 && (
-              <div className="col-span-2 text-center py-12 text-[#556]">No countries available for this region yet,more launching soon.</div>
-            )}
-          </div>
-
-          <p className="section-label text-center mb-4">COMING SOON</p>
-          <h2 className="text-2xl font-bold text-center mb-2 font-[\'Space_Grotesk\']">Expanding globally</h2>
-          <p className="text-[#8892a0] text-sm text-center mb-8">More countries across every continent launching soon</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-            {soon.map(c => (
-              <Card key={c.code} className="p-5 text-center opacity-60">
-                <div className="text-3xl mb-2">{c.flag}</div>
-                <p className="font-semibold font-[\'Space_Grotesk\'] mb-1">{c.name}</p>
-                <p className="text-[10px] text-[#8892a0] mb-2">{c.region}</p>
-                <span className="text-[11px] border border-amber-500 text-amber-400 px-2 py-0.5 rounded-full bg-amber-900/10">Coming soon</span>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-      <Footer />
-    </>
-  )
-}
-
-// ─── RATES PAGE ──────────────────────────────────────────────────────
-
-export function RatesPage() {
-  const [sendAmount, setSendAmount] = useState(100)
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
-  const live = COUNTRIES.filter(c => c.status === 'live')
-
-  return (
-    <>
-      <div className="bg-[#0D1117] min-h-screen">
-        <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 text-center">
-          <Badge>TRANSPARENT PRICING</Badge>
-          <h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4">Live <span className="gradient-text">Exchange Rates</span></h1>
-          <p className="text-[#8892a0] text-base max-w-xl mx-auto leading-relaxed">Real-time rates across all 18+ global destinations. Fees shown upfront. No hidden charges, ever.</p>
-          <div className="flex items-center justify-center gap-2 mt-5 text-sm text-[#8892a0]">
-            <span className="live-dot" />
-            Rates update every 60 seconds · Powered by Arc Network
-          </div>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-6 pb-16">
-          {/* Calculator */}
-          <Card glow className="p-6 mb-10">
-            <p className="font-semibold font-['Space_Grotesk'] text-sm mb-5">Rate calculator — see what your family receives</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4">
-              <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4">
-                <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">YOU SEND</p>
-                <input type="number" value={sendAmount} onChange={e => setSendAmount(Number(e.target.value) || 0)}
-                  className="w-full bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] mb-1" />
-                <p className="text-xs text-[#8892a0]">USDC · from your wallet</p>
-              </div>
-              <div className="text-center text-[#00D4FF] text-2xl">→</div>
-              <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4">
-                <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">THEY RECEIVE</p>
-                <div className="flex items-end gap-2">
-                  <p className="text-2xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{(sendAmount * selectedCountry.rate).toLocaleString()}</p>
-                  <select value={selectedCountry.code} onChange={e => setSelectedCountry(COUNTRIES.find(c => c.code === e.target.value))}
-                    className="bg-[#1e2530] text-white text-xs rounded-md px-2 py-1 outline-none mb-0.5">
-                    {live.map(c => <option key={c.code} value={c.code}>{c.flag} {c.currency}</option>)}
-                  </select>
-                </div>
-                <p className="text-xs text-[#8892a0] mt-1">{selectedCountry.name}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { l: 'EXCHANGE RATE', v: `${selectedCountry.symbol}${selectedCountry.rate}`, color: 'text-[#00D4FF]' },
-                { l: 'ARC NETWORK FEE', v: '$0.003', color: 'text-green-400' },
-                { l: 'YOU SAVE VS WIRE', v: '-$24.97', color: 'text-green-400' },
-              ].map(d => (
-                <div key={d.l} className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-3">
-                  <p className="text-[10px] text-[#8892a0] mb-1">{d.l}</p>
-                  <p className={`font-bold font-['Space_Grotesk'] ${d.color}`}>{d.v}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Rates table */}
-          <p className="section-label mb-2">LIVE RATES</p>
-          <h2 className="text-xl font-bold font-['Space_Grotesk'] mb-1">All destination rates</h2>
-          <p className="text-[#8892a0] text-sm mb-5">Per 1 USDC sent · Rates refreshed every 60 seconds</p>
-
-          <Card className="overflow-hidden mb-10">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#1e2530] bg-[#13181f]">
-                  {['COUNTRY', 'EXCHANGE RATE', 'PARAGON FEE', 'SETTLEMENT', 'SAVE VS WIRE', 'STATUS'].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10px] tracking-widest text-[#8892a0] font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {live.map(c => (
-                  <tr key={c.code} className="border-b border-[#0f1520] hover:bg-[#0f1822] transition-colors">
-                    <td className="px-5 py-4"><div className="flex items-center gap-2"><span className="text-xl">{c.flag}</span><div><p className="font-semibold font-['Space_Grotesk']">{c.name}</p><p className="text-[10px] text-[#8892a0]">{c.currency}</p></div></div></td>
-                    <td className="px-5 py-4 text-[#00D4FF] font-semibold">{c.symbol}{c.rate.toLocaleString()}</td>
-                    <td className="px-5 py-4 text-green-400 font-semibold">$0.003</td>
-                    <td className="px-5 py-4 text-green-400">&lt; 1 second</td>
-                    <td className="px-5 py-4 text-green-400 font-semibold">~$24.97</td>
-                    <td className="px-5 py-4"><LiveBadge /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-
-          {/* Fee comparison */}
-          <p className="section-label mb-2">FEE COMPARISON</p>
-          <h2 className="text-xl font-bold font-['Space_Grotesk'] mb-1">Paragon Finance vs the old way</h2>
-          <p className="text-[#8892a0] text-sm mb-5">Sending $100 internationally — all providers compared</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {COMPETITORS.map(c => (
-              <div key={c.name} className={`rounded-xl p-6 text-center border ${c.badge === 'best' ? 'bg-[#0a2030] border-[#00D4FF]' : 'bg-[#0f1822] border-[#1e2530]'}`}>
-                <p className="text-[11px] text-[#8892a0] tracking-wider mb-3 font-['Space_Grotesk']">{c.name}</p>
-                <p className={`text-3xl font-bold font-['Space_Grotesk'] mb-2 ${c.badge === 'best' ? 'text-[#00D4FF]' : 'text-red-400'}`}>{c.fee}</p>
-                <p className="text-xs text-[#8892a0] mb-4">{c.time}</p>
-                {c.badge === 'best'
-                  ? <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-green-900/30 border border-green-500 text-green-400">Best value</span>
-                  : <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-red-900/20 border border-red-500 text-red-400">Avoid</span>
-                }
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <Footer />
-    </>
-  )
-}
-
-// ─── ABOUT PAGE ──────────────────────────────────────────────────────
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ABOUT
-// The why: what's broken, what we're building, who's building it. The how
-// lives in Docs.
-// ═══════════════════════════════════════════════════════════════════════════
 export function AboutPage() {
   return (
     <>
@@ -548,7 +322,7 @@ export function AboutPage() {
                 {
                   icon: '🚫',
                   title: 'Access gaps',
-                  desc: 'For Global users and businesses, all of the above compounds: limited access to global financial infrastructure, fragmented payment systems, and conversion friction at every border.',
+                  desc: 'For African users and businesses, all of the above compounds: limited access to global financial infrastructure, fragmented payment systems, and conversion friction at every border.',
                 },
               ].map(p => <InfoCard key={p.title} {...p} />)}
             </div>
@@ -573,7 +347,7 @@ export function AboutPage() {
             <Card className="p-6">
               <SectionLabel>VISION</SectionLabel>
               <p className="text-white font-['Space_Grotesk'] font-semibold text-sm leading-relaxed">
-                To become a leading global-focused DeFi and stablecoin platform, connecting users,
+                To become a leading African-focused DeFi and stablecoin platform, connecting users,
                 businesses, liquidity, and decentralised financial infrastructure — and making
                 on-chain finance usable for everyday financial activity, not just for traders.
               </p>
@@ -663,7 +437,7 @@ export function AboutPage() {
                   Founder of <span className="font-bold">Paragon Finance</span> | Fullstack Developer
                 </p>
                 <p className="text-sm text-[#8892a0] leading-relaxed mb-4">
-                  Eze Julius is a MERN stack developer and builder with over 4 years of
+                  Eze Julius is a MERN stack developer and builder from Nigeria with over 4 years of
                   experience building scalable web applications and digital products. He founded
                   Paragon Finance to make stablecoin-powered financial infrastructure accessible to
                   users and businesses across Africa and beyond.
@@ -683,18 +457,19 @@ export function AboutPage() {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-3 mb-1">
                   <h3 className="text-xl font-bold font-['Space_Grotesk']">David Emeremgini</h3>
-                  <span className="text-xs text-[#556] font-mono">@Tochimmxm</span>
+                  <span className="text-xs text-[#556] font-mono">@daviwork</span>
                 </div>
                 <p className="text-sm text-[#00D4FF] mb-3">
                   Co-Founder of <span className="font-bold">Paragon Finance</span> | Fullstack Developer
                 </p>
                 <p className="text-sm text-[#8892a0] leading-relaxed mb-4">
-                  David is a full-stack developer with 5+ years of experience building modern web applications.
-                   He is also a co-founder and developer at Paragon Finance, focused on creating simpler solutions 
-                   for global payments.
+                  David is a MERN stack developer based in Enugu, Nigeria, with over 4 years of
+                  experience building production-grade web applications. He studied Computer
+                  Statistics at the University of Nigeria, Nsukka, and works as a Fullstack
+                  Developer at Enzo Solution Network while co-founding Paragon Finance.
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  {['React.js', 'Node.js', 'MongoDB', 'Tailwind CSS', 'Web3', 'Co-Founder'].map(t => (
+                  {['React.js', 'Node.js', 'MongoDB', 'Tailwind CSS', 'Web3', 'Enugu, Nigeria 🇳🇬'].map(t => (
                     <span key={t} className="text-xs border border-[#1e2530] text-[#8892a0] px-3 py-1 rounded-full">{t}</span>
                   ))}
                 </div>
@@ -1079,7 +854,7 @@ export function DocsPage() {
               <div>
                 <p className="text-[10px] tracking-[2px] text-[#8892a0] mb-4">SUPPORTS</p>
                 <div className="space-y-2">
-                  {['Growing user activity', 'Higher transaction volumes', 'Additional DeFi integrations', 'Enterprise applications', 'Global financial infrastructure', 'Institutional integrations'].map(a => (
+                  {['Growing user activity', 'Higher transaction volumes', 'Additional DeFi integrations', 'Enterprise applications', 'Pan-African financial infrastructure', 'Institutional integrations'].map(a => (
                     <div key={a} className="flex items-center gap-2.5 text-sm text-[#8892a0]">
                       <span className="text-[#00FFCC]">→</span>{a}
                     </div>
@@ -1172,7 +947,7 @@ export function DocsPage() {
             <p className="text-[#8892a0] text-sm max-w-2xl mb-8 leading-relaxed">
               The differentiation isn't another swap interface or another payment app. It's
               combining DeFi liquidity, stablecoins, cross-chain infrastructure and real-world
-              financial applications into one ecosystem, built first for users and
+              financial applications into one ecosystem, built first for African users and
               businesses.
             </p>
 

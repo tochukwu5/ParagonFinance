@@ -6,26 +6,28 @@ import { useArcTestnet } from './hooks/useArcTestnet'
 import { useTestnet } from './context/TestnetContext'
 
 import Sidebar from './components/Sidebar'
-// import Footer from './components/Footer'
+import Footer from './components/Footer'
 
 import Home from './pages/Home'
 import ConnectWallet from './pages/ConnectWallet'
 import Dashboard from './pages/Dashboard'
 import { Transactions, WalletPage, Notifications, Settings } from './pages/DashboardPages'
-import { HowItWorks, CountriesPage, RatesPage, AboutPage, DocsPage } from './pages/PublicPages'
+import { HowItWorks, AboutPage, DocsPage } from './pages/PublicPages'
 
 import TestnetSend from './pages/testnet/TestnetSend'
 import AdminPage from './pages/AdminPage'
 import StatsPage from './pages/StatsPage'
 
-// No <Footer /> here — Docs, PublicPages, StatsPage and the testnet pages
-// each render their own, and adding one at the layout level would show two.
+// Sidebar plus content. md:pl-16 clears the collapsed rail — the expanded
+// state overlays rather than reflowing, so this padding never changes as the
+// sidebar animates.
 function AppLayout({ children }) {
   return (
     <>
       <Sidebar />
       <div className="md:pl-16 min-h-screen bg-[#0D1117]">
         {children}
+        <Footer />
       </div>
     </>
   )
@@ -67,8 +69,11 @@ export default function App() {
             {/* ── Public ─────────────────────────────────────────── */}
             <Route path="/" element={<AppLayout><Home /></AppLayout>} />
             <Route path="/how-it-works" element={<AppLayout><HowItWorks /></AppLayout>} />
-            <Route path="/countries" element={<AppLayout><CountriesPage /></AppLayout>} />
-            <Route path="/rates" element={<AppLayout><RatesPage /></AppLayout>} />
+            {/* Countries and Rates retired — the platform is positioned
+                around chains and stablecoin rails now, not a list of
+                destinations. Redirects keep old links alive. */}
+            <Route path="/countries" element={<Navigate to="/how-it-works" replace />} />
+            <Route path="/rates" element={<Navigate to="/how-it-works" replace />} />
             <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
             <Route path="/docs" element={<AppLayout><DocsPage /></AppLayout>} />
 
@@ -91,11 +96,11 @@ export default function App() {
             <Route path="/connect" element={<BareLayout><ConnectWallet /></BareLayout>} />
 
             {/* ── Dashboard — renders its own sidebar ────────────── */}
-            <Route path="/dashboard" element={<BareLayout><Dashboard /></BareLayout>} />
-            <Route path="/dashboard/transactions" element={<BareLayout><Transactions /></BareLayout>} />
-            <Route path="/dashboard/wallet" element={<BareLayout><WalletPage /></BareLayout>} />
-            <Route path="/dashboard/notifications" element={<BareLayout><Notifications /></BareLayout>} />
-            <Route path="/dashboard/settings" element={<BareLayout><Settings /></BareLayout>} />
+            <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
+            <Route path="/dashboard/transactions" element={<AppLayout><Transactions /></AppLayout>} />
+            <Route path="/dashboard/wallet" element={<AppLayout><WalletPage /></AppLayout>} />
+            <Route path="/dashboard/notifications" element={<AppLayout><Notifications /></AppLayout>} />
+            <Route path="/dashboard/settings" element={<AppLayout><Settings /></AppLayout>} />
 
             {/* ── Internal ───────────────────────────────────────── */}
             <Route path="/admin" element={<BareLayout><AdminPage /></BareLayout>} />

@@ -70,8 +70,8 @@ const MENU = [
   { to: '/testnet/send', label: 'Testnet', icon: 'testnet' },
   { to: '/about',        label: 'About',        icon: 'about' },
   { to: '/how-it-works', label: 'How it works', icon: 'howItWorks' },
-  { to: '/countries',    label: 'Countries',    icon: 'countries' },
-  { to: '/rates',        label: 'Rates',        icon: 'rates' },
+  // { to: '/countries',    label: 'Countries',    icon: 'countries' },
+  // { to: '/rates',        label: 'Rates',        icon: 'rates' },
   { to: '/docs',         label: 'Docs',         icon: 'docs' },
 ]
 
