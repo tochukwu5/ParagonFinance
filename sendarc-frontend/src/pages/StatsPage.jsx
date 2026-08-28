@@ -89,7 +89,7 @@ export default function StatsPage() {
             </p>
             <div className="flex items-center gap-4 mt-5">
               <a
-                href="https://testnet.arcscan.app/address/0xd01Bbb99Ef57a82238591f3898D721fc2f7CDf50"
+                href="https://testnet.arcscan.app/address/0xe22f1D1f72437734cd789F34668eDcd945e048fct"
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-[#00D4FF] border border-[#00D4FF]/30 px-3 py-1.5 rounded-full hover:bg-[#0a2030] transition-all"
