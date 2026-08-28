@@ -94,7 +94,7 @@ export default function StatsPage() {
                 rel="noreferrer"
                 className="text-xs text-[#00D4FF] border border-[#00D4FF]/30 px-3 py-1.5 rounded-full hover:bg-[#0a2030] transition-all"
               >
-                SendArcRouter on ArcScan ↗
+                ParagonFinancePaymentRouter on ArcScan ↗
               </a>
               <Link
                 to="/testnet"
