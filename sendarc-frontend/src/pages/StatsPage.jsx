@@ -207,7 +207,7 @@ export default function StatsPage() {
           )}
 
           {/* Activity chart */}
-          {activity.length > 0 && (
+          {/* {activity.length > 0 && (
             <div className="bg-[#0f1822] border border-[#1e2530] rounded-2xl p-6 mb-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -257,7 +257,7 @@ export default function StatsPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          )}
+          )} */}
 
           {/* Leaderboard */}
           {leaderboard.length > 0 && (
