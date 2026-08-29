@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 import {
-  SWAP_TOKENS, SWAP_TOKEN_LIST, getSwapQuote, executeSwap,
-  checkAllowances, UNITFLOW,
+  SWAP_TOKENS, SWAP_TOKEN_LIST, executeSwap, checkAllowances,
 } from '../../utils/unitflowSwap'
+import { getAllQuotes, bestPriceEdge, SWAP_FEE_USDC, PARAGON_SWAP_ROUTER } from '../../utils/swapQuotes'
 import { ARC_TESTNET, arcScanTx, getUsdcBalance, getEurcBalance, getCirbtcBalance } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import TokenSelectModal from '../../components/TokenSelectModal'
@@ -23,6 +22,25 @@ const SLIPPAGE_OPTIONS = [
   { bps: 100, label: '1%' },
 ]
 
+// Approximate USD reference prices, for the secondary line under each
+// amount. Testnet tokens have no real market, so a live feed would be
+// quoting a price that doesn't exist — these are indicative only and the
+// UI never uses them for anything that affects execution.
+const USD_REFERENCE = {
+  USDC: 1.00,
+  EURC: 1.08,
+  cirBTC: 65000,
+  USDT: 1.00,
+}
+
+const usd = (symbol, amount) => {
+  const rate = USD_REFERENCE[symbol]
+  if (!rate || !amount) return null
+  const v = parseFloat(amount) * rate
+  if (!isFinite(v)) return null
+  return v < 0.01 ? '<$0.01' : '$' + v.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+}
+
 export default function SwapTab({ account, provider, onRecordTransaction }) {
   const [view, setView] = useState('form') // 'form' | 'confirm' | 'success'
 
@@ -33,9 +51,13 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   const [showInModal, setShowInModal] = useState(false)
   const [showOutModal, setShowOutModal] = useState(false)
 
-  const [quote, setQuote] = useState(null)
-  const [quoting, setQuoting] = useState(false)
-  const [noRoute, setNoRoute] = useState(false)
+  // Quote rows, filled progressively. `searching` stays true until every
+  // source has answered, but rows appear as each one lands — waiting on the
+  // slowest venue to show the fastest venue's price helps nobody.
+  const [quotes, setQuotes] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [selectedSource, setSelectedSource] = useState(null)
+  const requestId = useRef(0)
 
   const [slippageBps, setSlippageBps] = useState(50)
   const [showSlippage, setShowSlippage] = useState(false)
@@ -51,68 +73,87 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   const tokenIn = SWAP_TOKENS[tokenInSymbol]
   const tokenOut = SWAP_TOKENS[tokenOutSymbol]
 
-  // A token can't be swapped for itself, so the opposite side never offers
-  // the one already chosen. Picking a token that's currently on the other
-  // side swaps them rather than creating an invalid pair — almost certainly
-  // what the user meant by that action.
   const inputChoices = SWAP_TOKEN_LIST.filter(t => t.symbol !== tokenOutSymbol)
   const outputChoices = SWAP_TOKEN_LIST.filter(t => t.symbol !== tokenInSymbol)
 
   const balanceOf = (symbol) => balances[symbol] ?? null
   const inBalance = balanceOf(tokenInSymbol)
+  const numericBalance = inBalance === null ? null : parseFloat(inBalance)
+
+  // The row the user has picked, or the best one if they haven't picked.
+  // Selection is respected because a venue with a marginally worse price
+  // may still be the one someone wants for reasons we can't see.
+  const liveQuotes = quotes.filter(q => q.available)
+  const activeQuote =
+    liveQuotes.find(q => q.sourceId === selectedSource) ||
+    liveQuotes.find(q => q.best) ||
+    liveQuotes[0] ||
+    null
+
+  const edge = bestPriceEdge(quotes)
+  const noRoute = !searching && quotes.length > 0 && liveQuotes.length === 0
 
   // ── Balances ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!account) return
     let cancelled = false
-
-    const load = async () => {
-      const [usdc, eurc, cirbtc] = await Promise.all([
-        getUsdcBalance('arc', account),
-        getEurcBalance(account),
-        getCirbtcBalance(account),
-      ])
-      if (cancelled) return
-      setBalances({ USDC: usdc, EURC: eurc, cirBTC: cirbtc, USDT: null })
-    }
-
-    load()
+    Promise.all([
+      getUsdcBalance('arc', account),
+      getEurcBalance(account),
+      getCirbtcBalance(account),
+    ]).then(([usdc, eurc, cirbtc]) => {
+      if (!cancelled) setBalances({ USDC: usdc, EURC: eurc, cirBTC: cirbtc, USDT: null })
+    })
     return () => { cancelled = true }
   }, [account, result])
 
-  // ── Live quote, debounced ───────────────────────────────────────────
-  // Every keystroke would otherwise fire four eth_calls (one per fee tier),
-  // so this waits for a pause before asking.
+  // ── Quote every source, debounced ───────────────────────────────────
   useEffect(() => {
     if (!amount || parseFloat(amount) <= 0 || !tokenIn?.available || !tokenOut?.available) {
-      setQuote(null)
-      setNoRoute(false)
+      setQuotes([])
+      setSearching(false)
       return
     }
 
+    const id = ++requestId.current
     let cancelled = false
-    setQuoting(true)
-    setNoRoute(false)
+
+    setSearching(true)
+    setQuotes([])
+    setSelectedSource(null)
 
     const timer = setTimeout(async () => {
       try {
-        const q = await getSwapQuote({ tokenIn, tokenOut, amountIn: amount })
-        if (cancelled) return
-        setQuote(q)
-        setNoRoute(q === null)
-      } catch {
-        if (!cancelled) { setQuote(null); setNoRoute(true) }
+        const all = await getAllQuotes({
+          tokenIn,
+          tokenOut,
+          amountIn: amount,
+          // Rows appear one at a time as each venue answers. A stale
+          // request's results are dropped by the id check — otherwise a
+          // slow quote from two keystrokes ago could overwrite a fresh one.
+          onProgress: (entry) => {
+            if (cancelled || id !== requestId.current) return
+            setQuotes(prev => {
+              const next = [...prev, entry]
+              return next.sort((a, b) => {
+                if (!a.available && !b.available) return 0
+                if (!a.available) return 1
+                if (!b.available) return -1
+                return parseFloat(b.quote.amountOut) - parseFloat(a.quote.amountOut)
+              })
+            })
+          },
+        })
+        if (!cancelled && id === requestId.current) setQuotes(all)
       } finally {
-        if (!cancelled) setQuoting(false)
+        if (!cancelled && id === requestId.current) setSearching(false)
       }
     }, 450)
 
     return () => { cancelled = true; clearTimeout(timer) }
   }, [amount, tokenInSymbol, tokenOutSymbol])
 
-  // ── Approval state ──────────────────────────────────────────────────
-  // Surfaced up front so the review screen can say how many wallet prompts
-  // to expect, rather than surprising the user mid-swap.
+  // ── Approvals ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!account || !tokenIn || tokenIn.isNative) { setApprovals(null); return }
     let cancelled = false
@@ -127,31 +168,25 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
     setTokenInSymbol(tokenOutSymbol)
     setTokenOutSymbol(oldIn)
     setAmount('')
-    setQuote(null)
-    setNoRoute(false)
+    setQuotes([])
   }
 
-  const selectInput = (symbol) => {
-    if (symbol === tokenOutSymbol) { handleFlip(); return }
-    setTokenInSymbol(symbol)
-    setAmount('')
-  }
-
-  const selectOutput = (symbol) => {
-    if (symbol === tokenInSymbol) { handleFlip(); return }
-    setTokenOutSymbol(symbol)
-  }
+  const selectInput = (s) => { if (s === tokenOutSymbol) return handleFlip(); setTokenInSymbol(s); setAmount('') }
+  const selectOutput = (s) => { if (s === tokenInSymbol) return handleFlip(); setTokenOutSymbol(s) }
 
   const handleSwap = async () => {
+    if (!activeQuote) return
     setSwapping(true)
     setSwapError(null)
     setStatus('')
     try {
       const r = await executeSwap({
-        tokenIn, tokenOut, amountIn: amount, quote,
+        tokenIn, tokenOut, amountIn: amount,
+        quote: activeQuote.quote,
         slippageBps, provider, from: account,
         onStatus: setStatus,
       })
+      r.source = activeQuote.name
       if (onRecordTransaction) {
         try { await onRecordTransaction(r, account) } catch { /* logging only */ }
       }
@@ -167,23 +202,22 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   }
 
   const reset = () => {
-    setView('form'); setAmount(''); setQuote(null); setResult(null)
-    setSwapError(null); setStatus(''); setNoRoute(false)
+    setView('form'); setAmount(''); setQuotes([]); setResult(null)
+    setSwapError(null); setStatus(''); setSelectedSource(null)
   }
 
   const bothAvailable = tokenIn?.available && tokenOut?.available
-  const numericBalance = inBalance === null ? null : parseFloat(inBalance)
   const exceedsBalance = numericBalance !== null && amount && parseFloat(amount) > numericBalance
 
   const promptCount = tokenIn?.isNative
     ? 1
     : 1 + (approvals?.needsTokenApproval ? 1 : 0) + (approvals?.needsPermit2Approval ? 1 : 0)
 
-  const minReceived = quote
-    ? (parseFloat(quote.amountOut) * (10000 - slippageBps) / 10000).toFixed(6)
+  const minReceived = activeQuote
+    ? (parseFloat(activeQuote.quote.amountOut) * (10000 - slippageBps) / 10000).toFixed(6)
     : null
 
-  const canReview = !!quote && !quoting && !exceedsBalance && bothAvailable && !!account
+  const canReview = !!activeQuote && !searching && !exceedsBalance && bothAvailable && !!account
 
   // ── Token box ───────────────────────────────────────────────────────
   const tokenBox = ({ label, token, isInput, onPick, balance, value, onChange, readOnly }) => (
@@ -191,7 +225,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
       <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
         <span className="text-[10px] tracking-widest text-[#8892a0]">{label}</span>
         <span className="text-[10px] text-[#8892a0]">
-          Balance: {balance === null ? '—' : balance}
+          {balance === null ? '—' : balance} {token.symbol}
           {isInput && numericBalance > 0 && (
             <>
               <button onClick={() => setAmount((numericBalance * 0.5).toFixed(6))}
@@ -203,40 +237,117 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
         </span>
       </div>
       <div className="flex items-center justify-between gap-2 sm:gap-3">
-        <button
-          onClick={onPick}
-          className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
-        >
+        <button onClick={onPick}
+          className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0">
           <CoinIcon symbol={token.symbol} size={20} />
           {token.symbol}
           <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
-        {readOnly ? (
-          <span className={
-            'flex-1 min-w-0 text-2xl font-bold font-[\'Space_Grotesk\'] text-right truncate ' +
-            (quoting ? 'text-[#ccccd6] animate-pulse' : 'text-white')
-          }>
-            {quoting ? '…' : quote ? parseFloat(quote.amountOut).toFixed(6) : '0.00'}
+
+        <div className="flex-1 min-w-0 text-right">
+          {readOnly ? (
+            <span className={
+              'block text-2xl font-bold font-[\'Space_Grotesk\'] truncate ' +
+              (searching && !activeQuote ? 'text-[#556] animate-pulse' : 'text-white')
+            }>
+              {searching && !activeQuote
+                ? '…'
+                : activeQuote
+                  ? parseFloat(activeQuote.quote.amountOut).toFixed(6)
+                  : '0.00'}
+            </span>
+          ) : (
+            <input
+              type="number"
+              placeholder="0.00"
+              value={value}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                if (e.target.value === '' || e.target.value === '0') onChange('')
+                else if (!isNaN(v) && v > 0) onChange(e.target.value)
+              }}
+              min="0"
+              className="w-full bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
+            />
+          )}
+          {/* Indicative dollar value, mirroring the reference layout. */}
+          <span className="block text-[11px] text-[#556] mt-0.5">
+            {readOnly
+              ? (activeQuote ? usd(token.symbol, activeQuote.quote.amountOut) : null)
+              : usd(token.symbol, value)}
           </span>
-        ) : (
-          <input
-            type="number"
-            placeholder="0.00"
-            value={value}
-            onChange={e => {
-              const v = parseFloat(e.target.value)
-              if (e.target.value === '' || e.target.value === '0') onChange('')
-              else if (!isNaN(v) && v > 0) onChange(e.target.value)
-            }}
-            min="0"
-            className="flex-1 min-w-0 bg-transparent text-white text-2xl font-bold outline-none font-['Space_Grotesk'] text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0"
-          />
-        )}
+        </div>
       </div>
-      <p className="text-[10px] text-[#ccccd6] mt-1.5">{token.name}</p>
+      <p className="text-[10px] text-[#556] mt-1.5">{token.name}</p>
       {!token.available && (
         <p className="text-[10px] text-[#e8c374] mt-1">{token.unavailableReason}</p>
       )}
+    </div>
+  )
+
+  // ── Quote row ───────────────────────────────────────────────────────
+  const QuoteRow = ({ q }) => {
+    const isActive = activeQuote?.sourceId === q.sourceId
+    return (
+      <button
+        onClick={() => q.available && setSelectedSource(q.sourceId)}
+        disabled={!q.available}
+        className={
+          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left border ' +
+          (isActive
+            ? 'bg-[#101a26] border-[#00D4FF]/40'
+            : q.available
+              ? 'border-transparent hover:bg-[#11161f]'
+              : 'border-transparent opacity-40 cursor-not-allowed')
+        }
+      >
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: q.color + '18', border: '1px solid ' + q.color + '35' }}
+        >
+          <img
+            src={q.logo}
+            alt=""
+            className="w-4 h-4 object-contain"
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-sm font-semibold text-white truncate">{q.name}</span>
+          {q.best && q.available && (
+            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30 flex-shrink-0">
+              Best Price
+            </span>
+          )}
+        </div>
+
+        <div className="text-right flex-shrink-0">
+          {q.available ? (
+            <>
+              <p className="text-sm font-bold text-white leading-tight">
+                {parseFloat(q.quote.amountOut).toFixed(2)}
+              </p>
+              <p className="text-[10px] text-[#556]">
+                ~{usd(tokenOutSymbol, q.quote.amountOut)}
+              </p>
+            </>
+          ) : (
+            <p className="text-[10px] text-[#556]">No route</p>
+          )}
+        </div>
+      </button>
+    )
+  }
+
+  // Placeholder rows for venues still being queried, so the panel has its
+  // final shape from the first frame rather than growing as answers land.
+  const pendingCount = Math.max(0, 2 - quotes.length)
+  const SkeletonRow = () => (
+    <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl">
+      <div className="w-7 h-7 rounded-lg bg-[#161d28] animate-pulse flex-shrink-0" />
+      <div className="h-3 w-20 rounded bg-[#161d28] animate-pulse" />
+      <div className="ml-auto h-3 w-12 rounded bg-[#161d28] animate-pulse" />
     </div>
   )
 
@@ -249,14 +360,14 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           Swap <span className="text-green-400">confirmed</span>
         </h2>
         <p className="text-[#8892a0] text-xs mb-6">
-          via UnitFlow on Arc Testnet · {(result.settlementTime / 1000).toFixed(1)}s
+          via {result.source || 'UnitFlow'} on Arc Testnet · {(result.settlementTime / 1000).toFixed(1)}s
         </p>
 
         <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-left mb-5 space-y-2.5">
           {[
             { l: 'Swapped', v: result.amountIn + ' ' + result.tokenIn },
             { l: 'Received', v: '~' + result.amountOut.toFixed(6) + ' ' + result.tokenOut },
-            { l: 'Pool fee', v: (result.fee / 10000).toFixed(2) + '%' },
+            { l: 'Routed via', v: result.source || 'UnitFlow' },
             { l: 'Max slippage', v: (result.slippageBps / 100).toFixed(2) + '%' },
             { l: 'Status', v: 'Confirmed', green: true },
           ].map(r => (
@@ -306,17 +417,19 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           <span className="text-[#00D4FF]">→</span>
           <span className="flex items-center gap-1.5 text-sm text-white font-semibold">
             <CoinIcon symbol={tokenOut.symbol} size={18} />
-            {quote ? parseFloat(quote.amountOut).toFixed(6) : '—'} {tokenOut.symbol}
+            {activeQuote ? parseFloat(activeQuote.quote.amountOut).toFixed(6) : '—'} {tokenOut.symbol}
           </span>
         </div>
 
         <div className="space-y-3 mb-5">
           {[
-            { l: 'Rate', v: quote ? '1 ' + tokenIn.symbol + ' ≈ ' + quote.rate.toFixed(6) + ' ' + tokenOut.symbol : '—' },
+            { l: 'Routed via', v: activeQuote?.name || '—' },
+            { l: 'Rate', v: activeQuote ? '1 ' + tokenIn.symbol + ' ≈ ' + (parseFloat(activeQuote.quote.amountOut) / parseFloat(amount)).toFixed(6) + ' ' + tokenOut.symbol : '—' },
             { l: 'Minimum received', v: minReceived ? minReceived + ' ' + tokenOut.symbol : '—', accent: true },
             { l: 'Max slippage', v: (slippageBps / 100).toFixed(2) + '%' },
-            { l: 'Pool fee tier', v: quote ? (quote.fee / 10000).toFixed(2) + '%' : '—' },
-            { l: 'Routed via', v: 'UnitFlow Finance' },
+            // Disclosed before signing rather than after — a fee someone
+            // discovers on the explorer is a fee they didn't agree to.
+            ...(PARAGON_SWAP_ROUTER ? [{ l: 'ParagonFinance fee', v: SWAP_FEE_USDC + ' USDC' }] : []),
             { l: 'Prompts', v: promptCount + (promptCount === 1 ? ' (swap)' : ' (approvals + swap)') },
           ].map(r => (
             <div key={r.l} className="flex justify-between items-center border-b border-[#1e2530] pb-2.5 last:border-0 text-sm">
@@ -329,16 +442,14 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
         {promptCount > 1 && (
           <div className="bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl px-3 py-2.5 mb-4">
             <p className="text-[11px] text-[#8892a0] leading-relaxed">
-              {tokenIn.symbol} needs a one-time approval before UnitFlow can route it,
-              so expect {promptCount} wallet prompts this first time. Later swaps of{' '}
-              {tokenIn.symbol} will only need one.
+              {tokenIn.symbol} needs a one-time approval before it can be routed, so expect{' '}
+              {promptCount} wallet prompts this first time. Later swaps of {tokenIn.symbol} need
+              only one.
             </p>
           </div>
         )}
 
-        {status && swapping && (
-          <p className="text-xs text-[#00D4FF] mb-4">{status}</p>
-        )}
+        {status && swapping && <p className="text-xs text-[#00D4FF] mb-4">{status}</p>}
 
         {swapError && (
           <div className="bg-red-900/10 border border-red-500/30 rounded-xl p-3 mb-4">
@@ -351,7 +462,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
             className="flex-1 border border-[#1e2530] text-[#8892a0] py-3 rounded-xl hover:border-[#00D4FF] transition-all font-['Space_Grotesk'] font-semibold text-sm disabled:opacity-40">
             Edit
           </button>
-          <button onClick={handleSwap} disabled={swapping || !quote}
+          <button onClick={handleSwap} disabled={swapping || !activeQuote}
             className="flex-[2] bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
             {swapping ? (<><LoadingSpinner size="sm" /> Swapping…</>) : 'Confirm & Swap →'}
           </button>
@@ -364,9 +475,9 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
-        {/* <span className="text-[10px] tracking-widest text-[#8892a0]">
-          POWERED BY UNITFLOW
-        </span> */}
+        <span className="text-[10px] tracking-widest text-[#8892a0]">
+          BEST PRICE ACROSS VENUES
+        </span>
         <button
           onClick={() => setShowSlippage(!showSlippage)}
           className="text-[10px] text-[#8892a0] hover:text-[#00D4FF] transition-colors border border-[#1e2530] rounded-lg px-2.5 py-1"
@@ -378,21 +489,18 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
       {showSlippage && (
         <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-3 py-2.5 mb-3">
           <p className="text-[10px] text-[#8892a0] mb-2">
-            The swap reverts rather than filling below this. Tighter protects
-            your price; looser is more likely to go through on a thin pool.
+            The swap reverts rather than filling below this. Tighter protects your price;
+            looser is likelier to go through on a thin pool.
           </p>
           <div className="flex gap-2">
             {SLIPPAGE_OPTIONS.map(o => (
-              <button
-                key={o.bps}
-                onClick={() => setSlippageBps(o.bps)}
+              <button key={o.bps} onClick={() => setSlippageBps(o.bps)}
                 className={
                   'text-[11px] px-3 py-1 rounded-full border transition-all ' +
                   (slippageBps === o.bps
                     ? 'bg-[#0a2030] border-[#00D4FF] text-[#00D4FF]'
                     : 'border-[#1e2530] text-[#8892a0] hover:border-[#00D4FF]')
-                }
-              >
+                }>
                 {o.label}
               </button>
             ))}
@@ -401,56 +509,30 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
       )}
 
       {tokenBox({
-        label: 'YOU PAY',
-        token: tokenIn,
-        isInput: true,
-        onPick: () => setShowInModal(true),
-        balance: inBalance,
-        value: amount,
-        onChange: setAmount,
-        readOnly: false,
+        label: 'YOU PAY', token: tokenIn, isInput: true,
+        onPick: () => setShowInModal(true), balance: inBalance,
+        value: amount, onChange: setAmount, readOnly: false,
       })}
 
       <div className="flex justify-center -my-2.5 relative z-10">
-        <button
-          onClick={handleFlip}
-          title="Flip direction"
-          className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] hover:rotate-180 active:scale-90 transition-all duration-300"
-        >
+        <button onClick={handleFlip} title="Flip direction"
+          className="w-8 h-8 rounded-full bg-[#0f1822] border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-[#00D4FF] hover:border-[#00D4FF] hover:rotate-180 active:scale-90 transition-all duration-300">
           ↓↑
         </button>
       </div>
 
       {tokenBox({
-        label: 'YOU RECEIVE',
-        token: tokenOut,
-        isInput: false,
-        onPick: () => setShowOutModal(true),
-        balance: balanceOf(tokenOutSymbol),
-        value: '',
-        onChange: () => {},
-        readOnly: true,
+        label: 'YOU RECEIVE', token: tokenOut, isInput: false,
+        onPick: () => setShowOutModal(true), balance: balanceOf(tokenOutSymbol),
+        value: '', onChange: () => {}, readOnly: true,
       })}
 
       {!bothAvailable && (
         <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
           <span className="text-sm">🚧</span>
           <p className="text-xs text-[#e8c374]">
-            {(!tokenIn.available ? tokenIn.symbol : tokenOut.symbol)} isn't live on
-            Arc Testnet yet. Arc currently supports USDC, EURC and cirBTC.
-          </p>
-        </div>
-      )}
-
-      {noRoute && bothAvailable && (
-        <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
-          <span className="text-sm">🔀</span>
-          <p className="text-xs text-[#e8c374]">
-            No liquidity pool for {tokenIn.symbol}/{tokenOut.symbol} on UnitFlow yet.
-            Try a different pair, or{' '}
-            <a href="https://app.unitflow.finance" target="_blank" rel="noreferrer" className="underline">
-              check UnitFlow directly →
-            </a>
+            {(!tokenIn.available ? tokenIn.symbol : tokenOut.symbol)} isn't live on Arc Testnet yet.
+            Arc currently supports USDC, EURC and cirBTC.
           </p>
         </div>
       )}
@@ -458,38 +540,65 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
       {exceedsBalance && (
         <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
           <span className="text-sm">⚠️</span>
-          <p className="text-xs text-[#e8c374]">
-            You only have {inBalance} {tokenIn.symbol}.
-          </p>
+          <p className="text-xs text-[#e8c374]">You only have {inBalance} {tokenIn.symbol}.</p>
         </div>
       )}
-
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#1e2530] text-center">
-        <div>
-          <p className="text-[9px] text-[#8892a0] mb-0.5">RATE</p>
-          <p className="text-xs text-white font-semibold">
-            {quoting ? '…' : quote ? '1 : ' + quote.rate.toFixed(4) : '—'}
-          </p>
-        </div>
-        <div>
-          <p className="text-[9px] text-[#8892a0] mb-0.5">EST. TIME</p>
-          <p className="text-xs text-white font-semibold">&lt; 1 sec</p>
-        </div>
-        <div>
-          <p className="text-[9px] text-[#8892a0] mb-0.5">MIN RECEIVED</p>
-          <p className="text-xs text-white font-semibold">
-            {minReceived ? parseFloat(minReceived).toFixed(4) : '—'}
-          </p>
-        </div>
-      </div>
 
       <button
         onClick={() => setView('confirm')}
         disabled={!canReview}
-        className="w-full mt-5 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full mt-4 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {!account ? 'Connect wallet to swap' : quoting ? 'Finding best route…' : 'Review & Swap →'}
+        {!account
+          ? 'Connect wallet to swap'
+          : searching
+            ? 'Finding best route…'
+            : noRoute
+              ? 'No route available'
+              : 'Review & Swap →'}
       </button>
+
+      {/* ── Quotes panel ────────────────────────────────────────────────
+          Shown whenever there's an amount to quote, so the panel doesn't
+          appear and vanish between keystrokes. */}
+      {amount && parseFloat(amount) > 0 && bothAvailable && (
+        <div className="mt-4 bg-[#0D1117] border border-[#1e2530] rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-white">Quotes</span>
+              {searching && (
+                <span className="flex items-center gap-1.5 text-[10px] text-[#00D4FF]">
+                  <span className="w-3 h-3 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin" />
+                  searching…
+                </span>
+              )}
+            </div>
+
+            {!searching && edge && (
+              <span className="text-[10px] text-[#8892a0]">
+                <span className="text-[#00D4FF] font-semibold">+{edge.toFixed(2)}%</span>
+                {' '}vs next best
+              </span>
+            )}
+            {!searching && !edge && liveQuotes.length > 0 && (
+              <span className="text-[10px] text-[#556]">
+                {liveQuotes.length} {liveQuotes.length === 1 ? 'venue' : 'venues'}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-0.5">
+            {quotes.map(q => <QuoteRow key={q.sourceId} q={q} />)}
+            {searching && Array.from({ length: pendingCount }).map((_, i) => <SkeletonRow key={'sk' + i} />)}
+          </div>
+
+          {noRoute && (
+            <p className="text-[11px] text-[#e8c374] px-3 py-2">
+              No liquidity for {tokenIn.symbol}/{tokenOut.symbol} on any connected venue yet.
+            </p>
+          )}
+        </div>
+      )}
 
       <TokenSelectModal
         open={showInModal}
