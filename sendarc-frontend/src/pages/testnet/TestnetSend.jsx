@@ -15,6 +15,7 @@ import TokenSelectModal from '../../components/TokenSelectModal'
 import { CoinIcon } from '../../components/CoinLogos'
 import NetworkTokenModal from '../../components/NetworkTokenModal'
 import SwapTab from './SwapTab'
+import PartnerCards from '../../components/PartnerCards'
 
 // ─── Chain icons ───────────────────────────────────────────────────────────
 // EVM_CHAINS.icon is either an emoji ('⬡') or an image path ('/ethlogo.svg').
@@ -515,7 +516,7 @@ export default function TestnetSend() {
             </div>
             {account && (
               <div className="flex items-center gap-2 bg-[#0f1822] border border-[#1e2530] rounded-lg px-3 py-1.5">
-                <span className="live-dot" />
+                {/* <span className="live-dot" /> */}
                 <span className="text-xs font-mono text-white">{shortAddr(account)}</span>
               </div>
             )}
@@ -1070,6 +1071,7 @@ export default function TestnetSend() {
         activeKey={bridgeToKey}
         onSelect={setBridgeToKey}
       />
+        <PartnerCards />
     </>
   )
 }

@@ -47,6 +47,24 @@ const FEE_TIERS = [100, 500, 3000, 10000]
 const MAX_UINT160 = (1n << 160n) - 1n
 const MAX_UINT256 = (1n << 256n) - 1n
 
+// ParagonFinanceSwapRouter. When set, swaps route through it so the fee
+// reaches Treasury in the same transaction as the swap. When unset they go
+// direct to UnitFlow with no fee — which keeps local development working
+// without a deployed contract, and means the UI never shows a fee it isn't
+// actually taking.
+export const PARAGON_SWAP_ROUTER = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || null
+
+// swapWithFee(address,bytes,uint256,address)
+// Computed with Keccak-256 and cross-checked against three selectors already
+// live in this file: transfer = a9059cbb, balanceOf = 70a08231,
+// decimals = 313ce567.
+const SWAP_WITH_FEE_SELECTOR = '2718ee37'
+
+// Flat fee, 0.1 USDC. Arc's native USDC is 18 decimals in value fields, so
+// this is 1e17 — the ERC-20 interface's 6 decimals do not apply here.
+export const SWAP_FEE_USDC = 0.1
+const SWAP_FEE_RAW = BigInt(1e17)
+
 // ─── ABI encoding ─────────────────────────────────────────────────────────
 // Every value in ABI encoding occupies a 32-byte word, left-padded. Dynamic
 // types (bytes, bytes[]) put an offset in the head and their contents in a
@@ -428,6 +446,54 @@ function encodeExecuteCall(commandsHex, inputs, deadline) {
 }
 
 // ─── Execution ────────────────────────────────────────────────────────────
+/**
+ * Wrap a DEX call in ParagonFinanceSwapRouter.swapWithFee().
+ *
+ * Four static head words then the dynamic `bytes`, so the calldata offset
+ * is 4 * 32 = 128.
+ */
+function encodeSwapWithFee({ dexRouter, swapDataHex, swapValue, tokenOut }) {
+  const head =
+    encAddress(dexRouter) +
+    encUint(128) +
+    encUint(swapValue) +
+    encAddress(tokenOut)
+
+  return '0x' + SWAP_WITH_FEE_SELECTOR + head + encBytesTail(strip(swapDataHex))
+}
+
+/**
+ * Whether the Paragon router will accept a call to this DEX.
+ *
+ * Checked before sending rather than after reverting: "UnitFlow is not yet
+ * approved" is a message someone can act on, where a raw RouterNotApproved
+ * revert is not.
+ */
+export async function isRouterApproved(dexRouter) {
+  if (!PARAGON_SWAP_ROUTER) return false
+  try {
+    // approvedRouter(address) = cd753bb4
+    const data = '0xcd753bb4' + encAddress(dexRouter)
+    const result = await arcCall(PARAGON_SWAP_ROUTER, data)
+    return !!result && BigInt(result) === 1n
+  } catch {
+    return false
+  }
+}
+
+/** Live fee from the contract, so the UI cannot drift from what is charged. */
+export async function getSwapFee() {
+  if (!PARAGON_SWAP_ROUTER) return 0
+  try {
+    // swapFee() = 54cf2aeb
+    const result = await arcCall(PARAGON_SWAP_ROUTER, '0x54cf2aeb')
+    if (!result || result === '0x') return SWAP_FEE_USDC
+    return Number(BigInt(result)) / 1e18
+  } catch {
+    return SWAP_FEE_USDC
+  }
+}
+
 export async function executeSwap({
   tokenIn,
   tokenOut,
@@ -444,6 +510,11 @@ export async function executeSwap({
   const start = Date.now()
 
   // Approvals, when the input isn't native.
+  //
+  // These still approve UnitFlow's Permit2, not the Paragon router. That is
+  // correct: Permit2 pulls tokens on behalf of whoever calls the
+  // UniversalRouter, and in the routed path that caller is the Paragon
+  // router — so the grant names the UniversalRouter as spender either way.
   if (!tokenIn.isNative) {
     onStatus('Checking approvals...')
     const { needsTokenApproval, needsPermit2Approval } =
@@ -459,8 +530,8 @@ export async function executeSwap({
     }
   }
 
-  // Slippage floor. Without this the swap would accept any fill, which on a
-  // thin pool means an arbitrarily bad price.
+  // Slippage floor. Without this the swap accepts any fill, which on a thin
+  // pool means an arbitrarily bad price.
   const minOutRaw = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
 
   const { commandsHex, inputs, value } = buildSwapCommands({
@@ -469,24 +540,69 @@ export async function executeSwap({
     amountInRaw: quote.amountInRaw,
     minOutRaw,
     fee: quote.fee,
-    recipient: MSG_SENDER,
+    // In the routed path the UniversalRouter is called BY the Paragon
+    // router, so MSG_SENDER would resolve to the Paragon router rather than
+    // the user — and output would land in a contract with no way to forward
+    // it. Naming the user explicitly keeps funds going where they belong.
+    recipient: PARAGON_SWAP_ROUTER ? from : MSG_SENDER,
   })
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
-  const callData = encodeExecuteCall(commandsHex, inputs, deadline)
+  const dexCalldata = encodeExecuteCall(commandsHex, inputs, deadline)
 
-  onStatus('Confirm the swap in your wallet...')
+  let txHash
+  let routedThroughParagon = false
 
-  const txHash = await provider.request({
-    method: 'eth_sendTransaction',
-    params: [{
-      from,
-      to: UNITFLOW.universalRouter,
-      data: callData,
-      value: value > 0n ? '0x' + value.toString(16) : '0x0',
-      gas: '0x7A120', // 500k — multi-command routes are not cheap
-    }],
-  })
+  if (PARAGON_SWAP_ROUTER) {
+    // Fail early with something readable rather than letting the contract
+    // revert on an unapproved target.
+    const approved = await isRouterApproved(UNITFLOW.universalRouter)
+    if (!approved) {
+      throw new Error(
+        'UnitFlow is not yet approved on the ParagonFinance swap router. ' +
+        'Run approveRouter() on the swap router contract, then try again.'
+      )
+    }
+
+    onStatus('Confirm the swap in your wallet...')
+
+    const totalValue = SWAP_FEE_RAW + value
+    const data = encodeSwapWithFee({
+      dexRouter: UNITFLOW.universalRouter,
+      swapDataHex: dexCalldata,
+      swapValue: value,
+      tokenOut: poolAddress(tokenOut),
+    })
+
+    txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: PARAGON_SWAP_ROUTER,
+        data,
+        value: '0x' + totalValue.toString(16),
+        // 700k — the router's own accounting and Treasury transfer sit on
+        // top of the DEX call it forwards.
+        gas: '0xAAE60',
+      }],
+    })
+    routedThroughParagon = true
+  } else {
+    // No router configured: direct to UnitFlow, no fee.
+    console.warn('VITE_SWAP_ROUTER_ADDRESS not set — swapping direct, no fee collected')
+    onStatus('Confirm the swap in your wallet...')
+
+    txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: UNITFLOW.universalRouter,
+        data: dexCalldata,
+        value: value > 0n ? '0x' + value.toString(16) : '0x0',
+        gas: '0x7A120',
+      }],
+    })
+  }
 
   onStatus('Waiting for confirmation...')
 
@@ -518,6 +634,8 @@ export async function executeSwap({
     minAmountOut: parseFloat(formatUnits(minOutRaw, quote.outDecimals)),
     fee: quote.fee,
     slippageBps,
+    paragonFee: routedThroughParagon ? SWAP_FEE_USDC : 0,
+    routedThroughParagon,
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',

@@ -76,7 +76,7 @@ export function TestnetTransactions() {
                   <span className="text-[10px] font-mono text-[#8892a0]">{account}</span>
                   {backendOnline && (
                     <span className="text-[10px] text-green-400 border border-green-500/30 bg-green-900/10 px-2 py-0.5 rounded-full">
-                      ● MongoDB connected
+                      {/* ● MongoDB connected */}
                     </span>
                   )}
                   {isSyncing && (

@@ -952,7 +952,7 @@ export function DocsPage() {
             <p className="text-[#8892a0] text-sm max-w-2xl mb-8 leading-relaxed">
               The differentiation isn't another swap interface or another payment app. It's
               combining DeFi liquidity, stablecoins, cross-chain infrastructure and real-world
-              financial applications into one ecosystem, built first for African users and
+              financial applications into one ecosystem, built for Global users and
               businesses.
             </p></Reveal>
 
@@ -967,7 +967,6 @@ export function DocsPage() {
                 'Stablecoin FX',
                 'Treasury tools',
                 'Payments & remittance',
-                'Africa-focused',
                 'EVM-compatible architecture',
                 'Programmable financial infrastructure',
               ].map(f => <CheckRow key={f} label={f} />)}

@@ -58,7 +58,7 @@ export function Transactions() {
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] font-mono text-[#556]">{account}</span>
                 {backendOnline && (
-                  <span className="text-[10px] text-green-400">● MongoDB</span>
+                  <span className="text-[10px] text-green-400"></span>
                 )}
                 {isSyncing && (
                   <span className="text-[10px] text-[#8892a0] animate-pulse">Syncing...</span>
@@ -240,7 +240,18 @@ export function Transactions() {
 // ─── WALLET PAGE ────────────────────────────────────────────────────
 export function WalletPage() {
   const { wallet } = useWallet()
-  const { account, balance, isConnected, isCorrectNetwork, refreshBalance } = useArcTestnet()
+  const {
+    account, balance, isConnected, isCorrectNetwork,
+    refreshBalance, disconnect, walletId,
+  } = useArcTestnet()
+
+  const address = account || wallet?.address || null
+
+  const WALLET_LABEL = {
+    metamask: 'MetaMask',
+    rabby: 'Rabby Wallet',
+    coinbase: 'Coinbase Wallet',
+  }
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
@@ -248,54 +259,96 @@ export function WalletPage() {
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Wallet</h1>
         <p className="text-[#8892a0] text-sm mb-8">Your connected wallet and USDC balance</p>
 
-        <Card glow className="p-6 mb-5">
-          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">CONNECTED WALLET</p>
-          <div className="flex items-center gap-4 mb-5">
-            <div className="w-12 h-12 rounded-xl bg-[#e8821a] flex items-center justify-center text-white font-bold text-sm">MM</div>
-            <div>
-              <p className="font-semibold font-['Space_Grotesk']">MetaMask</p>
-              <p className="text-xs text-[#8892a0] font-mono mt-0.5 break-all">
-                {account || wallet?.address || 'Not connected'}
+        {!isConnected ? (
+          /* Disconnected state gets its own card rather than a greyed copy of
+             the connected one — showing a 0.00 balance with dead buttons reads
+             as "your wallet is empty", not "connect a wallet".
+
+             Links to /connect rather than calling connect('metamask') directly.
+             Hard-coding one wallet throws for anyone who doesn't have it
+             installed, which is exactly what was failing here. */
+          <Card glow className="p-8 text-center mb-5">
+            <h2 className="font-bold font-['Space_Grotesk'] text-white mb-2">
+              No wallet connected
+            </h2>
+            <p className="text-sm text-[#8892a0] mb-6 max-w-sm mx-auto leading-relaxed">
+              Connect a wallet to view your balance, copy your address, and send
+              or swap on Arc Testnet.
+            </p>
+            <Link
+              to="/connect"
+              className="inline-block bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-8 py-3 rounded-xl hover:opacity-90 transition-all"
+            >
+              Connect Wallet
+            </Link>
+          </Card>
+        ) : (
+          <Card glow className="p-6 mb-5">
+            <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">CONNECTED WALLET</p>
+
+            <div className="flex items-center gap-4 mb-5 flex-wrap">
+              <div className="w-12 h-12 rounded-xl bg-[#0a2030] border border-[#00D4FF]/40 flex items-center justify-center text-[#00D4FF] font-bold text-sm font-['Space_Grotesk'] flex-shrink-0">
+                {(WALLET_LABEL[walletId] || 'Wallet').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold font-['Space_Grotesk']">
+                  {WALLET_LABEL[walletId] || 'Connected wallet'}
+                </p>
+                <p className="text-xs text-[#8892a0] font-mono mt-0.5 break-all">
+                  {address}
+                </p>
+              </div>
+              <span className="text-xs border border-green-500 text-green-400 bg-green-900/20 px-2 py-0.5 rounded-full flex-shrink-0">
+                Connected
+              </span>
+            </div>
+
+            <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 text-center mb-5">
+              <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">USDC BALANCE</p>
+              <p className="text-4xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{balance}</p>
+              <p className="text-sm text-[#8892a0] mt-1">USDC · Arc Testnet</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => navigator.clipboard.writeText(address || '')}
+                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk']"
+              >
+                Copy Address
+              </button>
+              <a
+                href={'https://testnet.arcscan.app/address/' + address}
+                target="_blank"
+                rel="noreferrer"
+                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk'] text-center block"
+              >
+                View on ArcScan
+              </a>
+            </div>
+
+            <button
+              onClick={refreshBalance}
+              className="w-full mt-3 border border-[#1e2530] text-[#8892a0] py-2 rounded-xl text-xs hover:border-[#00D4FF] hover:text-white transition-all"
+            >
+              Refresh Balance
+            </button>
+
+            {/* Below a rule, away from Copy and Refresh. Disconnect is the one
+                destructive action here and shouldn't sit in the same visual
+                group as two harmless ones. */}
+            <div className="mt-5 pt-4 border-t border-[#1e2530]">
+              <button
+                onClick={disconnect}
+                className="w-full border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-red-500/50 hover:text-red-400 hover:bg-red-900/10 transition-all font-['Space_Grotesk']"
+              >
+                Disconnect Wallet
+              </button>
+              <p className="text-[11px] text-[#556] text-center mt-2">
+                This revokes the site's permission. You'll pick an account again next time.
               </p>
             </div>
-            <span className={
-              'ml-auto text-xs border px-2 py-0.5 rounded-full ' +
-              (isConnected
-                ? 'border-green-500 text-green-400 bg-green-900/20'
-                : 'border-[#556] text-[#556]')
-            }>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-
-          <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 text-center mb-5">
-            <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">USDC BALANCE</p>
-            <p className="text-4xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{balance}</p>
-            <p className="text-sm text-[#8892a0] mt-1">USDC · Arc Testnet</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigator.clipboard.writeText(account || '')}
-              className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk']"
-            >
-              📋 Copy Address
-            </button>
-            <a
-              href={'https://testnet.arcscan.app/address/' + account}
-              target="_blank"
-              rel="noreferrer"
-              className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk'] text-center block">
-              🔍 View on ArcScan
-            </a>
-          </div>
-          <button
-            onClick={refreshBalance}
-            className="w-full mt-3 border border-[#1e2530] text-[#8892a0] py-2 rounded-xl text-xs hover:border-[#00D4FF] hover:text-white transition-all"
-          >
-            ↻ Refresh Balance
-          </button>
-        </Card>
+          </Card>
+        )}
 
         <Card className="p-5">
           <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">NETWORK</p>
@@ -303,9 +356,9 @@ export function WalletPage() {
             <span className="text-sm text-[#8892a0]">Current Network</span>
             <span className={
               'text-xs font-semibold ' +
-              (isCorrectNetwork ? 'text-green-400' : 'text-amber-400')
+              (!isConnected ? 'text-[#556]' : isCorrectNetwork ? 'text-green-400' : 'text-amber-400')
             }>
-              {isCorrectNetwork ? '● Arc Testnet' : '⚠ Wrong Network'}
+              {!isConnected ? 'Not connected' : isCorrectNetwork ? 'Arc Testnet' : 'Wrong Network'}
             </span>
           </div>
           <div className="flex justify-between items-center mb-3">

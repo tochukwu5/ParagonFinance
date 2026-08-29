@@ -8,7 +8,7 @@ const CARDS = [
   {
     id: 'unitflow',
     accent: '#00D4FF',
-    logo: '/dex/unitflow.svg',
+    logo: '/dex/unitflow.webp',
     title: 'UnitFlow liquidity, integrated',
     body:
       'Paragon Finance routes swaps through UnitFlow, one of the deepest liquidity venues on Arc. ' +
@@ -18,7 +18,7 @@ const CARDS = [
   {
     id: 'synthra',
     accent: '#8B5CF6',
-    logo: '/dex/synthra.svg',
+    logo: '/dex/synthra.png',
     title: 'Synthra joins the routing layer',
     body:
       'Synthra brings chain-abstracted execution to Paragon. We now quote both venues on every ' +
@@ -50,7 +50,7 @@ const CARDS = [
   },
 ]
 
-const INTERVAL_MS = 6000
+const INTERVAL_MS = 3000
 
 export default function PartnerCards() {
   const [index, setIndex] = useState(0)

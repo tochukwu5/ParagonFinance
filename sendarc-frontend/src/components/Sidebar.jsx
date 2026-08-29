@@ -310,7 +310,7 @@ export default function Sidebar() {
           {isConnected ? (
             <Link to="/dashboard"
               className="flex items-center gap-1.5 bg-[#0f1822] border border-[#1e2530] rounded-full px-2.5 py-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              {/* <span className="w-1.5 h-1.5 rounded-full bg-green-400" /> */}
               <span className="text-xs font-mono text-white">{displayAddress}</span>
             </Link>
           ) : (

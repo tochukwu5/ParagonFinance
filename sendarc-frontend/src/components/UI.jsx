@@ -56,7 +56,7 @@ export function StatusBadge({ status }) {
 export function LiveBadge({ text = 'Live' }) {
   return (
     <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgba(34,197,94,0.1)] border border-green-500 text-green-400">
-      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+      {/* <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> */}
       {text}
     </span>
   )

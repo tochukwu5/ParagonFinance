@@ -128,6 +128,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           tokenIn,
           tokenOut,
           amountIn: amount,
+           account,
           // Rows appear one at a time as each venue answers. A stale
           // request's results are dropped by the id check — otherwise a
           // slow quote from two keystrokes ago could overwrite a fresh one.
@@ -286,8 +287,25 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
   )
 
   // ── Quote row ───────────────────────────────────────────────────────
+    // ── Quote row ───────────────────────────────────────────────────────
+  // Every venue stays readable. Greying an unavailable row to 40% made it
+  // look broken rather than simply unselected — and a second-place venue
+  // with a real quote is a legitimate choice, not a failure, so it gets
+  // full contrast and a working hover.
   const QuoteRow = ({ q }) => {
     const isActive = activeQuote?.sourceId === q.sourceId
+
+    // Dollar advantage over the next-best fill. Shown only on the winner,
+    // and only when there's something to beat — with one venue the number
+    // would be meaningless.
+    let delta = null
+    if (q.best && liveQuotes.length > 1) {
+      const bestUsd = parseFloat(q.quote.amountOut) * (USD_REFERENCE[tokenOutSymbol] || 0)
+      const nextUsd = parseFloat(liveQuotes[1].quote.amountOut) * (USD_REFERENCE[tokenOutSymbol] || 0)
+      const d = bestUsd - nextUsd
+      if (d > 0.005) delta = '+$' + d.toFixed(2)
+    }
+
     return (
       <button
         onClick={() => q.available && setSelectedSource(q.sourceId)}
@@ -297,43 +315,62 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           (isActive
             ? 'bg-[#101a26] border-[#00D4FF]/40'
             : q.available
-              ? 'border-transparent hover:bg-[#11161f]'
-              : 'border-transparent opacity-40 cursor-not-allowed')
+              ? 'border-transparent hover:bg-[#141b24] hover:border-[#1e2530] cursor-pointer'
+              : 'border-transparent cursor-default')
         }
       >
         <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: q.color + '18', border: '1px solid ' + q.color + '35' }}
+          className={
+            'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden ' +
+            (q.available ? '' : 'grayscale opacity-60')
+          }
+          style={{
+            background: q.color + (q.available ? '18' : '0d'),
+            border: '1px solid ' + q.color + (q.available ? '35' : '1a'),
+          }}
         >
           <img
             src={q.logo}
             alt=""
-            className="w-4 h-4 object-contain"
+            className="w-5 h-5 object-contain"
             onError={e => { e.currentTarget.style.display = 'none' }}
           />
         </div>
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-sm font-semibold text-white truncate">{q.name}</span>
+          <span className={
+            'text-sm font-semibold truncate ' +
+            (q.available ? 'text-white' : 'text-[#6b7683]')
+          }>
+            {q.name}
+          </span>
           {q.best && q.available && (
-            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30 flex-shrink-0">
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30 flex-shrink-0">
               Best Price
             </span>
           )}
         </div>
 
-        <div className="text-right flex-shrink-0">
+        {delta && (
+          <span className="text-[11px] font-semibold text-green-400 flex-shrink-0">
+            {delta}
+          </span>
+        )}
+
+        <div className="text-right flex-shrink-0 min-w-[64px]">
           {q.available ? (
             <>
-              <p className="text-sm font-bold text-white leading-tight">
+              <p className="text-sm font-bold text-white leading-tight tabular-nums">
                 {parseFloat(q.quote.amountOut).toFixed(2)}
               </p>
-              <p className="text-[10px] text-[#556]">
+              <p className="text-[10px] text-[#6b7683] tabular-nums">
                 ~{usd(tokenOutSymbol, q.quote.amountOut)}
               </p>
             </>
           ) : (
-            <p className="text-[10px] text-[#556]">No route</p>
+            <p className="text-[11px] text-[#6b7683]">
+              {q.unconfigured ? 'Coming soon' : 'No route'}
+              </p>
           )}
         </div>
       </button>
@@ -563,7 +600,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           appear and vanish between keystrokes. */}
       {amount && parseFloat(amount) > 0 && bothAvailable && (
         <div className="mt-4 bg-[#0D1117] border border-[#1e2530] rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-white">Quotes</span>
               {searching && (
@@ -574,16 +611,22 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
               )}
             </div>
 
-            {!searching && edge && (
-              <span className="text-[10px] text-[#8892a0]">
-                <span className="text-[#00D4FF] font-semibold">+{edge.toFixed(2)}%</span>
-                {' '}vs next best
-              </span>
-            )}
-            {!searching && !edge && liveQuotes.length > 0 && (
-              <span className="text-[10px] text-[#556]">
-                {liveQuotes.length} {liveQuotes.length === 1 ? 'venue' : 'venues'}
-              </span>
+            {/* "Via UnitFlow and 1 other" — names the winner rather than
+                just counting venues, so the header says something the rows
+                below don't already. */}
+            {!searching && liveQuotes.length > 0 && (
+              <div className="flex items-center gap-2">
+                {edge && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#00D4FF]/12 text-[#00D4FF]">
+                    {edge.toFixed(1)}%
+                  </span>
+                )}
+                <span className="text-[10px] text-[#6b7683]">
+                  Via <span className="text-[#8892a0]">{liveQuotes[0].name}</span>
+                  {quotes.length > 1 && ' and ' + (quotes.length - 1) +
+                    (quotes.length - 1 === 1 ? ' other' : ' others')}
+                </span>
+              </div>
             )}
           </div>
 
