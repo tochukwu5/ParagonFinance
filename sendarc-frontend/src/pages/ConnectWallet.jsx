@@ -196,7 +196,7 @@ export default function ConnectWallet() {
                           ) : stillChecking ? (
                             <span className="w-4 h-4 rounded-full border border-[#1c232e]" />
                           ) : installed ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                            <span className="w-1.5 h-1.5 rounded-full " />
                           ) : (
                             <span className="text-[10px] text-[#5b6573]">
                               Not installed
