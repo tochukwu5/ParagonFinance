@@ -17,6 +17,8 @@
 
 import { getSwapQuote as getUnitflowQuote, SWAP_TOKENS } from './unitflowSwap'
 import { executeSwap as executeUnitflowSwap } from './unitflowSwap'
+export const PARAGON_SWAP_ROUTER = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || null
+
 
 // ParagonFinance takes a flat fee per swap, settled to Treasury by
 // ParagonFinanceSwapRouter. Flat rather than percentage because swap sizes
@@ -25,7 +27,7 @@ import { executeSwap as executeUnitflowSwap } from './unitflowSwap'
 
 
 function extractSynthraTx(data) {
-  console.log('[synthra] /swap response:', JSON.stringify(data, null, 2))
+  // console.log('[synthra] /swap response:', JSON.stringify(data, null, 2))
   const tx = data?.transaction || data?.tx || data?.swap || data
  
   const to = tx?.to || tx?.router || tx?.target || tx?.address
@@ -132,7 +134,7 @@ async function executeSynthraSwap({
   // Use their gasLimit when given — they simulated the route and know how
   // many hops it takes. This one splits 10/90 across four pools, which a
   // fixed guess would likely underestimate.
-  const gasLimit = res?.transaction?.gasLimit
+   const gasLimit = res?.transaction?.gasLimit
     ? '0x' + Math.ceil(Number(res.transaction.gasLimit) * 1.2).toString(16)
     : '0x927C0'
 
@@ -165,6 +167,33 @@ async function executeSynthraSwap({
       'Swap reverted on Synthra. If this is your first swap with them, the ' +
       'approvals may not have confirmed yet — wait a moment and try again.'
     )
+  }
+
+ // ← NEW CODE STARTS HERE
+  console.log('[paragon] router:', PARAGON_SWAP_ROUTER)
+
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      const tokenOutAddr = String(tokenOut.address || '')
+        .replace(/^0x/, '').toLowerCase().padStart(64, '0')
+      const feeData = '0xfe7edecc' + tokenOutAddr
+      const feeValue = BigInt(1e17)
+
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: feeData,
+          value: '0x' + feeValue.toString(16),
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
   }
 
   return {
@@ -240,7 +269,6 @@ export async function executeSwapForQuote({
 // small trades or punitive on large ones.
 export const SWAP_FEE_USDC = 0.1
 
-export const PARAGON_SWAP_ROUTER = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || null
 
 // ─── Synthra ──────────────────────────────────────────────────────────────
 // Endpoint and auth confirmed from their app's own network traffic:

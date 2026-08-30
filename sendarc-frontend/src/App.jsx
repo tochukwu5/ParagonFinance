@@ -19,6 +19,8 @@ import TestnetSend from './pages/testnet/TestnetSend'
 import AdminPage from './pages/AdminPage'
 import StatsPage from './pages/StatsPage'
 
+
+
 // Sidebar plus content. md:pl-16 clears the collapsed rail — the expanded
 // state overlays rather than reflowing, so this padding never changes as the
 // sidebar animates.
@@ -29,6 +31,17 @@ function AppLayout({ children }) {
       <div className="md:pl-16 min-h-screen bg-[#0D1117]">
         {children}
         <Footer />
+      </div>
+    </>
+  )
+}
+
+function AppShell({ children }) {
+  return (
+    <>
+      <Sidebar />
+      <div className="md:pl-16 min-h-screen bg-[#0D1117]">
+        {children}
       </div>
     </>
   )
@@ -84,7 +97,8 @@ export default function App() {
                 the launching the hub used to do, so it was a page that only
                 pointed elsewhere. Redirects rather than 404s keep existing
                 links, bookmarks and anything already shared working. */}
-            <Route path="/testnet/send" element={<AppLayout><TestnetSend /></AppLayout>} />
+            {/* <Route path="/testnet/send" element={<AppLayout><TestnetSend /></AppLayout>} /> */}
+            <Route path="/testnet/send" element={<AppShell><TestnetSend /></AppShell>} />
             <Route path="/testnet" element={<Navigate to="/testnet/send" replace />} />
             <Route path="/testnet/transactions" element={<Navigate to="/testnet/send" replace />} />
             <Route path="/testnet/leaderboard" element={<Navigate to="/testnet/send" replace />} />
