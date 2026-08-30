@@ -166,7 +166,7 @@ export default function Dashboard() {
               title="Available at mainnet launch"
               className="bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl cursor-not-allowed text-sm flex items-center gap-1.5"
             >
-              Send money (🔒 Mainnet Coming Soon)
+              (🔒 Mainnet Coming Soon)
             </button>
           </div>
         </div>

@@ -57,7 +57,7 @@ export default function Home() {
                   title="Arc Network mainnet has not launched yet"
                   className="bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold text-base px-8 py-3 rounded-xl cursor-not-allowed flex items-center gap-2"
                 >
-                  Send money (🔒 Mainnet Coming Soon)
+                (🔒 Mainnet Coming Soon)
                 </button>
                 <Link
                   to="/how-it-works"
@@ -246,7 +246,7 @@ export default function Home() {
             title="Arc Network mainnet has not launched yet"
             className="inline-flex items-center gap-2 bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold text-base px-10 py-4 rounded-xl cursor-not-allowed"
           >
-            Send money (🔒 Mainnet Coming Soon)
+            (🔒 Mainnet Coming Soon)
           </button>
 
           <div>
