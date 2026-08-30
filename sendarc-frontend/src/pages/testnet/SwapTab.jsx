@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  SWAP_TOKENS, SWAP_TOKEN_LIST, executeSwap, checkAllowances,
+  SWAP_TOKENS, SWAP_TOKEN_LIST, checkAllowances,
 } from '../../utils/unitflowSwap'
-import { getAllQuotes, bestPriceEdge, SWAP_FEE_USDC, PARAGON_SWAP_ROUTER } from '../../utils/swapQuotes'
+import {
+  getAllQuotes, bestPriceEdge, SWAP_FEE_USDC, PARAGON_SWAP_ROUTER,
+  executeSwapForQuote,
+} from '../../utils/swapQuotes'
 import { ARC_TESTNET, arcScanTx, getUsdcBalance, getEurcBalance, getCirbtcBalance } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import TokenSelectModal from '../../components/TokenSelectModal'
@@ -181,9 +184,9 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
     setSwapError(null)
     setStatus('')
     try {
-      const r = await executeSwap({
+         const r = await executeSwapForQuote({
         tokenIn, tokenOut, amountIn: amount,
-        quote: activeQuote.quote,
+        quoteEntry: activeQuote,
         slippageBps, provider, from: account,
         onStatus: setStatus,
       })

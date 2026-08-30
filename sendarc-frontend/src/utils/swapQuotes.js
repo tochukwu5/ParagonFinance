@@ -16,10 +16,227 @@
 //   ParagonFinanceSwapRouter possible without reimplementing their router.
 
 import { getSwapQuote as getUnitflowQuote, SWAP_TOKENS } from './unitflowSwap'
+import { executeSwap as executeUnitflowSwap } from './unitflowSwap'
 
 // ParagonFinance takes a flat fee per swap, settled to Treasury by
 // ParagonFinanceSwapRouter. Flat rather than percentage because swap sizes
 // vary far more than transfers do, and a percentage is either invisible on
+
+
+
+function extractSynthraTx(data) {
+  console.log('[synthra] /swap response:', JSON.stringify(data, null, 2))
+  const tx = data?.transaction || data?.tx || data?.swap || data
+ 
+  const to = tx?.to || tx?.router || tx?.target || tx?.address
+  const calldata = tx?.data || tx?.calldata || tx?.callData || tx?.input
+  const value = tx?.value ?? tx?.msgValue ?? '0'
+ 
+  if (!to || !calldata) {
+    console.warn('[synthra] no transaction in /swap response. Shape received:', data)
+    return null
+  }
+ 
+  return {
+    to,
+    data: calldata.startsWith('0x') ? calldata : '0x' + calldata,
+    value: typeof value === 'string' && value.startsWith('0x')
+      ? BigInt(value)
+      : BigInt(value || 0),
+  }
+}
+ 
+/**
+ * Execute a Synthra swap using calldata from their API.
+ *
+ * Synthra runs a UniversalRouter behind Permit2, and treats Arc's USDC as an
+ * ERC-20 at 0x3600… rather than as native value — their transaction.value is
+ * always "0" and the router pulls tokens through Permit2 instead.
+ *
+ * That means two allowances before the first swap:
+ *   1. ERC-20 approve  → Permit2
+ *   2. Permit2 approve → their UniversalRouter
+ *
+ * Their API also offers a signature path (approval.permit2.typedData) that
+ * would collapse step 2 into an off-chain signature. We use the on-chain
+ * approve instead: the returned calldata carries no PERMIT2_PERMIT command,
+ * so a signature would have nowhere to go without re-requesting the route.
+ * One extra first-time prompt is a fair trade for not depending on that.
+ *
+ * Note their Permit2 is the canonical 0x0000…78BA3, which is NOT the one
+ * UnitFlow uses — approving for one venue grants nothing to the other.
+ */
+async function executeSynthraSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+
+  onStatus('Building route via Synthra...')
+
+  const res = await getSynthraSwapCalldata({
+    tokenIn, tokenOut, amountIn, account: from, slippageBps,
+  })
+
+  const tx = extractSynthraTx(res)
+  if (!tx) {
+    throw new Error(
+      'Synthra returned a quote but no executable transaction. ' +
+      'This pair may be quote-only for now — try UnitFlow instead.'
+    )
+  }
+
+  const approval = res?.approval || null
+
+  // Step 1: ERC-20 → Permit2. Their API hands back ready-made calldata, so
+  // we send theirs rather than re-encoding an approve ourselves.
+  const tokenApproval = approval?.tokenApproval
+  if (tokenApproval?.needsApproval && tokenApproval?.approveTransaction) {
+    const a = tokenApproval.approveTransaction
+    onStatus('Approve ' + tokenIn.symbol + ' for Synthra (1 of 2)...')
+    await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from, to: a.to, data: a.data, value: '0x0', gas: '0x186A0' }],
+    })
+  }
+
+  // Step 2: Permit2 → router.
+  const p2 = approval?.permit2
+  if (p2?.available && p2?.spender && BigInt(p2.currentAllowance || '0') === 0n) {
+    // Permit2.approve(address token, address spender, uint160 amount, uint48 expiration)
+    const MAX_UINT160 = (1n << 160n) - 1n
+    const expiration = BigInt(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60)
+    const pad = (v) => BigInt(v).toString(16).padStart(64, '0')
+    const addr = (v) => String(v).replace(/^0x/, '').toLowerCase().padStart(64, '0')
+
+    const data = '0x87517c45'
+      + addr(approval.token?.address || tokenIn.address)
+      + addr(p2.spender)
+      + pad(MAX_UINT160)
+      + pad(expiration)
+
+    onStatus('Approve Synthra router (2 of 2)...')
+    await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: p2.permit2Address || '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+        data,
+        value: '0x0',
+        gas: '0x186A0',
+      }],
+    })
+  }
+
+  onStatus('Confirm the swap in your wallet...')
+
+  // Use their gasLimit when given — they simulated the route and know how
+  // many hops it takes. This one splits 10/90 across four pools, which a
+  // fixed guess would likely underestimate.
+  const gasLimit = res?.transaction?.gasLimit
+    ? '0x' + Math.ceil(Number(res.transaction.gasLimit) * 1.2).toString(16)
+    : '0x927C0'
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value > 0n ? '0x' + tx.value.toString(16) : '0x0',
+      gas: gasLimit,
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+
+  let receipt = null
+  for (let i = 0; i < 40 && !receipt; i++) {
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      })
+    } catch { /* keep polling */ }
+  }
+
+  if (receipt && receipt.status === '0x0') {
+    throw new Error(
+      'Swap reverted on Synthra. If this is your first swap with them, the ' +
+      'approvals may not have confirmed yet — wait a moment and try again.'
+    )
+  }
+
+  return {
+    hash: txHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(quote.amountOut),
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    status: 'confirmed',
+    network: 'Arc Testnet',
+    chainId: 5042002,
+    dex: 'Synthra',
+    source: 'Synthra',
+    routeString: res?.routeString || null,
+    swap: true,
+  }
+}
+/**
+ * Execute whichever venue won the quote.
+ *
+ * The venue tag is set by the adapter that produced the quote, so the
+ * transaction can never be built for a different router than the one whose
+ * price was displayed.
+ */
+export async function executeSwapForQuote({
+  tokenIn, tokenOut, amountIn, quoteEntry, slippageBps = 50,
+  provider, from, onStatus = () => {},
+}) {
+  if (!quoteEntry?.quote) throw new Error('No route selected')
+
+  const venue = quoteEntry.quote.venue || quoteEntry.sourceId
+
+  const result = venue === 'synthra'
+    ? await executeSynthraSwap({
+        tokenIn, tokenOut, amountIn,
+        quote: quoteEntry.quote,
+        slippageBps, provider, from, onStatus,
+      })
+    : await executeUnitflowSwap({
+        tokenIn, tokenOut, amountIn,
+        quote: quoteEntry.quote,
+        slippageBps, provider, from, onStatus,
+      })
+
+  if (venue !== 'synthra') result.source = 'UnitFlow'
+
+  // The backend's Transaction schema requires the same core fields for every
+  // transaction type. A swap has amountIn and amountOut, but the schema wants
+  // a single `amount` — so it was rejecting with "Missing required fields"
+  // even though the swap itself had already settled on-chain.
+  //
+  // Normalising here rather than in each venue means a new venue can't
+  // reintroduce the same gap.
+  result.amount = result.amountIn ?? parseFloat(amountIn)
+  result.to = result.to || from
+  result.gasCost = result.gasCost ?? '0'
+  result.sourceChain = result.sourceChain || 'Arc Testnet'
+  result.destinationChain = result.destinationChain || 'Arc Testnet'
+  result.sourceChainKey = result.sourceChainKey || 'arc'
+  result.destinationChainKey = result.destinationChainKey || 'arc'
+  result.cctpBridge = false
+
+  return result
+}
+ 
+
+
+
 // small trades or punitive on large ones.
 export const SWAP_FEE_USDC = 0.1
 
