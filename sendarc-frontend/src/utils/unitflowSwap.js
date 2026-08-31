@@ -553,7 +553,9 @@ export async function executeSwap({
   let txHash
   let routedThroughParagon = false
 
-  if (PARAGON_SWAP_ROUTER) {
+   const canRouteAtomically = PARAGON_SWAP_ROUTER && tokenIn.isNative
+
+  if (canRouteAtomically) {
     // Fail early with something readable rather than letting the contract
     // revert on an unapproved target.
     const approved = await isRouterApproved(UNITFLOW.universalRouter)
@@ -623,6 +625,30 @@ export async function executeSwap({
       'try again, or raise the tolerance.'
     )
   }
+  // ERC-20 input couldn't route through our contract, so the fee wasn't
+  // taken inside the swap. Collect it separately — same pattern as Synthra
+  // and Tower, for the same reason.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER && !routedThroughParagon) {
+    try {
+      const tokenOutAddr = String(poolAddress(tokenOut) || '')
+        .replace(/^0x/, '').toLowerCase().padStart(64, '0')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + tokenOutAddr, // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      // The swap already settled. Failing here would tell the user their
+      // swap failed when their tokens have arrived.
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
 
   return {
     hash: txHash,
@@ -634,7 +660,8 @@ export async function executeSwap({
     minAmountOut: parseFloat(formatUnits(minOutRaw, quote.outDecimals)),
     fee: quote.fee,
     slippageBps,
-    paragonFee: routedThroughParagon ? SWAP_FEE_USDC : 0,
+        paragonFee: (routedThroughParagon || feeHash) ? SWAP_FEE_USDC : 0,
+    feeHash,
     routedThroughParagon,
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
