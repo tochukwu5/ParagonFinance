@@ -25,14 +25,17 @@ const SLIPPAGE_OPTIONS = [
   { bps: 100, label: '1%' },
 ]
 
-// Approximate USD reference prices, for the secondary line under each
-// amount. Testnet tokens have no real market, so a live feed would be
-// quoting a price that doesn't exist — these are indicative only and the
-// UI never uses them for anything that affects execution.
+
+// Indicative USD references for the secondary line under each amount.
+// Testnet tokens have no real market, so these are illustrative only and
+// never feed anything that affects execution.
+//
+// cirBTC tracks BTC. At a stale 65000 every cirBTC quote read roughly 7x
+// low against what the venues themselves display.
 const USD_REFERENCE = {
   USDC: 1.00,
   EURC: 1.08,
-  cirBTC: 65000,
+  cirBTC: 493000,
   USDT: 1.00,
 }
 
