@@ -25,6 +25,16 @@ const CARDS = [
       'swap and route to whichever returns more — you keep the difference.',
     cta: { label: 'See live quotes', to: '/testnet/send' },
   },
+    {
+    id: 'tower',
+    accent: '#8B5CF6',
+    logo: '/dex/towerlogo.svg',
+    title: 'Tower Exchange routing, integrated',
+    body:
+      'Paragon Finance routes swaps through TowerExchange to access deep liquidity and competitive execution across Arc ' +
+      'More liquidity. Better routes. Better swaps.',
+    cta: { label: 'See live quotes', to: '/testnet/send' },
+  },
   {
     id: 'aggregation',
     accent: '#00FFCC',
