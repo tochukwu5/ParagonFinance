@@ -364,6 +364,128 @@ async function executeTowerSwap({
     swap: true,
   }
 }
+
+
+/**
+ * Execute a XyloNet swap.
+ *
+ * Uniswap-V2-style: approve the router, then swapExactTokensForTokens with a
+ * path. Their pools take ERC-20 via transferFrom rather than native value, so
+ * the ParagonFinance fee is a separate transaction — same as Synthra and
+ * Tower, and for the same reason.
+ */
+async function executeXyloSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+  const inAddr = quote.tokenInAddr
+  const outAddr = quote.tokenOutAddr
+
+  // allowance(owner, spender)
+  onStatus('Checking approval...')
+  let allowance = 0n
+  try {
+    const res = await arcCall(inAddr,
+      '0xdd62ed3e' + encAddress(from) + encAddress(XYLONET_ROUTER))
+    if (res && res !== '0x') allowance = BigInt(res)
+  } catch { /* treat as unapproved */ }
+
+  if (allowance < quote.amountInRaw) {
+    onStatus('Approve ' + tokenIn.symbol + ' for XyloNet...')
+    const MAX = (1n << 256n) - 1n
+    await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: inAddr,
+        data: '0x095ea7b3' + encAddress(XYLONET_ROUTER) + encUint(MAX),
+        value: '0x0',
+        gas: '0x186A0',
+      }],
+    })
+  }
+
+  const minOut = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300)
+
+  // Five head words, so the address[] offset is 5 * 32 = 160. Tail carries
+  // the array length then its two elements.
+  const data = '0x' + XYLO_SWAP_SELECTOR
+    + encUint(quote.amountInRaw)
+    + encUint(minOut)
+    + encUint(160)
+    + encAddress(from)
+    + encUint(deadline)
+    + encUint(2)
+    + encAddress(inAddr)
+    + encAddress(outAddr)
+
+  onStatus('Confirm the swap in your wallet...')
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{ from, to: XYLONET_ROUTER, data, value: '0x0', gas: '0x493E0' }],
+  })
+
+  onStatus('Waiting for confirmation...')
+
+  let receipt = null
+  for (let i = 0; i < 40 && !receipt; i++) {
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt', params: [txHash],
+      })
+    } catch { /* keep polling */ }
+  }
+
+  if (receipt && receipt.status === '0x0') {
+    throw new Error(
+      'Swap reverted on XyloNet — the price moved beyond your ' +
+      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
+    )
+  }
+
+  // Fee after the swap, so a revert costs the user nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(outAddr), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
+
+  return {
+    hash: txHash,
+    feeHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(quote.amountOut),
+    paragonFee: feeHash ? 0.1 : 0,
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    status: 'confirmed',
+    network: 'Arc Testnet',
+    chainId: 5042002,
+    dex: 'XyloNet',
+    source: 'XyloNet',
+    swap: true,
+  }
+}
 /**
  * Execute whichever venue won the quote.
  *
@@ -392,6 +514,8 @@ export async function executeSwapForQuote({
     result = await executeSynthraSwap(args)
   } else if (venue === 'tower') {
     result = await executeTowerSwap(args)
+     } else if (venue === 'xylonet') {
+    result = await executeXyloSwap(args)
   } else {
     result = await executeUnitflowSwap(args)
     result.source = 'UnitFlow'
@@ -668,6 +792,13 @@ export const SOURCES = [
     color: '#5B8DEF',
     getQuote: getTowerQuote,
   },
+    {
+    id: 'xylonet',
+    name: 'XyloNet',
+    logo: '/dex/xylonet.svg',
+    color: '#7C5CFF',
+    getQuote: getXyloQuote,
+  },
 ]
 
 
@@ -767,7 +898,108 @@ async function getTowerQuote({ tokenIn, tokenOut, amountIn }) {
  * that took two hundred milliseconds.
  *
  * Returns all results sorted best-first, with `best: true` on the winner.
+ *
  */
+
+
+
+// ─── XyloNet ──────────────────────────────────────────────────────────────
+// A Curve-style StableSwap AMM, quoted entirely on-chain. No API, no key —
+// getAmountOut is a view function and the router resolves the pool via the
+// factory, so a quote is one eth_call.
+//
+// Their amplification factor of 100 means near-zero slippage at the peg, so
+// on USDC/EURC they often beat the constant-product venues at size. They
+// only have two pools though — USDC/EURC and USDC/USYC — so anything
+// involving cirBTC returns no route, correctly.
+const XYLONET_ROUTER = '0x73742278c31a76dBb0D2587d03ef92E6E2141023'
+
+// getAmountOut(address,address,uint256)
+const XYLO_QUOTE_SELECTOR = '4aa06652'
+// swapExactTokensForTokens(uint256,uint256,address[],address,uint256)
+const XYLO_SWAP_SELECTOR = '38ed1739'
+
+// Every XyloNet token is 6 decimals, including USDC — they address it as an
+// ERC-20 at 0x3600…, not as Arc's 18-decimal native value.
+const XYLO_TOKENS = {
+  USDC: '0x3600000000000000000000000000000000000000',
+  EURC: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
+  USYC: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C',
+}
+
+// ─── Minimal RPC and ABI encoding ─────────────────────────────────────────
+// XyloNet is quoted on-chain rather than through an API, so this file needs
+// its own eth_call and encoders — the ones in unitflowSwap.js aren't
+// exported, and importing them would couple two adapters that shouldn't
+// know about each other.
+async function arcCall(to, data) {
+  const res = await fetch('https://rpc.testnet.arc.network', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'eth_call',
+      params: [{ to, data }, 'latest'],
+    }),
+  })
+  const json = await res.json()
+  if (json.error) throw new Error(json.error.message || 'eth_call failed')
+  return json.result
+}
+
+const encAddress = (a) => String(a).replace(/^0x/, '').toLowerCase().padStart(64, '0')
+const encUint = (n) => BigInt(n).toString(16).padStart(64, '0')
+
+
+async function getXyloQuote({ tokenIn, tokenOut, amountIn }) {
+  console.log('[xylonet] called', tokenIn.symbol, '->', tokenOut.symbol)
+  const inAddr = XYLO_TOKENS[tokenIn.symbol]
+  const outAddr = XYLO_TOKENS[tokenOut.symbol]
+
+  console.log('[xylonet] addresses:', inAddr, outAddr)
+
+  // Not "unconfigured" — XyloNet genuinely has no pool for these, and
+  // saying so is more honest than implying a setup gap.
+  if (!inAddr || !outAddr) return null
+
+  const amountRaw = parseUnits(amountIn, 6)
+
+  try {
+    const data = '0x' + XYLO_QUOTE_SELECTOR
+      + encAddress(inAddr)
+      + encAddress(outAddr)
+      + encUint(amountRaw)
+
+    const result = await arcCall(XYLONET_ROUTER, data)
+    console.log('[xylonet] raw result:', result)
+    if (!result || result === '0x') return null
+
+    const out = BigInt(result)
+    if (out === 0n) return null
+
+    return {
+      amountOut: formatUnits(out, 6),
+      amountOutRaw: out,
+      amountInRaw: amountRaw,
+      inDecimals: 6,
+      outDecimals: 6,
+      tokenInAddr: inAddr,
+      tokenOutAddr: outAddr,
+      venue: 'xylonet',
+    }
+  } catch (err) {
+    // A bare catch here hid a ReferenceError for twenty minutes. Log the
+    // reason — "no route" and "the code is broken" look identical otherwise.
+    console.warn('[xylonet] quote failed:', err?.message)
+    return null
+  }
+}
+
+
+
+// ================================================================================================================
+
+
+
 export async function getAllQuotes({ tokenIn, tokenOut, amountIn, account, onProgress = () => {} }) {
   if (!tokenIn?.available || !tokenOut?.available) return []
   if (!amountIn || parseFloat(amountIn) <= 0) return []
