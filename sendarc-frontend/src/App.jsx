@@ -98,8 +98,9 @@ export default function App() {
                 pointed elsewhere. Redirects rather than 404s keep existing
                 links, bookmarks and anything already shared working. */}
             {/* <Route path="/testnet/send" element={<AppLayout><TestnetSend /></AppLayout>} /> */}
-            <Route path="/testnet/send" element={<AppShell><TestnetSend /></AppShell>} />
-            <Route path="/testnet" element={<Navigate to="/testnet/send" replace />} />
+                       <Route path="/testnet" element={<AppShell><TestnetSend /></AppShell>} />
+          
+            <Route path="/testnet/send" element={<Navigate to="/testnet" replace />} />
             <Route path="/testnet/transactions" element={<Navigate to="/testnet/send" replace />} />
             <Route path="/testnet/leaderboard" element={<Navigate to="/testnet/send" replace />} />
 

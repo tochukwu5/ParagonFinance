@@ -175,7 +175,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             {
-              label: 'TOTAL SENT',
+              label: 'Total Transactions',
               value: testnetStats.totalVolume.toFixed(2) + ' USDC',
               sub: testnetStats.totalVolume > 0 ? '↑ Testnet volume' : 'No transactions yet',
               subColor: testnetStats.totalVolume > 0 ? 'text-green-400' : 'text-[#556]',

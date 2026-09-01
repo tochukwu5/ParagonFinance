@@ -92,7 +92,7 @@ const Icon = {
 const MENU = [
   { to: '/',             label: 'Home',         icon: 'home' },
   { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
-  { to: '/testnet/send', label: 'Testnet', icon: 'testnet' },
+  { to: '/testnet', label: 'Testnet', icon: 'testnet' },
   { to: '/how-it-works', label: 'How it works', icon: 'howItWorks' },
   { to: '/about',        label: 'About',        icon: 'about' },
   { to: '/docs',         label: 'Docs',         icon: 'docs' },

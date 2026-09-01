@@ -35,6 +35,16 @@ const CARDS = [
       'More liquidity. Better routes. Better swaps.',
     cta: { label: 'See live quotes', to: '/testnet/send' },
   },
+   {
+    id: 'xylonet',
+    accent: '#8B5CF6',
+    logo: '/dex/xylonet.svg',
+    title: 'Paragonfinance × Xylonet',
+    body:
+      'XyloNet’s routing infrastructure is now integrated into ParagonFinance ' +
+      'Better Routes • Deeper Liquidity • Seamless Swaps Built on Arc Network.',
+    cta: { label: 'See live quotes', to: '/testnet/send' },
+  },
   {
     id: 'aggregation',
     accent: '#00FFCC',
