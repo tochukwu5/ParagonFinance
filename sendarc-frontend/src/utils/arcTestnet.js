@@ -991,6 +991,70 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
   }
 }
 
+// ─── ERC-20 send fee ──────────────────────────────────────────────────────
+// EURC and cirBTC are ERC-20s, so a transfer() call never touches
+// ParagonFinancePaymentRouter and it can't take a cut the way it does with
+// native USDC.
+//
+// The fee is therefore a second transaction paid in native USDC through
+// collectSwapFee(). That function takes a flat amount, so the percentage is
+// computed here and sent as a fixed value — same 0.5% rate as USDC sends,
+// just calculated client-side rather than on-chain.
+//
+// Two consequences worth knowing. Sending EURC requires a small USDC balance
+// for the fee. And because the rate is computed off-chain, the contract
+// can't enforce it — a modified client could underpay. Neither is fixable
+// without transferFrom on the payment router and a redeploy.
+const SEND_FEE_BPS = 50 // 0.50%, matching the USDC send fee
+
+// Approximate USD values, only for converting the fee into USDC. Testnet
+// tokens have no market, so these come from what the Arc pools trade at.
+const FEE_USD_RATE = {
+  EURC: 1.08,
+  cirBTC: 422000,
+}
+
+async function collectTokenSendFee({ from, tokenAddress, amount, symbol }) {
+  const router = import.meta.env.VITE_SWAP_ROUTER_ADDRESS
+  if (!router) {
+    console.warn('[paragon] VITE_SWAP_ROUTER_ADDRESS not set — no fee collected')
+    return { hash: null, fee: 0 }
+  }
+
+  // 0.5% of the transfer, valued in USDC.
+  const rate = FEE_USD_RATE[symbol] || 1
+  const feeUsdc = parseFloat(amount) * rate * (SEND_FEE_BPS / 10000)
+
+  // Below this the fee costs more in gas than it collects.
+  if (feeUsdc < 0.0001) return { hash: null, fee: 0 }
+
+  const feeRaw = BigInt(Math.round(feeUsdc * 1e18))
+
+  try {
+    // collectSwapFee(address) = fe7edecc
+    const padded = String(tokenAddress || '')
+      .replace(/^0x/, '').toLowerCase().padStart(64, '0')
+
+    const hash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from,
+        to: router,
+        data: '0xfe7edecc' + padded,
+        value: '0x' + feeRaw.toString(16),
+        gas: '0x186A0',
+      }],
+    })
+
+    return { hash, fee: feeUsdc }
+  } catch (err) {
+    // The transfer already settled. Throwing here would tell the user their
+    // send failed when the recipient already has the tokens.
+    console.warn('[paragon] send fee not collected:', err?.message)
+    return { hash: null, fee: 0 }
+  }
+}
+
 // Real EURC transfer — standard ERC-20 on Arc.
 export async function sendEurcOnArc({ from, to, amount }) {
   if (!window.ethereum) throw new Error('MetaMask not found')
@@ -1010,6 +1074,14 @@ export async function sendEurcOnArc({ from, to, amount }) {
   if (receipt && receipt.status === '0x0') {
     throw new Error('EURC transfer failed. Check your balance.')
   }
+
+    // Fee after the transfer — a reverted transfer should cost nothing.
+   const feeResult = await collectTokenSendFee({
+    from,
+    tokenAddress: ARC_TESTNET.eurcAddress,
+    amount,
+    symbol: 'EURC',
+  })
   const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 60000
   const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
   const gasCostRaw = BigInt(gasUsed) * BigInt(parseInt(gasPrice, 16))
@@ -1017,6 +1089,8 @@ export async function sendEurcOnArc({ from, to, amount }) {
   return {
     hash: txHash, from, to,
     token: 'EURC',
+    feeHash: feeResult.hash,
+    paragonFee: feeResult.fee,
     amount: parseFloat(amount),
     gasCost: (Number(gasCostRaw) / 1e18).toFixed(9),
     gasUsed,
@@ -1054,6 +1128,13 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
   if (receipt && receipt.status === '0x0') {
     throw new Error('cirBTC transfer failed. Check your balance.')
   }
+
+   const feeResult = await collectTokenSendFee({
+    from,
+    tokenAddress: ARC_TESTNET.cirbtcAddress,
+    amount,
+    symbol: 'cirBTC',
+  })
   const gasUsed = receipt ? parseInt(receipt.gasUsed, 16) : 60000
   const gasPrice = await window.ethereum.request({ method: 'eth_gasPrice' })
   const gasCostRaw = BigInt(gasUsed) * BigInt(parseInt(gasPrice, 16))
@@ -1061,6 +1142,8 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
   return {
     hash: txHash, from, to,
     token: 'cirBTC',
+    feeHash: feeResult.hash,
+    paragonFee: feeResult.fee,
     amount: parseFloat(amount),
     gasCost: (Number(gasCostRaw) / 1e18).toFixed(9),
     gasUsed,

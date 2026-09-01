@@ -338,7 +338,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           <img
             src={q.logo}
             alt=""
-            className="w-5 h-5 object-contain"
+            className="w-5 h-5 object-contain "
             onError={e => { e.currentTarget.style.display = 'none' }}
           />
         </div>

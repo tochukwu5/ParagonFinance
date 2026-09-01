@@ -18,7 +18,7 @@ const CARDS = [
   {
     id: 'synthra',
     accent: '#8B5CF6',
-    logo: '/dex/synthra.png',
+    logo: '/dex/synthra11.svg',
     title: 'Synthra joins the routing layer',
     body:
       'Synthra brings chain-abstracted execution to Paragon. We now quote both venues on every ' +
@@ -28,7 +28,7 @@ const CARDS = [
     {
     id: 'tower',
     accent: '#8B5CF6',
-    logo: '/dex/towerlogo.svg',
+    logo: '/dex/tower11.svg',
     title: 'Tower Exchange routing, integrated',
     body:
       'Paragon Finance routes swaps through TowerExchange to access deep liquidity and competitive execution across Arc ' +

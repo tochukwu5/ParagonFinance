@@ -657,14 +657,14 @@ export const SOURCES = [
   {
     id: 'synthra',
     name: 'Synthra',
-    logo: '/dex/synthra.png',
+    logo: '/dex/synthra11.svg',
     color: '#8B5CF6',
     getQuote: getSynthraQuote,
   },
     {
     id: 'tower',
     name: 'Tower',
-    logo: '/dex/towerlogo.svg',
+    logo: '/dex/tower11.svg',
     color: '#5B8DEF',
     getQuote: getTowerQuote,
   },
