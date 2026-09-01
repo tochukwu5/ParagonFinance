@@ -35,7 +35,7 @@ const SLIPPAGE_OPTIONS = [
 const USD_REFERENCE = {
   USDC: 1.00,
   EURC: 1.08,
-  cirBTC: 493000,
+  cirBTC: 422000,
   USDT: 1.00,
 }
 
@@ -367,7 +367,13 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           {q.available ? (
             <>
               <p className="text-sm font-bold text-white leading-tight tabular-nums">
-                {parseFloat(q.quote.amountOut).toFixed(2)}
+                {(() => {
+                  const v = parseFloat(q.quote.amountOut)
+                  if (v >= 1000) return v.toFixed(2)
+                  if (v >= 1) return v.toFixed(4)
+                  if (v >= 0.001) return v.toFixed(6)
+                  return v.toFixed(8)
+                })()}
               </p>
               <p className="text-[10px] text-[#6b7683] tabular-nums">
                 ~{usd(tokenOutSymbol, q.quote.amountOut)}

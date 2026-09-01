@@ -41,7 +41,7 @@ export function Transactions() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'sendarc-transactions.csv'
+    a.download = 'paragonfinance-transactions.csv'
     a.click()
   }
 
@@ -134,22 +134,17 @@ export function Transactions() {
           <Card className="p-12 text-center">
             {/* <div className="text-4xl mb-4">🦊</div> */}
             <p className="font-semibold font-['Space_Grotesk'] mb-2">Connect your wallet to view transactions</p>
-            <p className="text-[#8892a0] text-sm mb-6">
-              Your transaction history is saved to MongoDB using your wallet address as your unique identifier.
-            </p>
-            <button
-              onClick={connect}
-              disabled={isLoading}
-              className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm hover:opacity-90 transition-all"
-            >
-              {isLoading ? 'Connecting...' : 'Connect MetaMask →'}
-            </button>
+             <Link
+            to="/connect"
+            className="inline-block bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-8 py-3 rounded-xl hover:opacity-90 transition-all"
+          >
+            {isLoading ? 'Connecting...' : 'Connect wallet →'}
+          </Link>
           </Card>
 
         ) : isSyncing && transactions.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="text-4xl mb-4 animate-pulse">⏳</div>
-            <p className="font-semibold font-['Space_Grotesk'] mb-2 text-[#00D4FF]">Loading from MongoDB...</p>
             <p className="text-[#8892a0] text-sm">Fetching your transaction history</p>
           </Card>
 
