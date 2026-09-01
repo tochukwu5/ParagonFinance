@@ -1185,8 +1185,8 @@ export async function payBridgeFeeToTreasury({ from }) {
 export function shortAddr(addr) { return !addr ? '--' : addr.slice(0, 6) + '...' + addr.slice(-4) }
 export function arcScanTx(hash) { return ARC_TESTNET.explorerUrl + '/tx/' + hash }
 export function arcScanAddr(addr) { return ARC_TESTNET.explorerUrl + '/address/' + addr }
-export function switchToArcTestnet() { return switchToChain('arc') }
+export function switchToArcTestnet(provider) { return switchToChain('arc', provider) }
 export function formatUsdc(raw, decimals = 6) { return (Number(raw) / Math.pow(10, decimals)).toFixed(6) }
 export function parseUsdc(amount, decimals = 6) { return BigInt(Math.round(parseFloat(amount) * Math.pow(10, decimals))) }
 export function formatSettlement(ms) { if (!ms || ms < 0) return '--'; return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's' }
-export function addArcTestnetToWallet() { return switchToChain('arc') }
+export function addArcTestnetToWallet(provider) { return switchToChain('arc', provider) }
