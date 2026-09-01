@@ -1021,12 +1021,20 @@ async function collectTokenSendFee({ from, tokenAddress, amount, symbol }) {
     return { hash: null, fee: 0 }
   }
 
-  // 0.5% of the transfer, valued in USDC.
+   // 0.5% of the transfer, valued in USDC — matching what native USDC sends
+  // charge, so the rate is consistent across tokens.
   const rate = FEE_USD_RATE[symbol] || 1
-  const feeUsdc = parseFloat(amount) * rate * (SEND_FEE_BPS / 10000)
+  const pct = parseFloat(amount) * rate * (SEND_FEE_BPS / 10000)
 
-  // Below this the fee costs more in gas than it collects.
-  if (feeUsdc < 0.0001) return { hash: null, fee: 0 }
+  // collectSwapFee enforces a 0.1 USDC minimum on-chain, so a percentage
+  // below that reverts with InsufficientValue — which is what was silently
+  // failing on small EURC sends. Floor at the contract's minimum rather than
+  // sending something it will reject.
+  //
+  // Crossover is ~18.5 EURC. Below that the floor applies and the effective
+  // rate is higher; above it, a straight 0.5%.
+  const MIN_FEE_USDC = 0.1
+  const feeUsdc = Math.max(pct, MIN_FEE_USDC)
 
   const feeRaw = BigInt(Math.round(feeUsdc * 1e18))
 
@@ -1110,7 +1118,7 @@ export async function sendEurcOnArc({ from, to, amount }) {
 
 // Real cirBTC transfer — standard ERC-20, decimals read from the contract.
 export async function sendCirbtcOnArc({ from, to, amount }) {
-  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!window.ethereum) throw new Error('wallet not found')
   const start = Date.now()
   const decimals = await getTokenDecimals(ARC_TESTNET.cirbtcAddress)
   const rawAmount = BigInt(Math.round(parseFloat(amount) * Math.pow(10, decimals)))

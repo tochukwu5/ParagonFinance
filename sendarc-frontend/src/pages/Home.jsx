@@ -91,22 +91,22 @@ export default function Home() {
           </div>
 
           {/* What you can do */}
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               {
-                icon: '⚡',
+                icon: '/dex/swap_arrows_coin.svg',
                 title: 'Send',
                 desc: 'Move stablecoins to any wallet on Arc. Sub-second settlement, fees in fractions of a cent.',
                 cta: 'Send now',
               },
               {
-                icon: '🌉',
+                icon: '/dex/bitcoin_dollar_bridge.svg',
                 title: 'Bridge',
                 desc: 'Bring USDC in from Ethereum, Base, Arbitrum, Polygon and more via Circle CCTP.',
                 cta: 'Bridge assets',
               },
               {
-                icon: '🔄',
+                icon: '/dex/bitcoin_dollar_swap.svg',
                 title: 'Swap',
                 desc: 'Convert between USDC, EURC and cirBTC through aggregated liquidity routing.',
                 cta: 'Start swapping',
@@ -114,7 +114,22 @@ export default function Home() {
             ].map((f, i) => (
               <Reveal key={f.title} delay={i * 120}>
                 <Card className="p-6 h-full hover:border-[#00D4FF]/40 transition-all">
-                  <div className="text-3xl mb-4">{f.icon}</div>
+                  {/* Handles both kinds of icon. A path is a string, and so is
+                      an emoji — rendering the value directly printed
+                      "/dex/synthra11.svg" as text. The check lets the three
+                      cards be migrated one at a time. */}
+                  <div className="mb-4 h-9 flex items-center">
+                    {typeof f.icon === 'string' && f.icon.startsWith('/') ? (
+                      <img
+                        src={f.icon}
+                        alt=""
+                        className="w-12 h-12 object-contain"
+                        onError={e => { e.currentTarget.style.display = 'none' }}
+                      />
+                    ) : (
+                      <span className="text-3xl">{f.icon}</span>
+                    )}
+                  </div>
                   <h3 className="font-bold font-['Space_Grotesk'] text-white mb-2">{f.title}</h3>
                   <p className="text-xs text-[#8892a0] leading-relaxed mb-4">{f.desc}</p>
                   <Link to="/testnet/send" className="text-sm text-[#00D4FF] font-semibold hover:underline font-['Space_Grotesk']">
