@@ -133,6 +133,26 @@ export default function TestnetSend() {
   const [cctpStatus, setCctpStatus] = useState('')
   const [cctpActiveStep, setCctpActiveStep] = useState(-1)
   const [cctpDoneSteps, setCctpDoneSteps] = useState([])
+  
+  // Phantom sits alongside the EVM wallet rather than replacing it — a Solana
+  // bridge needs both: Phantom signs the burn, MetaMask receives on the
+  // destination.
+  const [solanaAddress, setSolanaAddress] = useState(null)
+  const [connectingSolana, setConnectingSolana] = useState(false)
+
+  const needsSolana = sourceChainKey === 'solana' || bridgeToKey === 'solana'
+
+  const handleConnectSolana = async () => {
+    setConnectingSolana(true)
+    try {
+      const { connectSolanaWallet } = await import('../../utils/solanaBridge')
+      setSolanaAddress(await connectSolanaWallet())
+    } catch (err) {
+      setSwitchError(err.message || 'Could not connect Solana wallet')
+    } finally {
+      setConnectingSolana(false)
+    }
+  }
   const [strandedBridge, setStrandedBridge] = useState(null)
   const [missingGas, setMissingGas] = useState(null)
 
@@ -179,8 +199,12 @@ export default function TestnetSend() {
     setSwitchingChain(true)
     setSwitchError(null)
     setAmount('')
-    try {
-      await switchToChain(chainKey)
+       try {
+      // MetaMask can't switch to Solana — it isn't an EVM chain. The Solana
+      // wallet connects separately, so there's no network switch to make.
+      if (!EVM_CHAINS[chainKey]?.isSolana) {
+        await switchToChain(chainKey)
+      }
       setSourceChainKey(chainKey)
       if (account) applyBalance(setChainBalance, await getUsdcBalance(chainKey, account))
     } catch (err) {
@@ -396,12 +420,18 @@ export default function TestnetSend() {
     ? (parseFloat(validationBalance) - totalDebit).toFixed(6)
     : null
 
-  const isValidAddress = recipient && recipient.startsWith('0x') && recipient.length === 42
-  const isValidAmount = amount && parseFloat(amount) > 0 && totalDebit <= parseFloat(validationBalance)
+
+      // Solana addresses are base58 with no 0x prefix, so the EVM check rejects
+  // every valid one.
+  const isValidAddress = bridgeToKey === 'solana'
+    ? /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(recipient || '')
+    : recipient && recipient.startsWith('0x') && recipient.length === 42
+    
+    const isValidAmount = amount && parseFloat(amount) > 0 && totalDebit <= parseFloat(validationBalance)
 
   // Gating uses the RAW comparison, not the delayed warning state — an
   // invalid bridge must never be startable, not even for 300ms.
-  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked
+  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked && (!needsSolana || !!solanaAddress)
 
   const explorerTxUrl = (hash, result) => {
     const key = result?.sourceChainKey || 'arc'
@@ -501,6 +531,8 @@ export default function TestnetSend() {
       </p>
     </div>
   )
+
+    
 
   return (
     <>
@@ -722,6 +754,44 @@ export default function TestnetSend() {
                 </div>
 
                 {toBox}
+
+                                {needsSolana && (
+                  <div className="mt-2.5 bg-[#0f1822] border border-[#1e2530] rounded-xl px-4 py-3">
+                    {solanaAddress ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 text-xs text-[#8892a0]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#14F195]" />
+                          Phantom connected
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-white">
+                            {solanaAddress.slice(0, 4)}…{solanaAddress.slice(-4)}
+                          </span>
+                          <button
+                            onClick={() => setSolanaAddress(null)}
+                            className="text-[10px] text-[#8892a0] hover:text-red-400 transition-colors"
+                          >
+                            Disconnect
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-[#8892a0] mb-2.5 leading-relaxed">
+                          Solana bridges need a Solana wallet alongside your EVM one —
+                          Phantom signs on Solana, MetaMask receives on the other side.
+                        </p>
+                        <button
+                          onClick={handleConnectSolana}
+                          disabled={connectingSolana}
+                          className="w-full bg-[#14F195] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm py-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+                        >
+                          {connectingSolana ? 'Connecting…' : 'Connect Phantom'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Delayed by SAME_CHAIN_WARNING_DELAY_MS so a swap in progress
                     doesn't flash a warning for something the user didn't do. */}

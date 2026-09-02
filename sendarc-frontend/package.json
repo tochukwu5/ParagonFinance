@@ -18,7 +18,8 @@
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
-    "viem": "^2.54.6"
+    "viem": "^2.54.6",
+     "@circle-fin/adapter-solana": "^1.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -98,6 +98,27 @@ export const EVM_CHAINS = {
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
   },
+    solana: {
+    id: null,
+    chainIdHex: null,
+    name: 'Solana',
+    appKitChain: 'Solana_Devnet',
+    symbol: 'SOL',
+    rpcUrl: 'https://api.devnet.solana.com',
+    rpcUrls: ['https://api.devnet.solana.com'],
+    explorerUrl: 'https://solscan.io',
+    usdcAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+    nativeCurrency: { name: 'Solana', symbol: 'SOL', decimals: 9 },
+    faucetUrl: 'https://faucet.circle.com',
+    icon: '/dex/phantom.png',
+    color: '#14F195',
+    live: true,
+    useCCTP: true,
+    // Not EVM. wallet_switchEthereumChain, eth_call and eth_getBalance all
+    // fail here, so every code path that assumes them needs this guard.
+    isSolana: true,
+    note: 'CCTP Bridge · needs a Solana wallet',
+  },
   base: {
     id: 84532,
     chainIdHex: '0x14A34',
@@ -651,13 +672,25 @@ export async function bridgeUsdcViaAppKit(
       else if (step === 'mint') onStatusUpdate('✓ USDC minted on ' + toChain.name + '!')
     })
 
-    const adapter = await createViemAdapterFromProvider({ provider: window.ethereum })
+        // One adapter per side. They're the same object for EVM-to-EVM, but a
+    // Solana leg needs its own — different signing scheme entirely.
+    const evmAdapter = await createViemAdapterFromProvider({ provider: window.ethereum })
+
+    let fromAdapter = evmAdapter
+    let toAdapter = evmAdapter
+
+    if (fromChainKey === 'solana' || toChainKey === 'solana') {
+      const { createSolanaAdapter } = await import('./solanaBridge')
+      const solanaAdapter = await createSolanaAdapter()
+      if (fromChainKey === 'solana') fromAdapter = solanaAdapter
+      if (toChainKey === 'solana') toAdapter = solanaAdapter
+    }
     onStatusUpdate('Starting Circle CCTP bridge...')
 
-     const bridgeParams = {
-      from: { adapter, chain: fromChain.appKitChain },
+         const bridgeParams = {
+      from: { adapter: fromAdapter, chain: fromChain.appKitChain },
       to: {
-        adapter,
+        adapter: toAdapter,
         chain: toChain.appKitChain,
         // Circle fetches the attestation and submits the mint. Costs a
         // forwarding fee taken from the transfer, which is a far better
@@ -680,7 +713,7 @@ export async function bridgeUsdcViaAppKit(
 
     if (result.state === 'error') {
       onStatusUpdate('Retrying bridge...')
-      result = await kit.retryBridge(result, { from: adapter, to: adapter })
+        result = await kit.retryBridge(result, { from: fromAdapter, to: toAdapter })
     }
 
     if (result.state === 'error') {
