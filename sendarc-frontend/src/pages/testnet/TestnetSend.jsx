@@ -288,11 +288,17 @@ export default function TestnetSend() {
   }, [account, arcBalance])
 
   useEffect(() => {
-    if (activeTab === 'bridge' && account && !showWalletInput) {
-      setRecipient(account)
-      setUseOwnAddress(true)
+     if (activeTab === 'bridge' && !showWalletInput) {
+      // Bridging to Solana means the recipient must be a Solana address.
+      // Defaulting to the EVM account would burn USDC and mint to an
+      // address nobody controls.
+      const target = bridgeToKey === 'solana' ? solanaAddress : account
+      if (target) {
+        setRecipient(target)
+        setUseOwnAddress(true)
+      }
     }
-  }, [activeTab, account, showWalletInput])
+   }, [activeTab, account, showWalletInput, bridgeToKey, solanaAddress])
 
   useEffect(() => {
     if (activeTab !== 'send' || selectedToken !== 'USDC') { setEstimatedFee(null); return }
