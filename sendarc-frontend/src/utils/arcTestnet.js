@@ -695,7 +695,7 @@ export async function bridgeUsdcViaAppKit(
         // Circle fetches the attestation and submits the mint. Costs a
         // forwarding fee taken from the transfer, which is a far better
         // trade than telling someone to go acquire POL first.
-        useForwarder,
+         useForwarder: toChain.isSolana ? false : useForwarder,
       },
       amount: grossAmount.toFixed(2),
     }
