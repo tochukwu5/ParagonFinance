@@ -551,21 +551,34 @@ export async function getNativeBalance(chainKey, address) {
   }
 }
 
-// Circle App Kit CCTP bridge — handles approve/burn/attest/mint, plus the
-// ParagonFinance fee when a recipient is configured.
-//
-// CCTP is burn-then-mint across two chains, which has a consequence worth
-// stating plainly: the burn and the mint are separate transactions on
-// separate networks, and the mint is paid for in the DESTINATION chain's
-// native token. Bridging into Avalanche needs AVAX, into Polygon needs POL,
-// and so on — the USDC being bridged does not pay for its own arrival.
-//
-// If the burn succeeds and the mint doesn't, the USDC leaves the source
-// chain and doesn't appear on the destination. It is not lost — Circle
-// issues a signed attestation that authorises that exact mint, and it
-// doesn't expire — but it IS stranded until someone retries with gas.
-// Hence the pre-flight check below: refusing to start is far cheaper than
-// stranding funds and explaining it afterwards.
+// App Kit returns failures as a large result object rather than throwing, so
+// a user tapping "reject" arrives as ~4KB of chain metadata with the actual
+// reason nested four levels down. Pull out what happened before falling back
+// to dumping the whole thing.
+function readBridgeError(result) {
+  const steps = result?.steps || []
+  const failed = steps.find(s => s.state === 'error') || {}
+  const msg = failed.errorMessage || ''
+
+  // Walk the nesting App Kit wraps viem's error in.
+  const code =
+    failed?.error?.cause?.trace?.rawError?.rawError?.cause?.code ??
+    failed?.error?.code
+
+  if (code === 4001 || /user (rejected|denied)/i.test(msg)) {
+    return 'Rejected in your wallet.'
+  }
+  if (/insufficient funds/i.test(msg)) {
+    return 'Not enough ' + (result?.source?.chain?.nativeCurrency?.symbol || 'gas') +
+           ' on ' + (result?.source?.chain?.name || 'the source chain') + ' to cover gas.'
+  }
+  if (/max fee must be less than amount/i.test(msg)) {
+    return 'Amount too small — it must exceed the CCTP transfer fee. Try a larger amount.'
+  }
+  return null
+}
+
+// ─── Bridge via Circle App Kit ─────────────────────────────────────────────
 export async function bridgeUsdcViaAppKit(
   { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false, useForwarder = true },
   onStatusUpdate = () => {}
@@ -702,8 +715,13 @@ export async function bridgeUsdcViaAppKit(
       }
 
       // Nothing burned — no funds moved, so this is a clean failure.
-      const err = new Error('Bridge failed before any funds moved. No USDC left your wallet. Details: ' + detail)
+      const readable = readBridgeError(result)
+      const err = new Error(
+        readable || 'Bridge failed. No USDC left your wallet.'
+      )
       err.recoverable = false
+      // Full payload kept off the message but available for debugging.
+      err.detail = detail
       throw err
     }
 
