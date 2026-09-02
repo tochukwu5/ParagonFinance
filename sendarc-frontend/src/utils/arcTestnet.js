@@ -728,16 +728,23 @@ export async function bridgeUsdcViaAppKit(
       const burnHash = burnStep?.txHash || burnStep?.data?.txHash || observedBurnHash
 
       if (burnHash) {
-        // Burn landed, mint didn't. Funds are stranded but recoverable —
-        // say so explicitly rather than leaving someone to conclude their
-        // money vanished.
+                // Distinguish the two causes. A 404 from Circle's attestation API
+        // means it simply hasn't finalised yet — retrying in a minute works,
+        // and telling someone to go find SOL sends them chasing a problem
+        // they don't have.
+        const notAttestedYet = /404|not found|attestation/i.test(detail)
+
         const err = new Error(
-          'The burn on ' + fromChain.name + ' completed but the mint on ' + toChain.name + ' did not. ' +
-          'Your USDC is NOT lost — Circle holds a signed attestation authorising the mint, and it does not expire. ' +
-          (gasToken
-            ? 'The mint is paid in ' + gasToken + ' on ' + toChain.name + ': fund the wallet with ' + gasToken + ', then run this same bridge again to complete it. '
-            : 'Retry this same bridge to complete it. ') +
-          'Burn tx: ' + burnHash
+          notAttestedYet
+            ? 'Your USDC is safe. The burn on ' + fromChain.name + ' completed and Circle is ' +
+              'still finalising the attestation — this usually takes 1–3 minutes. Run this same ' +
+              'bridge again shortly to complete the mint. Burn tx: ' + burnHash
+            : 'The burn on ' + fromChain.name + ' completed but the mint on ' + toChain.name +
+              ' did not. Your USDC is not lost — Circle holds a signed attestation for it. ' +
+              (gasToken
+                ? 'The mint is paid in ' + gasToken + ' on ' + toChain.name + ': fund your wallet, then retry. '
+                : 'Retry this bridge to complete it. ') +
+              'Burn tx: ' + burnHash
         )
         err.recoverable = true
         err.burnHash = burnHash
