@@ -567,7 +567,7 @@ export async function getNativeBalance(chainKey, address) {
 // Hence the pre-flight check below: refusing to start is far cheaper than
 // stranding funds and explaining it afterwards.
 export async function bridgeUsdcViaAppKit(
-  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false },
+  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false, useForwarder = true },
   onStatusUpdate = () => {}
 ) {
   const fromChain = EVM_CHAINS[fromChainKey]
@@ -594,8 +594,8 @@ export async function bridgeUsdcViaAppKit(
   // fires there is no undo.
   //
   
-   const gasToken = destinationGasToken(toChainKey)
-  if (gasToken && !skipGasCheck) {
+    const gasToken = destinationGasToken(toChainKey)
+  if (gasToken && !skipGasCheck && !useForwarder) {
     onStatusUpdate('Checking ' + gasToken + ' balance on ' + toChain.name + '...')
     const destGas = await getNativeBalance(toChainKey, to || from)
     if (destGas !== null && parseFloat(destGas) === 0) {
@@ -641,9 +641,16 @@ export async function bridgeUsdcViaAppKit(
     const adapter = await createViemAdapterFromProvider({ provider: window.ethereum })
     onStatusUpdate('Starting Circle CCTP bridge...')
 
-    const bridgeParams = {
+     const bridgeParams = {
       from: { adapter, chain: fromChain.appKitChain },
-      to: { adapter, chain: toChain.appKitChain },
+      to: {
+        adapter,
+        chain: toChain.appKitChain,
+        // Circle fetches the attestation and submits the mint. Costs a
+        // forwarding fee taken from the transfer, which is a far better
+        // trade than telling someone to go acquire POL first.
+        useForwarder,
+      },
       amount: grossAmount.toFixed(2),
     }
 
@@ -746,6 +753,7 @@ export async function bridgeUsdcViaAppKit(
       network: fromChain.name + ' → ' + toChain.name + ' (CCTP v2)',
       chainId: fromChain.id,
       cctpBridge: true,
+      forwarded: useForwarder,
       appKitBridge: true,
       simulated: false,
     })
