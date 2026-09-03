@@ -140,7 +140,10 @@ export default function TestnetSend() {
   const [solanaAddress, setSolanaAddress] = useState(null)
   const [connectingSolana, setConnectingSolana] = useState(false)
 
-  const needsSolana = sourceChainKey === 'solana' || bridgeToKey === 'solana'
+  // Only the SOURCE chain's wallet signs the burn. Bridging TO Solana needs
+  // nothing but a destination address — requiring Phantom there forces an
+  // extension on someone who is only receiving.
+  const needsSolana = sourceChainKey === 'solana'
 
   const handleConnectSolana = async () => {
     setConnectingSolana(true)
@@ -810,7 +813,7 @@ export default function TestnetSend() {
 
                 {!showWalletInput ? (
                   <button onClick={() => setShowWalletInput(true)} className="text-[10px] text-[#ccccd6] hover:text-[#00D4FF] mt-2 pl-4">
-                    + Add receiving wallet
+                 + Add {bridgeToKey === 'solana' ? 'Solana' : 'EVM'} receiving wallet
                   </button>
                 ) : (
                   <div className="mt-2 bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
@@ -823,7 +826,7 @@ export default function TestnetSend() {
                     </div>
                     <input
                       type="text"
-                      placeholder="0x… wallet address"
+                       placeholder={bridgeToKey === 'solana' ? 'Enter Solana address…' : '0x…'}
                       value={recipient}
                       onChange={e => { setRecipient(e.target.value); setUseOwnAddress(false) }}
                       className="w-full bg-transparent text-white text-sm font-mono outline-none"
@@ -881,12 +884,16 @@ export default function TestnetSend() {
                   </div>
                 )}
 
-                <button
+                               <button
                   onClick={() => setView('confirm')}
                   disabled={!canReview}
                   className="w-full mt-5 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Review &amp; Bridge →
+                  {!isValidAddress && bridgeToKey === 'solana'
+                    ? 'Enter Solana Address'
+                    : !isValidAddress
+                      ? 'Enter EVM Address'
+                      : 'Review & Bridge →'}
                 </button>
               </div>
             )}

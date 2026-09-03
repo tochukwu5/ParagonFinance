@@ -415,6 +415,20 @@ async function readChain(chain, method, params) {
 export async function getUsdcBalance(chainKey, address) {
   const chain = EVM_CHAINS[chainKey]
   if (!chain || !address) return null
+
+  // Solana is not EVM. eth_call returns "Method not found", the catch below
+  // returns null, and the previous chain's balance stays on screen looking
+  // like a real figure — which is worse than showing nothing.
+  if (chain.isSolana) {
+    try {
+      const { getSolanaUsdcBalance } = await import('./solanaBridge')
+      return await getSolanaUsdcBalance(address)
+    } catch (err) {
+      console.warn('[balance] solana read failed:', err?.message)
+      return null
+    }
+  }
+
   try {
     if (chainKey === 'arc') {
       const raw = await readChain(chain, 'eth_getBalance', [address, 'latest'])
