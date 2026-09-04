@@ -239,7 +239,12 @@ export default function TestnetSend() {
     setSwitchingChain(true)
     setSwitchError(null)
     try {
-      await switchToChain(newSource)
+      // Solana isn't EVM — wallet_switchEthereumChain needs a chainId, and
+      // Solana's is null. The Solana wallet connects separately, so there's
+      // no network switch to make. Same guard as handleChainSelect.
+      if (!EVM_CHAINS[newSource]?.isSolana) {
+        await switchToChain(newSource)
+      }
       if (account) {
         applyBalance(setChainBalance, await getUsdcBalance(newSource, account))
         applyBalance(setDestBalance, await getUsdcBalance(newDest, account))
