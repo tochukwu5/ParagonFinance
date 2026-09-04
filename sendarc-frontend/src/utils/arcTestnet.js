@@ -693,7 +693,7 @@ export async function bridgeUsdcViaAppKit(
     let fromAdapter = evmAdapter
     let toAdapter = evmAdapter
 
-    if (fromChainKey === 'solana' || toChainKey === 'solana') {
+     if (fromChainKey === 'solana') {
       const { createSolanaAdapter } = await import('./solanaBridge')
       const solanaAdapter = await createSolanaAdapter()
       if (fromChainKey === 'solana') fromAdapter = solanaAdapter
