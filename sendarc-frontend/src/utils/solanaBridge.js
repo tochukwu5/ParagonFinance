@@ -61,7 +61,7 @@ export async function createSolanaAdapter() {
   if (!window.solana) throw new Error('No Solana wallet connected')
 
   try {
-      throw new Error('Solana adapter unavailable locally — test on the deployed site')
+     const { createSolanaAdapterFromProvider } = await import('@circle-fin/adapter-solana')
     return await createSolanaAdapterFromProvider({ provider: window.solana })
   } catch (err) {
     if (err.message?.includes('Cannot find module')) {
