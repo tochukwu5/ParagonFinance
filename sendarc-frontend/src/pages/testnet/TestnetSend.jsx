@@ -792,8 +792,8 @@ export default function TestnetSend() {
                     ) : (
                       <>
                         <p className="text-xs text-[#8892a0] mb-2.5 leading-relaxed">
-                          Solana bridges need a Solana wallet alongside your EVM one —
-                          Phantom signs on Solana, MetaMask receives on the other side.
+                          Connect Phantom so we can deliver to your Solana wallet.
+                          Your EVM wallet signs the transaction — Phantom won't be asked to.
                         </p>
                         <button
                           onClick={handleConnectSolana}
