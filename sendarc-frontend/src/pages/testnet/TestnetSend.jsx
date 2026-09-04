@@ -143,7 +143,7 @@ export default function TestnetSend() {
   // Only the SOURCE chain's wallet signs the burn. Bridging TO Solana needs
   // nothing but a destination address — requiring Phantom there forces an
   // extension on someone who is only receiving.
-  const needsSolana = sourceChainKey === 'solana'
+    const needsSolana = sourceChainKey === 'solana' || bridgeToKey === 'solana'
 
   const handleConnectSolana = async () => {
     setConnectingSolana(true)
