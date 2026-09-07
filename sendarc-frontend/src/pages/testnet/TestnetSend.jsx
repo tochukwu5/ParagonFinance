@@ -176,6 +176,12 @@ export default function TestnetSend() {
   ]
 
   const applyBalance = (setter, value) => { if (value !== null && value !== undefined) setter(value) }
+  
+  // Solana balances must be read against the Solana address, not the EVM
+  // one. Passing `account` to a Solana RPC queries an address that doesn't
+  // exist there and always comes back empty.
+  const addressFor = (chainKey) =>
+    EVM_CHAINS[chainKey]?.isSolana ? solanaAddress : account
 
   // Only surface the same-chain warning once the condition has held for
   // SAME_CHAIN_WARNING_DELAY_MS. Clearing is immediate — the moment the
@@ -209,7 +215,7 @@ export default function TestnetSend() {
         await switchToChain(chainKey)
       }
       setSourceChainKey(chainKey)
-      if (account) applyBalance(setChainBalance, await getUsdcBalance(chainKey, account))
+      if (account) applyBalance(setChainBalance, await getUsdcBalance(chainKey, addressFor(chainKey)))
     } catch (err) {
       setSwitchError(err.message || 'Could not switch network')
     } finally {
@@ -246,8 +252,8 @@ export default function TestnetSend() {
         await switchToChain(newSource)
       }
       if (account) {
-        applyBalance(setChainBalance, await getUsdcBalance(newSource, account))
-        applyBalance(setDestBalance, await getUsdcBalance(newDest, account))
+        applyBalance(setChainBalance, await getUsdcBalance(newSource, addressFor(newSource)))
+        applyBalance(setDestBalance, await getUsdcBalance(newDest, addressFor(newDest)))
       }
     } catch (err) {
       setSwitchError(err.message || 'Could not switch network')
@@ -281,12 +287,12 @@ export default function TestnetSend() {
 
   useEffect(() => {
     if (!account) return
-    getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v))
+    getUsdcBalance(sourceChainKey, addressFor(sourceChainKey)).then(v => applyBalance(setChainBalance, v))
   }, [sourceChainKey, account, arcBalance])
 
   useEffect(() => {
     if (!account) return
-    getUsdcBalance(bridgeToKey, account).then(v => applyBalance(setDestBalance, v))
+    getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)).then(v => applyBalance(setDestBalance, v))
   }, [bridgeToKey, account, arcBalance])
 
   useEffect(() => {
@@ -354,9 +360,12 @@ export default function TestnetSend() {
         // customFee — charged in USDC on the source chain, settled atomically.
         result = await bridgeUsdcViaAppKit(
           {
-            fromChainKey: sourceChainKey,
+                fromChainKey: sourceChainKey,
             toChainKey: bridgeToKey,
-            from: account,
+            // `from` must match the chain that signs. Passing the EVM address
+            // when Solana is the source names an account that can't sign
+            // there.
+            from: addressFor(sourceChainKey),
             to: recipient,
             amount,
             feeUsdc: BRIDGE_FLAT_FEE_USDC,
@@ -377,8 +386,8 @@ export default function TestnetSend() {
       } else if (selectedToken === 'cirBTC') {
         applyBalance(setCirbtcBalance, await getCirbtcBalance(account))
       } else if (activeTab === 'bridge') {
-        applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, account))
-        applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, account))
+        applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, addressFor(sourceChainKey)))
+        applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)))
         refreshBalance()
         applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
       } else {
@@ -393,7 +402,7 @@ export default function TestnetSend() {
         setMissingGas({ token: err.missingGasToken, chain: err.missingGasChain })
         setSendError(null)
       } else if (err.code === 4001) {
-        setSendError('Transaction rejected in MetaMask.')
+        setSendError('Transaction rejected in wallet.')
       } else {
         setSendError(err.message || 'Transaction failed. Please try again.')
       }
@@ -748,7 +757,7 @@ export default function TestnetSend() {
                     title="Refresh balances"
                     onClick={() => account && Promise.all([
                       getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v)),
-                      getUsdcBalance(bridgeToKey, account).then(v => applyBalance(setDestBalance, v)),
+                      getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)).then(v => applyBalance(setDestBalance, v)),
                       getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v)),
                     ])}
                     className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
