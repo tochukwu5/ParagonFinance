@@ -112,7 +112,7 @@ export const EVM_CHAINS = {
     faucetUrl: 'https://faucet.circle.com',
     icon: '/dex/phantom.png',
     color: '#14F195',
-    live: true,
+    live: false,
     useCCTP: true,
     // Not EVM. wallet_switchEthereumChain, eth_call and eth_getBalance all
     // fail here, so every code path that assumes them needs this guard.

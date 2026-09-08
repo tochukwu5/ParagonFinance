@@ -75,7 +75,9 @@ const CCTP_STEPS = [
   { key: 'mint',     label: 'Mint' },
 ]
 
-const ALL_NETWORKS = Object.keys(EVM_CHAINS).map(key => ({
+const ALL_NETWORKS = Object.keys(EVM_CHAINS)
+  .filter(key => EVM_CHAINS[key].live !== false)
+  .map(key => ({
   key,
   name: EVM_CHAINS[key].name,
   icon: EVM_CHAINS[key].icon,
