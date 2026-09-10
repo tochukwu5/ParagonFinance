@@ -78,7 +78,7 @@ export default function AffiliateDashboard() {
 
   return (
     <div className="min-h-screen bg-[#0D1117]">
-      <main className="max-w-5xl mx-auto p-6 md:p-8">
+      <main className="max-w-5xl mx-auto p-6 md:p-8 font-['Space_Grotesk']">
 
         <div className="flex justify-between items-start flex-wrap gap-3 mb-8">
           <div>

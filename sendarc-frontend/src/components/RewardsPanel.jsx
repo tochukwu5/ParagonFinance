@@ -66,7 +66,7 @@ export default function RewardsPanel({ account }) {
   const pendingReferrals = data.referrals?.filter(r => !r.qualified).length || 0
 
   return (
-    <Card glow className="p-6 mb-5">
+        <Card glow className="p-6 mb-5 font-['Space_Grotesk']">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-5">
         <div>
           <p className="text-[10px] tracking-[2px] text-[#4a5568] mb-1.5">POINTS EARNED</p>
