@@ -92,7 +92,7 @@ export default function RewardsPanel({ account }) {
         {[
           { label: 'TRANSACTIONS', value: data.points.transactions },
           { label: 'REFERRALS', value: data.points.referrals },
-          { label: 'JOINING', value: data.points.signup },
+          { label: 'BONUS', value: data.points.signup },
           ...(data.isAffiliate
             ? [{ label: 'AFFILIATE', value: data.points.affiliateBonus }]
             : []),
