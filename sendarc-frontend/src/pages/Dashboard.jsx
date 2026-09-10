@@ -6,6 +6,7 @@ import { Card, StatusBadge } from '../components/UI'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTestnet } from '../context/TestnetContext'
 import { useArcTestnet } from '../hooks/useArcTestnet'
+import RewardsPanel from '../components/RewardsPanel'
 
 const CHART_DATA = [
   { month: 'Dec', usdc: 120 }, { month: 'Jan', usdc: 340 }, { month: 'Feb', usdc: 280 },
@@ -114,6 +115,7 @@ function Sidebar({ active }) {
   )
 }
 
+
 export default function Dashboard() {
   const { wallet } = useWallet()
   const { stats: testnetStats, transactions: testnetTxs, loadTransactions, backendOnline } = useTestnet()
@@ -170,6 +172,8 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+      <RewardsPanel account={wallet.address} />
 
         {/* Stat cards — real data from MongoDB */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

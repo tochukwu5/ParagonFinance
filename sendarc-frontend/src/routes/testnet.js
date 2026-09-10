@@ -1,6 +1,7 @@
 import express from 'express'
 import Transaction from '../models/Transaction.js'
 import WalletStats from '../models/WalletStats.js'
+import { awardTransaction } from '../services/rewardService.js'
 
 const router = express.Router()
 
@@ -172,10 +173,25 @@ router.post('/transactions', async (req, res) => {
       walletAddress: walletAddress.toLowerCase(),
     })
 
-    // Update wallet stats with this new transaction
+      // Update wallet stats with this new transaction
     await updateWalletStats(walletAddress.toLowerCase(), tx)
 
-    res.status(201).json({ success: true, transaction: tx })
+    // Points last, and never fatal. A rewards failure must not fail a
+    // transaction that already settled on-chain — the user's money moved
+    // whether or not we managed to credit them.
+    let rewards = null
+    try {
+      rewards = await awardTransaction({
+        walletAddress: walletAddress.toLowerCase(),
+        txType: req.body.swap ? 'swap' : req.body.cctpBridge ? 'bridge' : 'send',
+        txHash: hash,
+        amount: parseFloat(amount),
+      })
+    } catch (err) {
+      console.error('Reward award failed:', err.message)
+    }
+
+    res.status(201).json({ success: true, transaction: tx, rewards })
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ error: 'Duplicate transaction' })

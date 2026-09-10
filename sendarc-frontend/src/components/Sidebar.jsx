@@ -38,6 +38,13 @@ const Icon = {
       <path d="M13.7 21a2 2 0 0 1-3.4 0" />
     </svg>
   ),
+    affiliate: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 11h-6M19 8v6" />
+    </svg>
+  ),
   howItWorks: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
       <circle cx="12" cy="12" r="9" />
@@ -93,6 +100,7 @@ const MENU = [
   { to: '/',             label: 'Home',         icon: 'home' },
   { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
   { to: '/testnet', label: 'Testnet', icon: 'testnet' },
+  { to: '/affiliate',    label: 'Affiliate',    icon: 'affiliate' },
   { to: '/how-it-works', label: 'How it works', icon: 'howItWorks' },
   { to: '/about',        label: 'About',        icon: 'about' },
   { to: '/docs',         label: 'Docs',         icon: 'docs' },
@@ -103,6 +111,7 @@ const MENU = [
 // and it's account state like the rest.
 const ACCOUNT = [
   { to: '/dashboard/transactions',  label: 'Transactions',  icon: 'transactions' },
+  { to: '/dashboard/referrals',     label: 'Referrals',     icon: 'affiliate' },
   { to: '/dashboard/wallet',        label: 'Wallet',        icon: 'wallet' },
   { to: '/dashboard/notifications', label: 'Notifications', icon: 'bell' },
   { to: '/dashboard/settings',      label: 'Settings',      icon: 'settings' },

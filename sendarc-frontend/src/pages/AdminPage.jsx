@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, Badge, LoadingSpinner, StatusBadge } from '../components/UI'
+import AffiliateReview from './AffiliateReview'
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')
 const SESSION_KEY = 'sendarc_admin_session'
@@ -170,8 +171,9 @@ function AdminDashboard({ adminKey, onLogout }) {
 
         <div className="flex gap-2 mb-6 border-b border-[#1e2530]">
           {[
-            { id: 'overview', label: 'Overview' },
+                     { id: 'overview', label: 'Overview' },
             { id: 'wallets', label: 'Wallets' },
+            { id: 'affiliates', label: 'Affiliates' },
           ].map(t => (
             <button
               key={t.id}
@@ -187,6 +189,10 @@ function AdminDashboard({ adminKey, onLogout }) {
             </button>
           ))}
         </div>
+
+        {tab === 'affiliates' && (
+          <AffiliateReview adminKey={adminKey} />
+        )}
 
         {tab === 'overview' && overview && (
           <>

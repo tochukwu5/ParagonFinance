@@ -18,6 +18,9 @@ import { HowItWorks, AboutPage, DocsPage } from './pages/PublicPages'
 import TestnetSend from './pages/testnet/TestnetSend'
 import AdminPage from './pages/AdminPage'
 import StatsPage from './pages/StatsPage'
+import { useReferralCapture } from './hooks/useReferralCapture'
+import AffiliatePage from './pages/AffiliatePage'
+import AffiliateDashboard from './pages/AffiliateDashboard'
 
 
 
@@ -61,6 +64,9 @@ function BareLayout({ children }) {
 function WalletBridge() {
   const { account, isConnected } = useArcTestnet()
   const { loadTransactions } = useTestnet()
+    // Captures ?ref=CODE anywhere on the site and redeems it once a wallet
+  // connects — which is rarely the same visit.
+  useReferralCapture(account)
 
   useEffect(() => {
     if (account && isConnected) {
@@ -91,6 +97,7 @@ export default function App() {
             <Route path="/rates" element={<Navigate to="/how-it-works" replace />} />
             <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
             <Route path="/docs" element={<AppLayout><DocsPage /></AppLayout>} />
+             <Route path="/affiliate" element={<AppLayout><AffiliatePage /></AppLayout>} />
 
             {/* ── Testnet ────────────────────────────────────────────
                 The hub and the leaderboard are retired — the sidebar does
@@ -115,6 +122,7 @@ export default function App() {
             {/* ── Dashboard — renders its own sidebar ────────────── */}
             <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
             <Route path="/dashboard/transactions" element={<AppLayout><Transactions /></AppLayout>} />
+            <Route path="/dashboard/referrals" element={<AppLayout><AffiliateDashboard /></AppLayout>} />
             <Route path="/dashboard/wallet" element={<AppLayout><WalletPage /></AppLayout>} />
             <Route path="/dashboard/notifications" element={<AppLayout><Notifications /></AppLayout>} />
             <Route path="/dashboard/settings" element={<AppLayout><Settings /></AppLayout>} />

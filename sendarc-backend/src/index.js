@@ -9,6 +9,7 @@ import dotenv from 'dotenv'
 import testnetRoutes from './routes/testnet.js'
 import adminRoutes from './routes/admin.js'
 import statsRoutes from './routes/stats.js'
+import rewardRoutes from './routes/rewards.js'
 
 dotenv.config()
 
@@ -74,6 +75,7 @@ app.use('/api', rateLimit({
 app.use('/api/testnet', testnetRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
+app.use('/api/rewards', rewardRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
