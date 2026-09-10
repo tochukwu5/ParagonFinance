@@ -92,8 +92,8 @@ export default function AffiliateDashboard() {
             </div>
             <p className="text-[#8892a0] text-sm mt-1">
               {data.isAffiliate
-                ? 'Earning 80 $PARA per qualified referral'
-                : 'Earning 50 $PARA per qualified referral'}
+                ? 'Earning 80 points  per qualified referral'
+                : 'Earning 50 points per qualified referral'}
             </p>
           </div>
           <Link
@@ -110,7 +110,7 @@ export default function AffiliateDashboard() {
           {[
             { value: data.qualifiedReferralCount, label: 'QUALIFIED', accent: true },
             { value: pending.length, label: 'PENDING' },
-            { value: data.points.referrals, label: '$PARA FROM REFERRALS' },
+            { value: data.points.referrals, label: 'POINTS FROM REFERRALS' },
             { value: rate + '%', label: 'CONVERSION' },
           ].map(s => (
             <Card key={s.label} className="p-5">
@@ -152,7 +152,7 @@ export default function AffiliateDashboard() {
             <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
               <div>
                 <p className="text-sm font-semibold text-[#FBBF24] font-['Space_Grotesk']">
-                  Affiliate bonus — 1,000 $PARA
+                  Affiliate bonus — 1,000 points
                 </p>
                 <p className="text-xs text-[#8892a0] mt-0.5">
                   {data.affiliateBonusProgress.required - data.affiliateBonusProgress.current} more
@@ -228,7 +228,7 @@ export default function AffiliateDashboard() {
         {data.recentEvents?.length > 0 && (
           <Card className="overflow-hidden">
             <div className="px-5 py-4 border-b border-[#1e2530]">
-              <p className="text-sm font-semibold font-['Space_Grotesk']">Recent $PARA</p>
+              <p className="text-sm font-semibold font-['Space_Grotesk']">Recent points</p>
             </div>
             <div className="divide-y divide-[#1e2530]">
               {data.recentEvents.slice(0, 10).map((e, i) => (
@@ -255,11 +255,11 @@ export default function AffiliateDashboard() {
         {!data.isAffiliate && (
           <div className="mt-6 bg-[#0a1520] border border-[#00D4FF]/20 rounded-xl p-5 text-center">
             <p className="text-sm text-white font-semibold font-['Space_Grotesk'] mb-1.5">
-              Earn 80 $PARA per referral instead of 50
+              Earn 80 points per referral instead of 50
             </p>
             <p className="text-xs text-[#8892a0] mb-4 max-w-md mx-auto leading-relaxed">
               The affiliate programme is open to anyone with 5,000+ followers on
-              one platform. Approved affiliates also get 1,000 $PARA at ten
+              one platform. Approved affiliates also get 1,000 points at ten
               qualified referrals.
             </p>
             <Link

@@ -138,12 +138,12 @@ export default function AffiliatePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {[
                 {
-                  value: '80 $PARA',
+                  value: '80 pts',
                   title: 'Per qualified referral',
                   desc: 'Credited each time someone you brought completes three transactions across two days.',
                 },
                 {
-                  value: '1,000 $PARA',
+                  value: '1,000 pts',
                   title: 'Approval bonus',
                   desc: 'Unlocked once ten of your referrals have qualified. Paid in full, once.',
                 },
@@ -179,7 +179,7 @@ export default function AffiliatePage() {
               <p className="text-xs text-[#8892a0] leading-relaxed">
                 <span className="text-white font-semibold">How referrals are counted: </span>
                 a referral pays once the person you referred completes three
-                transactions across two separate days. The 1,000 $PARA bonus
+                transactions across two separate days. The 1,000 points bonus
                 unlocks at ten of those. We count real usage rather than
                 sign-ups, which keeps the reward pool going to people who
                 actually brought users.

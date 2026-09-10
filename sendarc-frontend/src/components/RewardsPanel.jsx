@@ -69,12 +69,12 @@ export default function RewardsPanel({ account }) {
     <Card glow className="p-6 mb-5">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-5">
         <div>
-          <p className="text-[10px] tracking-[2px] text-[#4a5568] mb-1.5">$PARA EARNED</p>
+          <p className="text-[10px] tracking-[2px] text-[#4a5568] mb-1.5">POINTS EARNED</p>
           <div className="flex items-baseline gap-2.5 flex-wrap">
             <span className="text-4xl font-bold text-[#00D4FF] font-['Space_Grotesk']">
               {data.totalPoints.toLocaleString()}
             </span>
-            <span className="text-sm text-[#8892a0]">$PARA</span>
+            <span className="text-sm text-[#8892a0]">points</span>
             {data.isAffiliate && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#2a1a08] border border-[#F59E0B] text-[#FBBF24]">
                 AFFILIATE
@@ -83,30 +83,7 @@ export default function RewardsPanel({ account }) {
           </div>
         </div>
 
-        {badge && (
-          <div
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold font-['Space_Grotesk']"
-            style={{ background: badge.bg, border: '1px solid ' + badge.border, color: badge.text }}
-          >
-            {data.level.name}
-          </div>
-        )}
       </div>
-
-      {data.nextLevel && (
-        <div className="mb-5">
-          <div className="flex justify-between text-[10px] text-[#8892a0] mb-1.5">
-            <span>{data.level.name}</span>
-            <span>{data.nextLevel.min - data.totalPoints} $PARA to {data.nextLevel.name}</span>
-          </div>
-          <div className="h-1.5 bg-[#0D1117] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-[#00D4FF] to-[#00FFCC] transition-all duration-700"
-              style={{ width: progress + '%' }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Where the points came from. Zero-value sources stay visible rather
           than being hidden — an empty Referrals row is a prompt to share the
@@ -160,15 +137,15 @@ export default function RewardsPanel({ account }) {
             fails to pay reads as a broken product; one that explains what it
             needs reads as a rule. */}
         <p className="text-[10px] text-[#4a5568] mt-2.5 leading-relaxed">
-          You earn {data.isAffiliate ? 80 : 50} $PARA per referral, credited once they
-          complete 3 transactions across 2 days.
+          You earn {data.isAffiliate ? 80 : 50} points per referral, credited once they
+          complete 3 transactions across 2 days. Points convert to $PARA at the airdrop.
         </p>
       </div>
 
       {data.isAffiliate && data.affiliateBonusProgress && !data.affiliateBonusPaid && (
         <div className="mt-3 bg-[#2a1a08] border border-[#F59E0B]/30 rounded-xl p-4">
           <div className="flex justify-between text-xs mb-2">
-            <span className="text-[#FBBF24] font-semibold">Affiliate bonus — 1,000 $PARA</span>
+            <span className="text-[#FBBF24] font-semibold">Affiliate bonus — 1,000 points</span>
             <span className="text-[#8892a0]">
               {data.affiliateBonusProgress.current} / {data.affiliateBonusProgress.required}
             </span>
