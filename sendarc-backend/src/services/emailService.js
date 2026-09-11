@@ -7,7 +7,9 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null
 
-const FROM = 'Paragon Finance <support@paragonfinance.xyz>'
+// Resend's shared sender — works immediately, no DNS. Swap back once
+// paragonfinance.xyz is verified under Domains in the Resend dashboard.
+const FROM = 'Paragon Finance <onboarding@resend.dev>'
 const NOTIFY = process.env.NOTIFY_EMAIL || 'support@paragonfinance.xyz'
 
 async function send(opts) {
