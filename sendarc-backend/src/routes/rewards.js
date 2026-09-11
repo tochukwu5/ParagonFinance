@@ -10,14 +10,13 @@ import { notifyNewApplication, notifyApplicant } from '../services/emailService.
 
 const router = express.Router()
 
-// Applications are cheap to submit and expensive to review, so they get a
-// tighter limit than the read endpoints around them.
 const applyLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 3,
+  // 3 in production. Raised while testing — put it back before launch, or
+  // one person can fill the review queue faster than you can read it.
+  max: process.env.NODE_ENV === 'production' ? 20 : 100,
   message: { error: 'Too many applications. Try again later.' },
 })
-
 const isAddress = (a) => typeof a === 'string' && /^0x[a-fA-F0-9]{40}$/.test(a)
 
 // ─── GET /api/rewards/:walletAddress ──────────────────────────────────
