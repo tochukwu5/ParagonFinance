@@ -14,6 +14,11 @@ import rewardRoutes from './routes/rewards.js'
 dotenv.config()
 
 const app = express()
+
+// Railway terminates TLS at a proxy, so req.ip is the proxy's address
+// unless this is set — which makes express-rate-limit treat every visitor
+// as the same client. 1 trusts exactly one hop, which is what Railway is.
+app.set('trust proxy', 1)
 const PORT = process.env.PORT || 5000
 
 // ─── Security middleware ───────────────────────────────────────────────

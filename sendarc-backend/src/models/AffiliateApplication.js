@@ -2,8 +2,11 @@ import mongoose from 'mongoose'
 import { AFFILIATE_REQUIREMENTS } from '../config/rewardConfig.js'
 
 const affiliateApplicationSchema = new mongoose.Schema({
-  walletAddress: { type: String, required: true, lowercase: true, index: true },
-
+    // Optional at application time, mandatory before approval. Plenty of
+  // people with an audience haven't connected a wallet yet, and turning
+  // them away at the form loses applicants for no good reason.
+  walletAddress: { type: String, required: false, default: null, lowercase: true, index: true },
+  
   name: { type: String, required: true, trim: true, maxlength: 100 },
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 200 },
 
