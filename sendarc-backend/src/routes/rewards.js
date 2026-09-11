@@ -6,6 +6,7 @@ import {
   getOrCreateRewards, linkReferral, getRewardsSummary, approveAffiliate,
 } from '../services/rewardService.js'
 import { AFFILIATE_REQUIREMENTS, levelFor } from '../config/rewardConfig.js'
+import { notifyNewApplication, notifyApplicant } from '../services/emailService.js'
 
 const router = express.Router()
 
@@ -159,6 +160,11 @@ router.post('/affiliate/apply', applyLimiter, async (req, res) => {
       audienceDescription, promotionPlan,
     })
 
+        // Fire and forget. The application is already saved — waiting on an
+    // email would make the applicant stare at a spinner for a notification
+    // that isn't theirs.
+    notifyNewApplication(application)
+
     res.status(201).json({
       success: true,
       message: 'Application received. We review within 3–5 days.',
@@ -249,13 +255,12 @@ router.post('/admin/applications/:id/review', requireAdminKey, async (req, res) 
     application.reviewNote = note || ''
     await application.save()
 
-    // Approving flips the flag on UserRewards. Any referrals already pending
-    // will pay at the affiliate rate when they qualify, because payReferrer
-    // reads isAffiliate at payout time rather than at referral time.
-    if (decision === 'approved') {
+       if (decision === 'approved') {
       await approveAffiliate(application.walletAddress)
     }
 
+    notifyApplicant(application, decision, note)
+    
     res.json({ success: true, application })
   } catch (err) {
     console.error('Review application error:', err)
