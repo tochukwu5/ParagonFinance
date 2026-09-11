@@ -112,19 +112,23 @@ router.post('/affiliate/apply', applyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'At least one social account is required' })
     }
 
-    const address = walletAddress.toLowerCase()
+        // Optional at application time — null is a valid state here.
+    const address = walletAddress ? walletAddress.toLowerCase() : null
+    // These lookups only mean anything when a wallet was supplied. Querying
+    // on null matches every walletless application ever submitted.
+    if (address) {
+      const existing = await UserRewards.findOne({ walletAddress: address })
+      if (existing?.isAffiliate) {
+        return res.status(409).json({ error: 'Already an approved affiliate' })
+      }
 
-    const existing = await UserRewards.findOne({ walletAddress: address })
-    if (existing?.isAffiliate) {
-      return res.status(409).json({ error: 'Already an approved affiliate' })
-    }
-
-    const pending = await AffiliateApplication.findOne({
-      walletAddress: address,
-      status: 'pending',
-    })
-    if (pending) {
-      return res.status(409).json({ error: 'You already have an application under review' })
+      const pending = await AffiliateApplication.findOne({
+        walletAddress: address,
+        status: 'pending',
+      })
+      if (pending) {
+        return res.status(409).json({ error: 'You already have an application under review' })
+      }
     }
 
     // Validate shape before checking the threshold, so a malformed entry
@@ -150,9 +154,10 @@ router.post('/affiliate/apply', applyLimiter, async (req, res) => {
       })
     }
 
-    // Ensures a referral code exists before approval, so an approved
-    // affiliate always has a link to share.
-    await getOrCreateRewards(address)
+       // Ensures a referral code exists before approval, so an approved
+    // affiliate always has a link to share. Skipped without a wallet —
+    // the code is created when they connect one.
+    if (address) await getOrCreateRewards(address)
 
     const application = await AffiliateApplication.create({
       walletAddress: address,
@@ -260,7 +265,7 @@ router.post('/admin/applications/:id/review', requireAdminKey, async (req, res) 
     }
 
     notifyApplicant(application, decision, note)
-    
+
     res.json({ success: true, application })
   } catch (err) {
     console.error('Review application error:', err)
