@@ -7,6 +7,8 @@ import {
 } from '../services/rewardService.js'
 import { AFFILIATE_REQUIREMENTS, levelFor } from '../config/rewardConfig.js'
 import { notifyNewApplication, notifyApplicant } from '../services/emailService.js'
+import RewardEvent from '../models/RewardEvent.js'
+
 
 const router = express.Router()
 
@@ -259,7 +261,9 @@ router.post('/admin/applications/:id/review', requireAdminKey, async (req, res) 
     application.reviewNote = note || ''
     await application.save()
 
-       if (decision === 'approved') {
+      // A walletless application can be approved as a decision, but there's
+    // nothing to attach the affiliate flag to until they connect one.
+    if (decision === 'approved' && application.walletAddress) {
       await approveAffiliate(application.walletAddress)
     }
 
@@ -306,4 +310,200 @@ router.post('/admin/adjust', requireAdminKey, async (req, res) => {
   }
 })
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ADMIN — user and points tracking
+//
+// Append these two routes to src/routes/rewards.js, directly above the
+// final `export default router` line.
+//
+// They need RewardEvent, which the file doesn't import at the top — add
+// this alongside the other imports:
+//
+//   import RewardEvent from '../models/RewardEvent.js'
+//
+// (The existing /admin/adjust route imports it dynamically; once it's at
+// the top you can simplify that too, though leaving it does no harm.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+
+// ─── GET /api/rewards/admin/users ─────────────────────────────────────
+// Every wallet with points, for deciding who gets what at distribution.
+//
+// Filterable by affiliate status and sortable, because the two questions
+// you'll actually ask are "who earned most" and "how are my affiliates
+// doing" — and those want different orderings.
+router.get('/admin/users', requireAdminKey, async (req, res) => {
+  try {
+    const {
+      filter = 'all',        // all | affiliates | referrers
+      sort = 'points',       // points | referrals | transactions | recent
+      page = 1,
+      limit = 50,
+    } = req.query
+
+    const query = {}
+    if (filter === 'affiliates') query.isAffiliate = true
+    if (filter === 'referrers') query.qualifiedReferralCount = { $gt: 0 }
+
+    const sortMap = {
+      points: { totalPoints: -1 },
+      referrals: { qualifiedReferralCount: -1 },
+      transactions: { totalTransactions: -1 },
+      recent: { createdAt: -1 },
+    }
+
+    const perPage = Math.min(parseInt(limit), 200)
+    const skip = (Math.max(1, parseInt(page)) - 1) * perPage
+
+    const [users, total, totals] = await Promise.all([
+      UserRewards.find(query)
+        .sort(sortMap[sort] || sortMap.points)
+        .skip(skip)
+        .limit(perPage)
+        .lean(),
+      UserRewards.countDocuments(query),
+      // Distribution totals. Needed before any airdrop, and cheap enough to
+      // return on every page rather than behind a separate endpoint.
+      UserRewards.aggregate([
+        { $group: {
+          _id: null,
+          totalPoints: { $sum: '$totalPoints' },
+          totalWallets: { $sum: 1 },
+          totalAffiliates: { $sum: { $cond: ['$isAffiliate', 1, 0] } },
+          totalReferrals: { $sum: '$qualifiedReferralCount' },
+          totalTransactions: { $sum: '$totalTransactions' },
+        }},
+      ]),
+    ])
+
+    res.json({
+      success: true,
+      users: users.map(u => ({
+        walletAddress: u.walletAddress,
+        totalPoints: u.totalPoints,
+        points: u.points,
+        txCounts: u.txCounts,
+        totalTransactions: u.totalTransactions,
+        referralCode: u.referralCode,
+        referralCount: u.referralCount,
+        qualifiedReferralCount: u.qualifiedReferralCount,
+        isAffiliate: u.isAffiliate,
+        affiliateBonusPaid: u.affiliateBonusPaid,
+        activeDays: u.activeDays?.length || 0,
+        joinedAt: u.createdAt,
+      })),
+      pagination: {
+        page: parseInt(page),
+        limit: perPage,
+        total,
+        pages: Math.ceil(total / perPage),
+      },
+      summary: totals[0] || {
+        totalPoints: 0, totalWallets: 0, totalAffiliates: 0,
+        totalReferrals: 0, totalTransactions: 0,
+      },
+    })
+  } catch (err) {
+    console.error('Admin users error:', err)
+    res.status(500).json({ error: 'Failed to load users' })
+  }
+})
+
+// ─── GET /api/rewards/admin/users/:walletAddress ──────────────────────
+// One wallet in full: their points, who they referred, and every award.
+//
+// The referral list carries each person's transaction count, because the
+// question that brings you here is usually "why hasn't this affiliate been
+// paid" — and the answer is nearly always that their referrals haven't
+// qualified yet.
+router.get('/admin/users/:walletAddress', requireAdminKey, async (req, res) => {
+  try {
+    const { walletAddress } = req.params
+    if (!isAddress(walletAddress)) {
+      return res.status(400).json({ error: 'Invalid wallet address' })
+    }
+    const address = walletAddress.toLowerCase()
+
+    const user = await UserRewards.findOne({ walletAddress: address }).lean()
+    if (!user) return res.status(404).json({ error: 'Wallet not found' })
+
+    const [referred, events, application, referrer] = await Promise.all([
+      UserRewards.find({ referredBy: address })
+        .select('walletAddress totalTransactions activeDays referralPaid totalPoints createdAt')
+        .sort({ createdAt: -1 })
+        .lean(),
+      RewardEvent.find({ walletAddress: address })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
+      AffiliateApplication.findOne({ walletAddress: address })
+        .sort({ createdAt: -1 })
+        .lean(),
+      user.referredBy
+        ? UserRewards.findOne({ walletAddress: user.referredBy })
+            .select('walletAddress isAffiliate')
+            .lean()
+        : null,
+    ])
+
+    res.json({
+      success: true,
+      user: {
+        ...user,
+        activeDays: user.activeDays?.length || 0,
+        activeDaysList: user.activeDays || [],
+      },
+      referredBy: referrer,
+      referrals: referred.map(r => ({
+        walletAddress: r.walletAddress,
+        transactions: r.totalTransactions,
+        activeDays: r.activeDays?.length || 0,
+        qualified: r.referralPaid,
+        points: r.totalPoints,
+        joinedAt: r.createdAt,
+      })),
+      events,
+      application,
+    })
+  } catch (err) {
+    console.error('Admin user detail error:', err)
+    res.status(500).json({ error: 'Failed to load user' })
+  }
+})
+
+// ─── GET /api/rewards/admin/export ────────────────────────────────────
+// Flat CSV of every wallet and its points — what you'll actually hand to
+// whoever runs the distribution.
+router.get('/admin/export', requireAdminKey, async (req, res) => {
+  try {
+    const users = await UserRewards.find({ totalPoints: { $gt: 0 } })
+      .sort({ totalPoints: -1 })
+      .lean()
+
+    const header = 'wallet,points,tx_points,referral_points,signup_points,affiliate_points,transactions,qualified_referrals,is_affiliate,joined'
+    const rows = users.map(u => [
+      u.walletAddress,
+      u.totalPoints,
+      u.points?.transactions || 0,
+      u.points?.referrals || 0,
+      u.points?.signup || 0,
+      u.points?.affiliateBonus || 0,
+      u.totalTransactions,
+      u.qualifiedReferralCount,
+      u.isAffiliate ? 'yes' : 'no',
+      new Date(u.createdAt).toISOString().slice(0, 10),
+    ].join(','))
+
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', 'attachment; filename="paragon-points.csv"')
+    res.send([header, ...rows].join('\n'))
+  } catch (err) {
+    console.error('Export error:', err)
+    res.status(500).json({ error: 'Failed to export' })
+  }
+})
+
 export default router
+
+

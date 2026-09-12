@@ -1,12 +1,16 @@
-import { Resend } from 'resend'
+// Loaded dynamically so a missing package disables email rather than
+// crashing the server. Notifications are a convenience; the affiliate
+// programme works entirely through the admin panel without them.
+let resend = null
 
-// Optional by design. A missing key disables email rather than crashing the
-// server — an application that saved but didn't notify is a minor problem;
-// one that 500s because email was misconfigured is a lost applicant.
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null
-
+if (process.env.RESEND_API_KEY) {
+  try {
+    const { Resend } = await import('resend')
+    resend = new Resend(process.env.RESEND_API_KEY)
+  } catch {
+    console.warn('[email] resend package not installed — email disabled')
+  }
+}
 // Resend's shared sender — works immediately, no DNS. Swap back once
 // paragonfinance.xyz is verified under Domains in the Resend dashboard.
 const FROM = 'Paragon Finance <onboarding@resend.dev>'
