@@ -72,6 +72,13 @@ app.use('/api', rateLimit({
 
 // ─── Routes ───────────────────────────────────────────────────────────
 app.use('/api/testnet', testnetRoutes)
+// Brute-force guard on the shared-secret gate. Without it, ADMIN_SECRET can
+// be guessed at the same rate the server can answer.
+app.use('/api/admin', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many attempts' },
+}))
 app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
 

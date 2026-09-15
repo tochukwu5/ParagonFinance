@@ -21,6 +21,7 @@ import StatsPage from './pages/StatsPage'
 import { useReferralCapture } from './hooks/useReferralCapture'
 import AffiliatePage from './pages/AffiliatePage'
 import AffiliateDashboard from './pages/AffiliateDashboard'
+import { LegalIndex, PrivacyPolicy, TermsConditions, Imprint, RiskDisclosure } from './pages/LegalPages'
 
 
 
@@ -97,6 +98,14 @@ export default function App() {
             <Route path="/rates" element={<Navigate to="/how-it-works" replace />} />
             <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
             <Route path="/docs" element={<AppLayout><DocsPage /></AppLayout>} />
+            
+            {/* Legal. Grouped under /legal so the footer's "All Legal
+                Documents" link has a real index page to point at. */}
+            <Route path="/legal" element={<AppLayout><LegalIndex /></AppLayout>} />
+            <Route path="/legal/privacy" element={<AppLayout><PrivacyPolicy /></AppLayout>} />
+            <Route path="/legal/terms" element={<AppLayout><TermsConditions /></AppLayout>} />
+            <Route path="/legal/imprint" element={<AppLayout><Imprint /></AppLayout>} />
+            <Route path="/legal/risk" element={<AppLayout><RiskDisclosure /></AppLayout>} />
              <Route path="/affiliate" element={<AppLayout><AffiliatePage /></AppLayout>} />
 
             {/* ── Testnet ────────────────────────────────────────────

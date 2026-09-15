@@ -57,10 +57,44 @@ export default function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-[#1e2530] pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-[#556]">© 2026 Paragon Finance.</p>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-[#556]">$0.003 avg fee · &lt;1s settlement · 100% USDC backed</span>
+        <div className="border-t border-[#1e2530] pt-6 space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-[#556]">
+              Paragon Finance © 2026. All rights reserved.
+            </p>
+
+            {/* Legal links. Grouped here rather than in the column above
+                because they're obligations, not navigation — people look for
+                them in exactly this spot. */}
+            <div className="flex items-center gap-4 flex-wrap justify-center">
+              {[
+                { to: '/legal/privacy', label: 'Privacy' },
+                { to: '/legal/terms', label: 'Terms & Conditions' },
+                { to: '/legal/imprint', label: 'Imprint' },
+                { to: '/legal', label: 'All Legal Documents' },
+              ].map(l => (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className="text-xs text-[#556] hover:text-[#8892a0] transition-colors"
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Registration details. A registered entity is a trust signal most
+              projects at this stage can't show — worth stating plainly rather
+              than burying on an About page. */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-2 text-center md:text-left">
+            <p className="text-[10px] text-[#3a4450] leading-relaxed">
+              Paragon Tech Ventures · RC 9834873 · Registered in Nigeria under
+              the Companies and Allied Matters Act 2020
+            </p>
+            <span className="text-[10px] text-[#3a4450]">
+              Testnet · Not financial advice
+            </span>
           </div>
         </div>
       </div>

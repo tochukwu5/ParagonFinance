@@ -2,6 +2,7 @@ import express from 'express'
 import Transaction from '../models/Transaction.js'
 import WalletStats from '../models/WalletStats.js'
 import { awardTransaction } from '../services/rewardService.js'
+import { verifyTransaction, isSuspicious } from '../services/verifyTransaction.js'
 
 const router = express.Router()
 
@@ -177,7 +178,27 @@ router.post('/transactions', async (req, res) => {
 
     // Points last, and never fatal. A rewards failure must not fail a
     // transaction that already settled on-chain.
+       // Verify before paying. Recording an unverified transaction is fine —
+    // it's the user's own history. Paying for one is not.
     let rewards = null
+    const check = await verifyTransaction({
+      txHash: hash,
+      walletAddress: walletAddress.toLowerCase(),
+      amount: parseFloat(amount),
+    })
+
+    if (!check.valid) {
+      if (isSuspicious(check.reason)) {
+        console.warn('[reward] rejected claim:', check.reason, walletAddress, hash, check.onChain)
+      }
+      return res.status(201).json({
+        success: true,
+        transaction: tx,
+        rewards: null,
+        rewardSkipped: check.reason,
+      })
+    }
+
     try {
       rewards = await awardTransaction({
         walletAddress: walletAddress.toLowerCase(),
