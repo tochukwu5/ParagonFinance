@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { Badge, Card } from '../components/UI'
-import Footer from '../components/Footer'
+// import Footer from '../components/Footer'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LEGAL PAGES
@@ -65,7 +65,7 @@ function LegalShell({ title, subtitle, children }) {
           <div className="space-y-8">{children}</div>
         </div>
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }
@@ -148,7 +148,7 @@ export function LegalIndex() {
           </div>
         </div>
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }
