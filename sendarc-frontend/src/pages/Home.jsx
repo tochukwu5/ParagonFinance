@@ -256,12 +256,12 @@ export default function Home() {
               >
                 Launch App →
               </Link>
-
+{/* 
           <div>
             <Link to="/app" className="inline-block mt-4 text-sm text-[#00D4FF] hover:underline">
              Launch App →
             </Link>
-          </div>
+          </div> */}
         </Reveal>
       </section>
 
