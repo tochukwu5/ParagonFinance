@@ -79,7 +79,7 @@ export default function SendMoney() {
               <div style="font-size:12px;color:#6b7280;margin-top:4px;">Transaction Receipt</div>
             </div>
             <div class="meta">
-              <div>Arc Network · Chain 5042002</div>
+              <div>Arc Network · Chain  5042</div>
               <div>${date}</div>
               <div>paragonfinance.xyz</div>
             </div>

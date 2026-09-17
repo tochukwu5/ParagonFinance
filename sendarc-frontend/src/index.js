@@ -87,7 +87,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'SendArc API',
-    network: 'Arc Testnet · Chain 5042002',
+    network: 'Arc Testnet · Chain  5042',
     timestamp: new Date().toISOString(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   })

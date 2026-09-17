@@ -39,7 +39,7 @@ export default function TestnetHub() {
                 <span className="w-1.5 h-1.5 rounded-full bg-[#00D4FF] animate-pulse" />
                 ARC LIVE
               </span>
-              <span className="text-xs text-[#556] border border-[#1e2530] px-2 py-1 rounded-full">Chain ID: 5042002</span>
+              <span className="text-xs text-[#556] border border-[#1e2530] px-2 py-1 rounded-full">Chain ID:  5042</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
