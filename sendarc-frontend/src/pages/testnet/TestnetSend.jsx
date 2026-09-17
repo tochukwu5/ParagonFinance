@@ -75,8 +75,12 @@ const CCTP_STEPS = [
   { key: 'mint',     label: 'Mint' },
 ]
 
-const ALL_NETWORKS = Object.keys(EVM_CHAINS)
+// Built per network rather than once. Mixing testnet and mainnet chains in
+// one picker means someone can select Arc mainnet as source and Ethereum
+// Sepolia as destination — a bridge that burns real USDC into a testnet.
+const networksFor = (isMainnet) => Object.keys(EVM_CHAINS)
   .filter(key => EVM_CHAINS[key].live !== false)
+  .filter(key => !!EVM_CHAINS[key].isMainnet === isMainnet)
   .map(key => ({
   key,
   name: EVM_CHAINS[key].name,
@@ -103,8 +107,30 @@ export default function TestnetSend() {
   const [activeTab, setActiveTab] = useState('bridge') // 'bridge' | 'send' | 'swap'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
 
-  const [sourceChainKey, setSourceChainKey] = useState('ethereum')
-  const [bridgeToKey, setBridgeToKey] = useState('arc')
+    // 'testnet' | 'mainnet'. Persisted so a refresh doesn't silently drop
+  // someone back to testnet mid-transaction.
+  const [network, setNetwork] = useState(
+    () => localStorage.getItem('paragonfinance_network') || 'testnet'
+  )
+  const isMainnet = network === 'mainnet'
+
+  const ALL_NETWORKS = networksFor(isMainnet)
+
+  const [sourceChainKey, setSourceChainKey] = useState(isMainnet ? 'arc-mainnet' : 'ethereum')
+  const [bridgeToKey, setBridgeToKey] = useState(isMainnet ? 'base' : 'arc')
+
+  // Switching networks resets both sides. Carrying a testnet chain into
+  // mainnet is how someone bridges from Arc mainnet to Ethereum Sepolia.
+   const switchNetwork = (next) => {
+    if (next === network) return
+    setActiveNetwork(next)
+    localStorage.setItem('paragonfinance_network', next)
+    setNetwork(next)
+    setSourceChainKey(next === 'mainnet' ? 'arc-mainnet' : 'ethereum')
+    setBridgeToKey(next === 'mainnet' ? 'base' : 'arc')
+    setAmount('')
+    setRecipient('')
+  }
   const [chainBalance, setChainBalance] = useState('0.000000')
   const [destBalance, setDestBalance] = useState('0.000000')
   const [arcUsdcBalance, setArcUsdcBalance] = useState('0.000000')
@@ -569,7 +595,29 @@ export default function TestnetSend() {
           <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
             <div>
               <h1 className="text-lg sm:text-xl font-bold font-['Space_Grotesk'] text-white">Bridge, Send &amp; Swap USDC</h1>
-              <p className="text-xs text-[#8892a0] mt-0.5">Move USDC across wallets and chains.</p>
+                          <p className="text-xs text-[#8892a0] mt-0.5">Move USDC across wallets and chains.</p>
+            </div>
+
+            {/* Network switch. Mainnet is amber rather than the usual cyan —
+                the colour is the warning that this moves real money. */}
+            <div className="flex items-center gap-1 bg-[#0f1822] border border-[#1e2530] rounded-lg p-1">
+              {[
+                { id: 'testnet', label: 'Testnet' },
+                { id: 'mainnet', label: 'Mainnet' },
+              ].map(n => (
+                <button
+                  key={n.id}
+                  onClick={() => switchNetwork(n.id)}
+                  className={
+                    "px-3 py-1 rounded-md text-[11px] font-semibold font-['Space_Grotesk'] transition-all " +
+                    (network === n.id
+                       ? 'bg-[#00D4FF] text-[#0D1117]'
+                      : 'text-[#8892a0] hover:text-white')
+                  }
+                >
+                  {n.label}
+                </button>
+              ))}
             </div>
             {account && (
               <div className="flex items-center gap-2 bg-[#0f1822] border border-[#1e2530] rounded-lg px-3 py-1.5">

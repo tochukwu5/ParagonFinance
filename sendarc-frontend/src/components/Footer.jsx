@@ -44,7 +44,7 @@ export default function Footer() {
               {[
                 { to: '/about', label: 'About' },
                 { to: '/docs', label: 'Documentation' },
-                { href: 'https://twitter.com/ParagonFinance1', label: 'Twitter / X' },
+                { href: 'https://twitter.com/ParagonFinance_', label: 'Twitter / X' },
                 { href: 'https://www.arc.network', label: 'Arc Network' },
                 { href: 'https://www.circle.com', label: 'Circle (USDC)' },
               ].map(l => (

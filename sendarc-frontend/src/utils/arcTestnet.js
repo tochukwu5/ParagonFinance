@@ -1,3 +1,45 @@
+
+// Which network the app is currently on. Set from the UI toggle, read by
+// every contract lookup below.
+//
+// A module variable rather than a React context because arcTestnet.js is
+// plain JS called from outside React — threading a hook through every send
+// and bridge function would mean touching all of them.
+let ACTIVE_NETWORK = (typeof localStorage !== 'undefined'
+  && localStorage.getItem('paragonfinance_network')) || 'testnet'
+
+export function setActiveNetwork(network) {
+  ACTIVE_NETWORK = network === 'mainnet' ? 'mainnet' : 'testnet'
+}
+
+export function getActiveNetwork() {
+  return ACTIVE_NETWORK
+}
+
+const CONTRACTS = {
+  testnet: {
+    paymentRouter:  import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
+    bridgeRouter:   import.meta.env.VITE_BRIDGE_ROUTER_ADDRESS || null,
+    treasury:       import.meta.env.VITE_TREASURY_ADDRESS || null,
+    feeManager:     import.meta.env.VITE_FEE_MANAGER_ADDRESS || null,
+    bridgeRegistry: import.meta.env.VITE_BRIDGE_REGISTRY_ADDRESS || null,
+    swapRouter:     import.meta.env.VITE_SWAP_ROUTER_ADDRESS || null,
+  },
+  mainnet: {
+    paymentRouter:  '0x5fD7613492cA216B24b97324DBfa1dC8b71c63fb',
+    bridgeRouter:   '0x80229ac1317eAE4d1933E95EFD473446a42eE41b',
+    treasury:       '0xfAaD24cC8764b7C923B892222Fa05DFEFDf8CFd8',
+    feeManager:     '0xd01Bbb99Ef57a82238591f3898D721fc2f7CDf50',
+    bridgeRegistry: '0x5c1B1aAE195E247FcaF032540093d50855F62372',
+    swapRouter:     '0xc028F60dA1b3120edea1d8BF3dC64CB8C37D6817',
+  },
+}
+
+/** Address for the active network. Never falls back across networks — a
+ *  mainnet send routed through a testnet router silently fails. */
+export function paragonContract(name) {
+  return CONTRACTS[ACTIVE_NETWORK]?.[name] || null
+}
 // Paragon Finance — Arc Network + Circle App Kit CCTP Integration
 // Cross-chain transfers powered by Circle's official App Kit SDK
 // ─────────────────────────────────────────────────────────────────────────
@@ -6,7 +48,8 @@
 // from which Solidity source that address was verified against on-chain.
 // ─────────────────────────────────────────────────────────────────────────
 export const PARAGON_FINANCE_PAYMENT_ROUTER = {
-  address: import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS || null,
+    // Getter, not a value — the address changes when the network toggles.
+  get address() { return paragonContract('paymentRouter') },
   // sendPayment(address)
   sendPaymentSelector: '8a7644a8',
 }
@@ -18,7 +61,8 @@ export const PARAGON_FINANCE_BRIDGE_ROUTER = {
 }
 
 export const PARAGON_FINANCE_FEE_MANAGER_ADDRESS = import.meta.env.VITE_FEE_MANAGER_ADDRESS || null
-export const PARAGON_FINANCE_TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS || null
+export function getTreasuryAddress() { return paragonContract('treasury') }
+export const PARAGON_FINANCE_TREASURY_ADDRESS = paragonContract('treasury')
 export const PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS || null
 
 // Aliases kept in case another file imports the older names.
@@ -28,6 +72,29 @@ export const TREASURY_ADDRESS = PARAGON_FINANCE_TREASURY_ADDRESS
 export const BRIDGE_REGISTRY_ADDRESS = PARAGON_FINANCE_BRIDGE_REGISTRY_ADDRESS
 
 const CALCULATE_BRIDGE_FEE_SELECTOR = 'ade1af12'
+
+
+// Per-network contract addresses. Kept in code rather than env vars because
+// twelve variables across two networks is twelve chances to point mainnet at
+// a testnet contract.
+export const PARAGON_CONTRACTS = {
+  arc: {
+    treasury:       import.meta.env.VITE_TREASURY_ADDRESS,
+    feeManager:     import.meta.env.VITE_FEE_MANAGER_ADDRESS,
+    bridgeRegistry: import.meta.env.VITE_BRIDGE_REGISTRY_ADDRESS,
+    paymentRouter:  import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS,
+    bridgeRouter:   import.meta.env.VITE_BRIDGE_ROUTER_ADDRESS,
+    swapRouter:     import.meta.env.VITE_SWAP_ROUTER_ADDRESS,
+  },
+  'arc-mainnet': {
+    treasury:       '0xfAaD24cC8764b7C923B892222Fa05DFEFDf8CFd8',
+    feeManager:     '0xd01Bbb99Ef57a82238591f3898D721fc2f7CDf50',
+    bridgeRegistry: '0x5c1B1aAE195E247FcaF032540093d50855F62372',
+    paymentRouter:  '0x5fD7613492cA216B24b97324DBfa1dC8b71c63fb',
+    bridgeRouter:   '0x80229ac1317eAE4d1933E95EFD473446a42eE41b',
+    swapRouter:     '0xc028F60dA1b3120edea1d8BF3dC64CB8C37D6817',
+  },
+}
 
 // Deprecated — kept only so old explorer links still resolve.
 export const SENDARC_ROUTER = {
@@ -76,6 +143,260 @@ export const EVM_CHAINS = {
     useCCTP: false,
     note: 'Native Arc — direct on-chain transfer',
   },
+    'arc-mainnet': {
+    id: 5042,
+    chainIdHex: '0x13b2',
+    name: 'Arc',
+    appKitChain: 'Arc',
+    symbol: 'USDC',
+    rpcUrl: 'https://rpc.mainnet.arc.io',
+    rpcUrls: [
+      'https://rpc.mainnet.arc.io',
+      'https://rpc.blockdaemon.mainnet.arc.io',
+      'https://rpc.drpc.mainnet.arc.io',
+      'https://rpc.quicknode.mainnet.arc.io',
+    ],
+    explorerUrl: 'https://explorer.arc.io',
+    usdcAddress: '0x3600000000000000000000000000000000000000',
+    eurcAddress: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1',
+    nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 18 },
+    cctpDomain: 26,
+    icon: '/arc.svg',
+    isMainnet: true,
+    live: true,
+  },
+  // ═══════════════════════════════════════════════════════════════════════════
+// MAINNET CHAINS
+//
+// Paste these into EVM_CHAINS in src/utils/arcTestnet.js, directly after the
+// 'arc-mainnet' entry you already added.
+//
+// Keys are suffixed '-mainnet' so both networks coexist in one object and
+// the picker can filter on isMainnet. Icons reuse the testnet paths, since
+// a chain's logo doesn't change between networks.
+//
+// Every USDC address below is Circle's canonical mainnet deployment, and
+// every cctpDomain is Circle's published domain ID. These are the values
+// that decide where real money lands — worth checking against
+// developers.circle.com/stablecoins/usdc-contract-addresses before launch
+// rather than trusting a paste.
+// ═══════════════════════════════════════════════════════════════════════════
+
+  'ethereum-mainnet': {
+    id: 1,
+    chainIdHex: '0x1',
+    name: 'Ethereum',
+    appKitChain: 'Ethereum',
+    symbol: 'ETH',
+    rpcUrl: 'https://ethereum-rpc.publicnode.com',
+    rpcUrls: [
+      'https://ethereum-rpc.publicnode.com',
+      'https://eth.drpc.org',
+      'https://rpc.ankr.com/eth',
+    ],
+    explorerUrl: 'https://etherscan.io',
+    usdcAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/ethlogo.svg',
+    color: '#627EEA',
+    cctpDomain: 0,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'base-mainnet': {
+    id: 8453,
+    chainIdHex: '0x2105',
+    name: 'Base',
+    appKitChain: 'Base',
+    symbol: 'ETH',
+    rpcUrl: 'https://base-rpc.publicnode.com',
+    rpcUrls: [
+      'https://base-rpc.publicnode.com',
+      'https://mainnet.base.org',
+      'https://base.drpc.org',
+    ],
+    explorerUrl: 'https://basescan.org',
+    usdcAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/base.svg',
+    color: '#0052FF',
+    cctpDomain: 6,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'arbitrum-mainnet': {
+    id: 42161,
+    chainIdHex: '0xA4B1',
+    name: 'Arbitrum',
+    appKitChain: 'Arbitrum',
+    symbol: 'ETH',
+    rpcUrl: 'https://arbitrum-one-rpc.publicnode.com',
+    rpcUrls: [
+      'https://arbitrum-one-rpc.publicnode.com',
+      'https://arb1.arbitrum.io/rpc',
+      'https://arbitrum.drpc.org',
+    ],
+    explorerUrl: 'https://arbiscan.io',
+    usdcAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/arbitrum.svg',
+    color: '#28A0F0',
+    cctpDomain: 3,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'optimism-mainnet': {
+    id: 10,
+    chainIdHex: '0xA',
+    name: 'Optimism',
+    appKitChain: 'Optimism',
+    symbol: 'ETH',
+    rpcUrl: 'https://optimism-rpc.publicnode.com',
+    rpcUrls: [
+      'https://optimism-rpc.publicnode.com',
+      'https://mainnet.optimism.io',
+      'https://optimism.drpc.org',
+    ],
+    explorerUrl: 'https://optimistic.etherscan.io',
+    usdcAddress: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/optimism.svg',
+    color: '#FF0420',
+    cctpDomain: 2,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'polygon-mainnet': {
+    id: 137,
+    chainIdHex: '0x89',
+    name: 'Polygon',
+    appKitChain: 'Polygon',
+    symbol: 'POL',
+    rpcUrl: 'https://polygon-bor-rpc.publicnode.com',
+    rpcUrls: [
+      'https://polygon-bor-rpc.publicnode.com',
+      'https://polygon-rpc.com',
+      'https://polygon.drpc.org',
+    ],
+    explorerUrl: 'https://polygonscan.com',
+    usdcAddress: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+    nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+    icon: '/polygon.svg',
+    color: '#8247E5',
+    cctpDomain: 7,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'avalanche-mainnet': {
+    id: 43114,
+    chainIdHex: '0xA86A',
+    name: 'Avalanche',
+    appKitChain: 'Avalanche',
+    symbol: 'AVAX',
+    rpcUrl: 'https://avalanche-c-chain-rpc.publicnode.com',
+    rpcUrls: [
+      'https://avalanche-c-chain-rpc.publicnode.com',
+      'https://api.avax.network/ext/bc/C/rpc',
+      'https://avalanche.drpc.org',
+    ],
+    explorerUrl: 'https://snowtrace.io',
+    usdcAddress: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+    nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+    icon: '/avalanche.svg',
+    color: '#E84142',
+    cctpDomain: 1,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'linea-mainnet': {
+    id: 59144,
+    chainIdHex: '0xE708',
+    name: 'Linea',
+    appKitChain: 'Linea',
+    symbol: 'ETH',
+    rpcUrl: 'https://linea-rpc.publicnode.com',
+    rpcUrls: [
+      'https://linea-rpc.publicnode.com',
+      'https://rpc.linea.build',
+      'https://linea.drpc.org',
+    ],
+    explorerUrl: 'https://lineascan.build',
+    usdcAddress: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/linea.svg',
+    color: '#61DFFF',
+    cctpDomain: 11,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'sonic-mainnet': {
+    id: 146,
+    chainIdHex: '0x92',
+    name: 'Sonic',
+    appKitChain: 'Sonic',
+    symbol: 'S',
+    rpcUrl: 'https://sonic-rpc.publicnode.com',
+    rpcUrls: [
+      'https://sonic-rpc.publicnode.com',
+      'https://rpc.soniclabs.com',
+    ],
+    explorerUrl: 'https://sonicscan.org',
+    usdcAddress: '0x29219dd400f2Bf60E5a23d13Be72B486D4038894',
+    nativeCurrency: { name: 'Sonic', symbol: 'S', decimals: 18 },
+    icon: '/sonic.svg',
+    color: '#FE9A4C',
+    cctpDomain: 13,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  'unichain-mainnet': {
+    id: 130,
+    chainIdHex: '0x82',
+    name: 'Unichain',
+    appKitChain: 'Unichain',
+    symbol: 'ETH',
+    rpcUrl: 'https://unichain-rpc.publicnode.com',
+    rpcUrls: [
+      'https://unichain-rpc.publicnode.com',
+      'https://mainnet.unichain.org',
+    ],
+    explorerUrl: 'https://uniscan.xyz',
+    usdcAddress: '0x078D782b760474a361dDA0AF3839290b0EF57AD6',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    icon: '/unichain.svg',
+    color: '#FF007A',
+    cctpDomain: 10,
+    isMainnet: true,
+    live: true,
+    useCCTP: true,
+    note: 'CCTP Bridge via Circle App Kit',
+  },
+
+  
   ethereum: {
     id: 11155111,
     chainIdHex: '0xAA36A7',
