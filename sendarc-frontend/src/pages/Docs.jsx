@@ -294,8 +294,8 @@ paragonfinance.transfer({
               { num: '01', icon: '💸', title: 'Diaspora Remittances', desc: 'Send instant stablecoin-powered payments with lower fees, faster settlement, transparent exchange rates, and borderless accessibility. Paragon Finance removes the friction that costs diaspora communities billions in unnecessary fees each year.' },
               { num: '02', icon: '🏢', title: 'Cross-Border Business Payments', desc: 'Businesses can pay suppliers instantly, settle invoices globally, reduce banking friction, and access stable digital payment rails — enabling the commercial velocity that growing economies demand.' },
               { num: '03', icon: '👨‍💻', title: 'Freelance & Creator Payments', desc: 'Instant creator payouts, remote worker payments, and global freelance settlements. Stablecoin-powered payments preserve income value against local currency volatility, giving global talent fair and timely compensation.' },
-              {
-                num: '04', icon: '🛒', title: 'Merchant Payments', desc: 'Merchants can accept stablecoin payments, settle instantly, reduce processing costs, and access global customers — all through Paragon Finance's programmable payment infrastructure.' },
+              
+               { num: '04', icon: '🛒', title: 'Merchant Payments', desc: 'Merchants can accept stablecoin payments, settle instantly, reduce processing costs, and access global customers — all through Paragon Finance programmable payment infrastructure.' },
               { num: '05', icon: '💱', title: 'Stablecoin FX Infrastructure', desc: 'Onchain FX conversion, multi-currency liquidity routing, real-time exchange infrastructure, and transparent pricing systems — the stablecoin FX layer that modern global commerce needs.' },
             ].map(u => (
                   <Card key={u.num} className="p-6 hover:border-[#00D4FF]/30 transition-all">
@@ -497,7 +497,7 @@ paragonfinance.transfer({
         </div>
 
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }

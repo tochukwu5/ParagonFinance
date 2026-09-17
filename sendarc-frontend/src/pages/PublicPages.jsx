@@ -247,7 +247,7 @@ export function HowItWorks() {
         </div>
 
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }
@@ -532,7 +532,7 @@ export function AboutPage() {
         </div>
 
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }
@@ -1013,7 +1013,7 @@ export function DocsPage() {
         </div>
 
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   )
 }
