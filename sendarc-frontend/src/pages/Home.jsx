@@ -60,7 +60,7 @@ export default function Home() {
               </Link>
                 <Link
                   to="/how-it-works"
-                  className="border border-[#1e2530] text-white font-['Space_Grotesk'] font-semibold text-base px-8 py-3 rounded-xl hover:border-[#00D4FF] transition-all"
+                  className="border border-[#1e2530]  text-white font-['Space_Grotesk'] font-semibold text-base px-8 py-3 rounded-xl hover:border-[#00D4FF] transition-all"
                 >
                   See How It Works
                 </Link>
