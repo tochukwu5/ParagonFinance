@@ -766,7 +766,10 @@ export async function getUsdcBalance(chainKey, address) {
   }
 
   try {
-    if (chainKey === 'arc') {
+       // Both keys resolve to Arc mainnet. Checking only 'arc' meant a send
+    // passed 'arc-mainnet' fell through to the CCTP bridge path and failed
+    // with "Route from Arc to Arc is not supported".
+    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
       const raw = await readChain(chain, 'eth_getBalance', [address, 'latest'])
       if (!raw) return null
       return (Number(BigInt(raw)) / 1e18).toFixed(6)
@@ -1594,7 +1597,7 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   const from = accounts[0]
   if (!from) throw new Error('No account connected')
 
-  if (chainKey === 'arc') {
+    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
     onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
     return sendUsdcViaPaymentRouter({ from, to, amount })
   }
