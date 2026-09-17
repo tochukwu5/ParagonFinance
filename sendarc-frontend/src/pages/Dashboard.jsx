@@ -66,7 +66,8 @@ function Sidebar({ active }) {
         ))}
 
         {/* Testnet shortcut — always accessible during testnet phase */}
-        <Link /app
+        <Link 
+        to="/app"
           className={'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-[\'Space_Grotesk\'] font-medium transition-all ' + (
             active === 'testnet'
               ? 'bg-[#0a2030] text-[#00D4FF] border border-[#00D4FF]/30'
@@ -380,7 +381,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              /app
+              to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-all flex-shrink-0 ml-4"
             >
               Go to Testnet →

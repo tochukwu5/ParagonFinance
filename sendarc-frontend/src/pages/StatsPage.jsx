@@ -97,7 +97,7 @@ export default function StatsPage() {
                 ParagonFinancePaymentRouter on ArcScan ↗
               </a>
               <Link
-                /app
+                to="/app"
                 className="text-xs text-[#8892a0] border border-[#1e2530] px-3 py-1.5 rounded-full hover:border-[#00D4FF] hover:text-white transition-all"
               >
                 Try the Testnet →
@@ -329,7 +329,7 @@ export default function StatsPage() {
             </div>
             <div className="flex gap-3">
               <Link
-                /app
+               to="/app"
                 className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all"
               >
                 Try Testnet →
