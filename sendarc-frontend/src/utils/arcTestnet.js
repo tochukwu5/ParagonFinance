@@ -103,18 +103,28 @@ export const SENDARC_ROUTER = {
   recordSelector: '73ac83ef',
 }
 
+// Arc mainnet. The name is kept as ARC_TESTNET because it's imported in
+// roughly forty places — renaming it is a separate, mechanical change and
+// not worth risking alongside a network switch.
+//
+// This is the object useArcTestnet reads balances from, which is why every
+// balance in the app was still showing testnet after the chain picker moved
+// to mainnet.
 export const ARC_TESTNET = {
-  id: 5042002,
-  name: 'Arc Testnet',
-  rpcUrl: 'https://rpc.testnet.arc.network',
-  explorerUrl: 'https://testnet.arcscan.app',
-  faucetUrl: 'https://faucet.circle.com',
+  id: 5042,
+  name: 'Arc',
+  rpcUrl: 'https://rpc.mainnet.arc.io',
+  explorerUrl: 'https://explorer.arc.io',
+  faucetUrl: null,
   usdcAddress: '0x3600000000000000000000000000000000000000',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   cctpDomain: 26,
-  eurcAddress: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
+  // EURC and USYC are reissued on mainnet — different addresses from testnet.
+  eurcAddress: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1',
   eurcDecimals: 6,
-  cirbtcAddress: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF',
+  usycAddress: '0x8a5D989Bbb96929F689B0200f435f53dA42bF490',
+  // No cirBTC on Arc mainnet in Circle's contract list.
+  cirbtcAddress: null,
 }
 
 // Each chain carries a LIST of RPC endpoints, not one.

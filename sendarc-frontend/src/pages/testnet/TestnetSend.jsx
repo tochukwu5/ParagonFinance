@@ -276,11 +276,11 @@ export default function TestnetSend() {
   useEffect(() => {
     if (!isConnected) return
     if (activeTab === 'send') {
-      switchToChain('arc').catch(() => {})
-      if (account) getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
+      switchToChain('arc-mainnet').catch(() => {})
+      if (account) getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v))
     }
     if (activeTab === 'bridge' && sourceChainKey === bridgeToKey) {
-      setBridgeToKey(sourceChainKey === 'arc' ? 'ethereum' : 'arc')
+          setBridgeToKey(sourceChainKey === 'arc-mainnet' ? 'ethereum-mainnet' : 'arc-mainnet')
     }
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected])
@@ -293,7 +293,7 @@ export default function TestnetSend() {
 
   useEffect(() => {
     if (!account) return
-    getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v))
+    getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v))
   }, [account])
 
   useEffect(() => {
@@ -386,7 +386,7 @@ export default function TestnetSend() {
         )
 
       } else {
-        result = await sendUsdcOnChain('arc', { to: recipient, amount }, handleStatusUpdate)
+        result = await sendUsdcOnChain('arc-mainnet', { to: recipient, amount }, handleStatusUpdate)
       }
 
       await recordTransaction(result, account)
@@ -400,10 +400,10 @@ export default function TestnetSend() {
         applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, addressFor(sourceChainKey)))
         applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)))
         refreshBalance()
-        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
+        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc-mainnet', account))
       } else {
         refreshBalance()
-        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc', account))
+        applyBalance(setArcUsdcBalance, await getUsdcBalance('arc-mainnet', account))
       }
 
       setTxResult(result)
@@ -468,7 +468,7 @@ export default function TestnetSend() {
   const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked && (!needsSolana || !!solanaAddress)
 
   const explorerTxUrl = (hash, result) => {
-    const key = result?.sourceChainKey || 'arc'
+    const key = result?.sourceChainKey || 'arc-mainnet'
     const chain = EVM_CHAINS[key]
     return chain ? chain.explorerUrl + '/tx/' + hash : arcScanTx(hash)
   }
@@ -770,7 +770,7 @@ export default function TestnetSend() {
                     onClick={() => account && Promise.all([
                       getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v)),
                       getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)).then(v => applyBalance(setDestBalance, v)),
-                      getUsdcBalance('arc', account).then(v => applyBalance(setArcUsdcBalance, v)),
+                      getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v)),
                     ])}
                     className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
                     🔄
