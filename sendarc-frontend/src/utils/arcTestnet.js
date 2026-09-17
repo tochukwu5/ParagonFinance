@@ -1,15 +1,16 @@
-
 // Which network the app is currently on. Set from the UI toggle, read by
 // every contract lookup below.
 //
 // A module variable rather than a React context because arcTestnet.js is
 // plain JS called from outside React — threading a hook through every send
 // and bridge function would mean touching all of them.
-let ACTIVE_NETWORK = (typeof localStorage !== 'undefined'
-  && localStorage.getItem('paragonfinance_network')) || 'testnet'
+// Mainnet only since Arc went live on 16 September. Kept as a variable
+// rather than inlined so a second network can return without unpicking
+// every lookup below.
+let ACTIVE_NETWORK = 'mainnet'
 
 export function setActiveNetwork(network) {
-  ACTIVE_NETWORK = network === 'mainnet' ? 'mainnet' : 'testnet'
+  ACTIVE_NETWORK = network === 'testnet' ? 'testnet' : 'mainnet'
 }
 
 export function getActiveNetwork() {

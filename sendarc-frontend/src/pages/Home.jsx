@@ -52,13 +52,12 @@ export default function Home() {
             <Reveal delay={340}>
               <div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
                 {/* Mainnet send button — disabled until Arc mainnet launches */}
-                <button
-                  disabled
-                  title="Arc Network mainnet has not launched yet"
-                  className="bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold text-base px-8 py-3 rounded-xl cursor-not-allowed flex items-center gap-2"
-                >
-                (🔒 Mainnet Coming Soon)
-                </button>
+                             <Link
+                to="/app"
+                className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-base px-8 py-3 rounded-xl hover:opacity-90 transition-all"
+              >
+                Launch App →
+              </Link>
                 <Link
                   to="/how-it-works"
                   className="border border-[#1e2530] text-white font-['Space_Grotesk'] font-semibold text-base px-8 py-3 rounded-xl hover:border-[#00D4FF] transition-all"
@@ -67,12 +66,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <Link
-                to="/testnet/send"
-                className="inline-block mt-4 text-sm text-[#00D4FF] hover:underline"
-              >
-                Try the live testnet now →
-              </Link>
+            
             </Reveal>
           </div>
 
@@ -132,7 +126,7 @@ export default function Home() {
                   </div>
                   <h3 className="font-bold font-['Space_Grotesk'] text-white mb-2">{f.title}</h3>
                   <p className="text-xs text-[#8892a0] leading-relaxed mb-4">{f.desc}</p>
-                  <Link to="/testnet/send" className="text-sm text-[#00D4FF] font-semibold hover:underline font-['Space_Grotesk']">
+                  <Link to="/app" className="text-sm text-[#00D4FF] font-semibold hover:underline font-['Space_Grotesk']">
                     {f.cta} →
                   </Link>
                 </Card>
@@ -256,16 +250,15 @@ export default function Home() {
           </p>
 
           {/* Mainnet CTA — disabled until Arc mainnet launches */}
-          <button
-            disabled
-            title="Arc Network mainnet has not launched yet"
-            className="inline-flex items-center gap-2 bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold text-base px-10 py-4 rounded-xl cursor-not-allowed"
-          >
-            (🔒 Mainnet Coming Soon)
-          </button>
+                      <Link
+                to="/app"
+                className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-base px-8 py-3 rounded-xl hover:opacity-90 transition-all"
+              >
+                Launch App →
+              </Link>
 
           <div>
-            <Link to="/testnet/send" className="inline-block mt-4 text-sm text-[#00D4FF] hover:underline">
+            <Link to="/app" className="inline-block mt-4 text-sm text-[#00D4FF] hover:underline">
               Try the live testnet now →
             </Link>
           </div>

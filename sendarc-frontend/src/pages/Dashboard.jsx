@@ -66,7 +66,7 @@ function Sidebar({ active }) {
         ))}
 
         {/* Testnet shortcut — always accessible during testnet phase */}
-        <Link to="/testnet"
+        <Link /app
           className={'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-[\'Space_Grotesk\'] font-medium transition-all ' + (
             active === 'testnet'
               ? 'bg-[#0a2030] text-[#00D4FF] border border-[#00D4FF]/30'
@@ -156,7 +156,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to="/testnet/send"
+              to="/app"
               className="border border-[#00D4FF] text-[#00D4FF] font-['Space_Grotesk'] font-bold px-4 py-2.5 rounded-xl hover:bg-[#0a2030] transition-all text-sm"
             >
               ⚡ Testnet
@@ -168,7 +168,7 @@ export default function Dashboard() {
               title="Available at mainnet launch"
               className="bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl cursor-not-allowed text-sm flex items-center gap-1.5"
             >
-              (🔒 Mainnet Coming Soon)
+              Launch App
             </button>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              to="/testnet"
+              /app
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-all flex-shrink-0 ml-4"
             >
               Go to Testnet →

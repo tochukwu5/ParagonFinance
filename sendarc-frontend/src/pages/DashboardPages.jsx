@@ -156,7 +156,7 @@ export function Transactions() {
               Send your first testnet USDC transaction to see it here.
             </p>
             <Link
-              to="/testnet/send"
+              to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm"
             >
               Send USDC →
@@ -420,7 +420,7 @@ export function Notifications() {
               Your transaction confirmations will appear here.
             </p>
             <Link
-              to="/testnet/send"
+              to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm"
             >
               Send USDC →

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useArcTestnet } from '../../hooks/useArcTestnet'
 import { useTestnet } from '../../context/TestnetContext'
 import {
-  ARC_TESTNET, EVM_CHAINS, setActiveNetwork , shortAddr, arcScanTx,
+  ARC_TESTNET, EVM_CHAINS, shortAddr, arcScanTx,
   switchToChain, sendUsdcOnChain, getUsdcBalance,
   getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
@@ -108,30 +108,12 @@ export default function TestnetSend() {
   const [activeTab, setActiveTab] = useState('bridge') // 'bridge' | 'send' | 'swap'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
 
-    // 'testnet' | 'mainnet'. Persisted so a refresh doesn't silently drop
-  // someone back to testnet mid-transaction.
-  const [network, setNetwork] = useState(
-    () => localStorage.getItem('paragonfinance_network') || 'testnet'
-  )
-  const isMainnet = network === 'mainnet'
+  // Mainnet only. Arc went live on 16 September and the testnet chains are
+  // no longer offered — the toggle and its network state are gone with them.
+  const ALL_NETWORKS = networksFor(true)
 
-  const ALL_NETWORKS = networksFor(isMainnet)
-
-  const [sourceChainKey, setSourceChainKey] = useState(isMainnet ? 'arc-mainnet' : 'ethereum')
-  const [bridgeToKey, setBridgeToKey] = useState(isMainnet ? 'base' : 'arc')
-
-  // Switching networks resets both sides. Carrying a testnet chain into
-  // mainnet is how someone bridges from Arc mainnet to Ethereum Sepolia.
-   const switchNetwork = (next) => {
-    if (next === network) return
-    setActiveNetwork(next)
-    localStorage.setItem('paragonfinance_network', next)
-    setNetwork(next)
-    setSourceChainKey(next === 'mainnet' ? 'arc-mainnet' : 'ethereum')
-    setBridgeToKey(next === 'mainnet' ? 'base' : 'arc')
-    setAmount('')
-    setRecipient('')
-  }
+  const [sourceChainKey, setSourceChainKey] = useState('ethereum-mainnet')
+  const [bridgeToKey, setBridgeToKey] = useState('arc-mainnet')
   const [chainBalance, setChainBalance] = useState('0.000000')
   const [destBalance, setDestBalance] = useState('0.000000')
   const [arcUsdcBalance, setArcUsdcBalance] = useState('0.000000')
@@ -599,27 +581,6 @@ export default function TestnetSend() {
                           <p className="text-xs text-[#8892a0] mt-0.5">Move USDC across wallets and chains.</p>
             </div>
 
-            {/* Network switch. Mainnet is amber rather than the usual cyan —
-                the colour is the warning that this moves real money. */}
-            <div className="flex items-center gap-1 bg-[#0f1822] border border-[#1e2530] rounded-lg p-1">
-              {[
-                { id: 'testnet', label: 'Testnet' },
-                { id: 'mainnet', label: 'Mainnet' },
-              ].map(n => (
-                <button
-                  key={n.id}
-                  onClick={() => switchNetwork(n.id)}
-                  className={
-                    "px-3 py-1 rounded-md text-[11px] font-semibold font-['Space_Grotesk'] transition-all " +
-                    (network === n.id
-                       ? 'bg-[#00D4FF] text-[#0D1117]'
-                      : 'text-[#8892a0] hover:text-white')
-                  }
-                >
-                  {n.label}
-                </button>
-              ))}
-            </div>
             {account && (
               <div className="flex items-center gap-2 bg-[#0f1822] border border-[#1e2530] rounded-lg px-3 py-1.5">
                 {/* <span className="live-dot" /> */}
@@ -1188,7 +1149,7 @@ export default function TestnetSend() {
           </Card>
 
           <p className="text-center text-xs text-[#556] mt-4">
-            Need testnet USDC?{' '}
+            Need USDC on Arc?{' '}
             <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer" className="text-[#00D4FF] hover:underline">
               Get some from Circle's faucet →
             </a>

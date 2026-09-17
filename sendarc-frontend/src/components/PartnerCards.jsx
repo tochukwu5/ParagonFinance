@@ -13,7 +13,7 @@ const CARDS = [
     body:
       'Paragon Finance routes swaps through UnitFlow, one of the deepest liquidity venues on Arc. ' +
       'Every quote is checked against their pools so you get the fill they can actually deliver.',
-    cta: { label: 'Try a swap', to: '/testnet/send' },
+    cta: { label: 'Try a swap', to: '/app' },
   },
   {
     id: 'synthra',
@@ -23,7 +23,7 @@ const CARDS = [
     body:
       'Synthra brings chain-abstracted execution to Paragon. We now quote both venues on every ' +
       'swap and route to whichever returns more — you keep the difference.',
-    cta: { label: 'See live quotes', to: '/testnet/send' },
+    cta: { label: 'See live quotes', to: '/app' },
   },
     {
     id: 'tower',
@@ -33,7 +33,7 @@ const CARDS = [
     body:
       'Paragon Finance routes swaps through TowerExchange to access deep liquidity and competitive execution across Arc ' +
       'More liquidity. Better routes. Better swaps.',
-    cta: { label: 'See live quotes', to: '/testnet/send' },
+    cta: { label: 'See live quotes', to: '/app' },
   },
    {
     id: 'xylonet',
@@ -43,7 +43,7 @@ const CARDS = [
     body:
       'XyloNet’s routing infrastructure is now integrated into ParagonFinance ' +
       'Better Routes • Deeper Liquidity • Seamless Swaps Built on Arc Network.',
-    cta: { label: 'See live quotes', to: '/testnet/send' },
+    cta: { label: 'See live quotes', to: '/app' },
   },
   {
     id: 'aggregation',

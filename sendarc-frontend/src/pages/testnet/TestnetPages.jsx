@@ -63,7 +63,7 @@ export function TestnetTransactions() {
           <div className="flex justify-between items-start mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2 text-xs text-[#8892a0]">
-                <Link to="/testnet" className="hover:text-white transition-colors">Testnet Hub</Link>
+                <Link /app className="hover:text-white transition-colors">Testnet Hub</Link>
                 <span>/</span>
                 <span className="text-white">Transactions</span>
               </div>
@@ -186,7 +186,7 @@ export function TestnetTransactions() {
                 Your wallet: <span className="font-mono text-[#8892a0]">{account}</span>
               </p>
               <Link
-                to="/testnet/send"
+                to="/app"
                 className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm"
               >
                 Send USDC →
@@ -318,7 +318,7 @@ export function TestnetLeaderboard() {
           {/* Header */}
           <div className="text-center mb-12">
             <div className="flex items-center gap-2 mb-2 text-xs text-[#8892a0] justify-center">
-              <Link to="/testnet" className="hover:text-white transition-colors">Testnet Hub</Link>
+              <Link /app className="hover:text-white transition-colors">Testnet Hub</Link>
               <span>/</span>
               <span className="text-white">Leaderboard</span>
             </div>
@@ -396,7 +396,7 @@ export function TestnetLeaderboard() {
                 <div className="text-4xl mb-4">📊</div>
                 <p className="font-semibold font-['Space_Grotesk'] mb-2">No participants yet</p>
                 <p className="text-[#8892a0] text-sm mb-4">Be the first to appear on the leaderboard.</p>
-                <Link to="/testnet/send" className="text-[#00D4FF] text-sm hover:underline">
+                <Link to="/app" className="text-[#00D4FF] text-sm hover:underline">
                   Send your first transaction →
                 </Link>
               </div>
@@ -463,7 +463,7 @@ export function TestnetLeaderboard() {
             </p>
             <div className="flex gap-3 justify-center">
               <Link
-                to="/testnet/send"
+                to="/app"
                 className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-all text-sm"
               >
                 Send USDC →

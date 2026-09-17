@@ -66,7 +66,7 @@ export default function ConnectWallet() {
   }, [])
 
   if (isConnected && wallet) {
-    return <Navigate to="/testnet/send" replace />
+    return <Navigate to="/app" replace />
   }
 
   const isInstalled = (id) => available?.[id] === true
@@ -101,7 +101,7 @@ export default function ConnectWallet() {
 
       setStep('success')
       await new Promise(r => setTimeout(r, 600))
-      navigate('/testnet/send', { replace: true })
+      navigate('/app', { replace: true })
     } catch (err) {
       // useArcTestnet attaches installUrl when the wallet is missing, so a
       // race between detection and click still ends with a useful message.

@@ -235,7 +235,7 @@ export function HowItWorks() {
             Everything works exactly as it will on mainnet.
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
-            <Link to="/testnet/send"
+            <Link to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
               Launch testnet →
             </Link>
@@ -510,7 +510,7 @@ export function AboutPage() {
                   platform.
                 </p>
                 <div className="flex gap-3 flex-wrap">
-                  <Link to="/testnet/send"
+                  <Link to="/app"
                     className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
                     Launch app →
                   </Link>
@@ -569,7 +569,7 @@ export function DocsPage() {
               the architecture, infrastructure, security model and roadmap of the Paragon protocol.
             </p>
             <div className="flex gap-3 flex-wrap">
-              <Link to="/testnet/send"
+              <Link to="/app"
                 className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
                 Launch app →
               </Link>
@@ -997,7 +997,7 @@ export function DocsPage() {
                 Built on Arc. Powered by stablecoins. Connected to DeFi.
               </p>
               <div className="flex gap-3 flex-wrap">
-                <Link to="/testnet/send"
+                <Link to="/app"
                   className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all">
                   Launch app →
                 </Link>

@@ -52,7 +52,7 @@ export default function TestnetHub() {
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   {isConnected && isCorrectNetwork ? (
-                    <Link to="/testnet/send"
+                    <Link to="/app"
                       className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-7 py-3 rounded-xl hover:opacity-90 transition-all shadow-[0_0_24px_rgba(0,212,255,0.3)]">
                       Send USDC →
                     </Link>
@@ -180,7 +180,7 @@ export default function TestnetHub() {
             {[
               {
                 icon: '⚡', title: 'Send USDC', desc: 'Transfer testnet USDC to any wallet address on Arc Network. Gas is deducted automatically.',
-                link: '/testnet/send', label: 'Send Now →', available: true,
+                link: '/app', label: 'Send Now →', available: true,
               },
               {
                 icon: '📊', title: 'View Transactions', desc: 'Full history of all your testnet transactions with on-chain hashes, gas costs, and settlement times.',

@@ -99,7 +99,7 @@ const Icon = {
 const MENU = [
   { to: '/',             label: 'Home',         icon: 'home' },
   { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
-  { to: '/testnet', label: 'Testnet', icon: 'testnet' },
+  { to: '/app', label: 'Launch App', icon: 'testnet' },
   { to: '/affiliate',    label: 'Affiliate',    icon: 'affiliate' },
   { to: '/how-it-works', label: 'How it works', icon: 'howItWorks' },
   { to: '/about',        label: 'About',        icon: 'about' },

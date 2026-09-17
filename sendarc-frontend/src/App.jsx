@@ -113,17 +113,17 @@ export default function App() {
                 the launching the hub used to do, so it was a page that only
                 pointed elsewhere. Redirects rather than 404s keep existing
                 links, bookmarks and anything already shared working. */}
-            {/* <Route path="/testnet/send" element={<AppLayout><TestnetSend /></AppLayout>} /> */}
-                       <Route path="/testnet" element={<AppShell><TestnetSend /></AppShell>} />
-          
-            <Route path="/testnet/send" element={<Navigate to="/testnet" replace />} />
-            <Route path="/testnet/transactions" element={<Navigate to="/testnet/send" replace />} />
-            <Route path="/testnet/leaderboard" element={<Navigate to="/testnet/send" replace />} />
+                 <Route path="/app" element={<AppShell><TestnetSend /></AppShell>} />
 
-            {/* /send is the mainnet flow and isn't live yet — it rendered a
-                wallet prompt that went nowhere. Points at the working flow
-                instead of removing the URL entirely. */}
-            <Route path="/send" element={<Navigate to="/testnet/send" replace />} />
+            {/* Every old path redirects straight to /app rather than through
+                each other. The previous chain sent /testnet/transactions to
+                /app, which then redirected again — one more hop than
+                needed, and a loop if either end ever changed. */}
+            <Route path="/testnet" element={<Navigate to="/app" replace />} />
+            <Route path="/app" element={<Navigate to="/app" replace />} />
+            <Route path="/testnet/transactions" element={<Navigate to="/app" replace />} />
+            <Route path="/testnet/leaderboard" element={<Navigate to="/app" replace />} />
+            <Route path="/send" element={<Navigate to="/app" replace />} />
 
             {/* ── Wallet ─────────────────────────────────────────── */}
             <Route path="/connect" element={<BareLayout><ConnectWallet /></BareLayout>} />
