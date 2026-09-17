@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useArcTestnet } from '../../hooks/useArcTestnet'
 import { useTestnet } from '../../context/TestnetContext'
 import {
-  ARC_TESTNET, EVM_CHAINS, shortAddr, arcScanTx,
+  ARC_TESTNET, EVM_CHAINS, setActiveNetwork , shortAddr, arcScanTx,
   switchToChain, sendUsdcOnChain, getUsdcBalance,
   getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
@@ -16,6 +16,7 @@ import { CoinIcon } from '../../components/CoinLogos'
 import NetworkTokenModal from '../../components/NetworkTokenModal'
 import SwapTab from './SwapTab'
 import PartnerCards from '../../components/PartnerCards'
+
 
 // ─── Chain icons ───────────────────────────────────────────────────────────
 // EVM_CHAINS.icon is either an emoji ('⬡') or an image path ('/ethlogo.svg').
