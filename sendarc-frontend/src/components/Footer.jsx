@@ -59,7 +59,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-[#1e2530] pt-6 space-y-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-[#556]">
+            <p className="text-xs text-[#8892a0]">
               Paragon Finance © 2026. All rights reserved.
             </p>
 
@@ -76,7 +76,7 @@ export default function Footer() {
                 <Link
                   key={l.to}
                   to={l.to}
-                  className="text-xs text-[#556] hover:text-[#8892a0] transition-colors"
+                  className="text-xs text-[#8892a0] hover:text-[#b5bdca] transition-colors"
                 >
                   {l.label}
                 </Link>
@@ -88,13 +88,11 @@ export default function Footer() {
               projects at this stage can't show — worth stating plainly rather
               than burying on an About page. */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-2 text-center md:text-left">
-            <p className="text-[10px] text-[#3a4450] leading-relaxed">
+            <p className="text-[10px] text-[#8892a0] leading-relaxed">
               Paragon Tech Ventures · RC 9834873 · Registered in Nigeria under
               the Companies and Allied Matters Act 2020
             </p>
-            <span className="text-[10px] text-[#3a4450]">
-              Testnet · Not financial advice
-            </span>
+        
           </div>
         </div>
       </div>

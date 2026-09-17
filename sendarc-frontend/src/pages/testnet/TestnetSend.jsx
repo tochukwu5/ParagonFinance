@@ -1148,12 +1148,7 @@ export default function TestnetSend() {
             )}
           </Card>
 
-          <p className="text-center text-xs text-[#556] mt-4">
-            Need USDC on Arc?{' '}
-            <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer" className="text-[#00D4FF] hover:underline">
-              Get some from Circle's faucet →
-            </a>
-          </p>
+      
         </div>
       </div>
 
