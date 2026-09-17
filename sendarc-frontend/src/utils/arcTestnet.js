@@ -136,7 +136,7 @@ export const ARC_TESTNET = {
 // read is what made a funded chain display 0.000000 the moment it became the
 // destination. Ordering here puts the more reliable provider first.
 export const EVM_CHAINS = {
-  arc: {
+  'arc-testnet': {
     id: 5042002,
     chainIdHex: '0x4CEF52',
     name: 'Arc Testnet',
@@ -154,7 +154,7 @@ export const EVM_CHAINS = {
     useCCTP: false,
     note: 'Native Arc — direct on-chain transfer',
   },
-    'arc-mainnet': {
+     arc: {
     id: 5042,
     chainIdHex: '0x13b2',
     name: 'Arc',
@@ -176,6 +176,7 @@ export const EVM_CHAINS = {
     isMainnet: true,
     live: true,
   },
+
   // ═══════════════════════════════════════════════════════════════════════════
 // MAINNET CHAINS
 //
@@ -611,6 +612,9 @@ export const EVM_CHAINS = {
     note: 'CCTP Bridge via Circle App Kit',
   },
 }
+
+// Both keys resolve to Arc mainnet.
+EVM_CHAINS['arc-mainnet'] = EVM_CHAINS.arc
 
 // Accepts an explicit provider so a Rabby or Coinbase session prompts the
 // wallet the user actually connected with. Falling back to window.ethereum
