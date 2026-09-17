@@ -205,7 +205,7 @@ function AdminDashboard({ adminKey, onLogout }) {
               <Card className="p-5">
                 <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">TOTAL VOLUME</p>
                 <p className="text-3xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{formatNum(overview.totalVolume)} USDC</p>
-                <p className="text-xs text-[#556] mt-1">All-time testnet volume</p>
+                <p className="text-xs text-[#556] mt-1">All-time volume</p>
               </Card>
               <Card className="p-5">
                 <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">TRANSACTIONS</p>

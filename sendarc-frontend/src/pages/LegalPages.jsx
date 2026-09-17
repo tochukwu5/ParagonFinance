@@ -250,10 +250,10 @@ export function TermsConditions() {
           on Arc Network and supported chains. We provide software. We do not
           hold, control, or take custody of your funds at any point.
         </p>
-        <p>
+        {/* <p>
           The service is currently on testnet. Testnet tokens have no monetary
           value.
-        </p>
+        </p> */}
       </Section>
 
       <Section heading="2. Your responsibilities">
@@ -421,13 +421,13 @@ export function RiskDisclosure() {
         </p>
       </Section>
 
-      <Section heading="Testnet">
+      {/* <Section heading="Testnet">
         <p>
           The service currently operates on Arc Testnet. Testnet tokens have no
           monetary value and testnets may be reset without notice, clearing all
           balances and history.
         </p>
-      </Section>
+      </Section> */}
     </LegalShell>
   )
 }

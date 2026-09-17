@@ -37,7 +37,7 @@ export default function TestnetHub() {
             <div className="flex items-center gap-3 mb-5">
               <span className="flex items-center gap-2 text-xs bg-[#0a2030] border border-[#00D4FF]/40 text-[#00D4FF] px-3 py-1.5 rounded-full font-['Space_Grotesk'] font-semibold">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#00D4FF] animate-pulse" />
-                ARC TESTNET LIVE
+                ARC LIVE
               </span>
               <span className="text-xs text-[#556] border border-[#1e2530] px-2 py-1 rounded-full">Chain ID: 5042002</span>
             </div>
@@ -45,10 +45,10 @@ export default function TestnetHub() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
               <div>
                 <h1 className="text-5xl font-bold font-['Space_Grotesk'] mb-4 leading-tight">
-                  ParagonFinance <span className="text-[#00D4FF]">Testnet</span>
+                  ParagonFinance <span className="text-[#00D4FF]"></span>
                 </h1>
                 <p className="text-[#8892a0] text-base leading-relaxed mb-6">
-                  Send real USDC transactions on Arc Testnet. Every transfer is recorded on-chain, gas fees are tracked, and your activity builds your testnet profile. Get testnet USDC from the faucet and start transacting.
+                  Send real USDC transactions on Arc. Every transfer is recorded on-chain, gas fees are tracked, and your activity builds your profile. Get USDC from the faucet and start transacting.
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   {isConnected && isCorrectNetwork ? (
@@ -62,15 +62,15 @@ export default function TestnetHub() {
                       {isLoading ? 'Connecting…' : 'Connect MetaMask →'}
                     </button>
                   )}
-                  <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer"
+                  {/* <a href={ARC_TESTNET.faucetUrl} target="_blank" rel="noreferrer"
                     className="border border-[#1e2530] text-[#8892a0] font-['Space_Grotesk'] font-semibold px-7 py-3 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">
                     Get Testnet USDC ↗
-                  </a>
+                  </a> */}
                 </div>
                 {error && <p className="mt-3 text-red-400 text-xs">{error}</p>}
                 {!hasMetaMask && (
                   <p className="mt-3 text-amber-400 text-xs">
-                    MetaMask required for testnet. <a href="https://metamask.io" target="_blank" rel="noreferrer" className="underline">Install MetaMask ↗</a>
+                    wallet required. <a href="https://metamask.io" target="_blank" rel="noreferrer" className="underline">Install MetaMask ↗</a>
                   </p>
                 )}
               </div>
@@ -83,7 +83,7 @@ export default function TestnetHub() {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${
                       isCorrectNetwork ? 'bg-green-900/20 border-green-500 text-green-400' : 'bg-amber-900/20 border-amber-500 text-amber-400'
                     }`}>
-                      {isCorrectNetwork ? '● Arc Testnet' : '⚠ Wrong Network'}
+                      {isCorrectNetwork ? '● Arc' : '⚠ Wrong Network'}
                     </span>
                   </div>
                   <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 mb-4">
@@ -96,12 +96,12 @@ export default function TestnetHub() {
                     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-center">
                       <p className="text-[10px] text-[#8892a0] mb-1">USDC BALANCE</p>
                       <p className="text-xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{balance}</p>
-                      <p className="text-[10px] text-[#556] mt-0.5">Testnet USDC</p>
+                      <p className="text-[10px] text-[#556] mt-0.5">Arc USDC</p>
                     </div>
                     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-center">
                       <p className="text-[10px] text-[#8892a0] mb-1">TRANSACTIONS</p>
                       <p className="text-xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{stats.totalTransactions}</p>
-                      <p className="text-[10px] text-[#556] mt-0.5">On Arc Testnet</p>
+                      <p className="text-[10px] text-[#556] mt-0.5">On Arc</p>
                     </div>
                   </div>
                 </Card>
@@ -110,9 +110,9 @@ export default function TestnetHub() {
                   <p className="text-[10px] tracking-[2px] text-[#8892a0] mb-4">HOW TO GET STARTED</p>
                   <div className="space-y-4">
                     {[
-                      { num: '01', title: 'Connect MetaMask', desc: 'Click Connect MetaMask — we\'ll auto-add Arc Testnet to your wallet.' },
-                      { num: '02', title: 'Get Testnet USDC', desc: 'Visit faucet.circle.com and request 10 USDC to your wallet address.' },
-                      { num: '03', title: 'Send a Transaction', desc: 'Use the Send page to transfer USDC to any address on Arc Testnet.' },
+                      { num: '01', title: 'Connect MetaMask', desc: 'Click Connect MetaMask — we\'ll auto-add Arc to your wallet.' },
+                      { num: '02', title: 'Get USDC', desc: 'Visit faucet.circle.com and request 10 USDC to your wallet address.' },
+                      { num: '03', title: 'Send a Transaction', desc: 'Use the Send page to transfer USDC to any address on Arc .' },
                       { num: '04', title: 'Track Your Stats', desc: 'Every transaction is recorded — watch your volume, gas and stats grow.' },
                     ].map(s => (
                       <div key={s.num} className="flex gap-3">
@@ -134,13 +134,13 @@ export default function TestnetHub() {
         <div className="bg-[#0f1822] border-b border-[#1e2530] py-6 px-6">
           <div className="max-w-6xl mx-auto flex flex-wrap gap-6 justify-between items-center">
             {[
-              { label: 'NETWORK', value: 'Arc Testnet' },
+              { label: 'NETWORK', value: 'Arc' },
               { label: 'CHAIN ID', value: '5042002' },
-              { label: 'RPC', value: 'rpc.testnet.arc.network' },
+              { label: 'RPC', value: 'rpc.mainnet.arc.network' },
               { label: 'GAS TOKEN', value: 'USDC (native)' },
               { label: 'AVG FEE', value: '~$0.003' },
               { label: 'FINALITY', value: '< 1 second' },
-              { label: 'EXPLORER', value: 'testnet.arcscan.app' },
+              { label: 'EXPLORER', value: 'arcscan.app' },
             ].map(i => (
               <div key={i.label}>
                 <p className="text-[10px] tracking-[1.5px] text-[#556] mb-0.5">{i.label}</p>
@@ -152,7 +152,7 @@ export default function TestnetHub() {
 
         {/* Stats */}
         <div className="max-w-6xl mx-auto px-6 py-12">
-          <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] font-semibold mb-3">YOUR TESTNET STATS</p>
+          <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] font-semibold mb-3">YOUR STATS</p>
           <h2 className="text-2xl font-bold font-['Space_Grotesk'] mb-8">Activity Overview</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
             {[
@@ -162,7 +162,7 @@ export default function TestnetHub() {
               { label: 'AVG SETTLEMENT', value: stats.avgSettlementTime ? `${(stats.avgSettlementTime/1000).toFixed(2)}` : '—', suffix: stats.avgSettlementTime ? 's' : '', color: 'text-[#00D4FF]' },
               { label: 'SUCCESS RATE', value: stats.successRate, suffix: '%', color: 'text-green-400' },
               { label: 'UNIQUE RECIPIENTS', value: stats.uniqueRecipients, suffix: '', color: 'text-[#00D4FF]' },
-              { label: 'NETWORK', value: 'Arc Testnet', suffix: '', color: 'text-white', small: true },
+              { label: 'NETWORK', value: 'Arc', suffix: '', color: 'text-white', small: true },
               { label: 'STATUS', value: isConnected ? 'Active' : 'Inactive', suffix: '', color: isConnected ? 'text-green-400' : 'text-[#556]', small: true },
             ].map(s => (
               <Card key={s.label} className="p-5">
@@ -175,15 +175,15 @@ export default function TestnetHub() {
           </div>
 
           {/* Quick actions */}
-          <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] font-semibold mb-5">TESTNET ACTIONS</p>
+          <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] font-semibold mb-5"> ACTIONS</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
             {[
               {
-                icon: '⚡', title: 'Send USDC', desc: 'Transfer testnet USDC to any wallet address on Arc Network. Gas is deducted automatically.',
+                icon: '⚡', title: 'Send USDC', desc: 'Transfer USDC to any wallet address on Arc Network. Gas is deducted automatically.',
                 link: '/app', label: 'Send Now →', available: true,
               },
               {
-                icon: '📊', title: 'View Transactions', desc: 'Full history of all your testnet transactions with on-chain hashes, gas costs, and settlement times.',
+                icon: '📊', title: 'View Transactions', desc: 'Full history of all your transactions with on-chain hashes, gas costs, and settlement times.',
                 link: '/testnet/transactions', label: 'View History →', available: true,
               },
               // Leaderboard — commented out for now, uncomment when ready to launch it
@@ -246,7 +246,7 @@ export default function TestnetHub() {
           )}
 
           {/* Faucet guide */}
-          <div className="mt-12 bg-[#0a2030] border border-[#00D4FF]/30 rounded-2xl p-8">
+          {/* <div className="mt-12 bg-[#0a2030] border border-[#00D4FF]/30 rounded-2xl p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div>
                 <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] font-semibold mb-3">GET TESTNET USDC</p>
@@ -281,7 +281,7 @@ export default function TestnetHub() {
                 </a>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
       <Footer />

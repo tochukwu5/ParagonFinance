@@ -63,13 +63,16 @@ export function TestnetTransactions() {
           <div className="flex justify-between items-start mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2 text-xs text-[#8892a0]">
-                <Link /app className="hover:text-white transition-colors">Testnet Hub</Link>
+                <Link
+                 to="/app" className="hover:text-white transition-colors">
+                   Launch App →
+                  </Link>
                 <span>/</span>
                 <span className="text-white">Transactions</span>
               </div>
               <h1 className="text-2xl font-bold font-['Space_Grotesk']">Transaction History</h1>
               <p className="text-[#8892a0] text-sm mt-1">
-                All your Arc Testnet USDC transfers — with gas costs and settlement times
+                All your Arc  USDC transfers — with gas costs and settlement times
               </p>
               {account && (
                 <div className="flex items-center gap-2 mt-2">
@@ -180,7 +183,7 @@ export function TestnetTransactions() {
               <div className="text-4xl mb-4">📭</div>
               <p className="font-semibold font-['Space_Grotesk'] mb-2">No transactions yet</p>
               <p className="text-[#8892a0] text-sm mb-2">
-                Send your first testnet USDC transaction to see it here.
+                Send your first USDC transaction to see it here.
               </p>
               <p className="text-xs text-[#556] mb-6">
                 Your wallet: <span className="font-mono text-[#8892a0]">{account}</span>
@@ -198,7 +201,7 @@ export function TestnetTransactions() {
             <Card className="overflow-hidden">
               <div className="px-5 py-3 border-b border-[#1e2530] flex justify-between items-center">
                 <p className="text-[10px] tracking-widest text-[#8892a0]">
-                  {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''} — ARC TESTNET
+                  {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''} — ARC 
                 </p>
                 {backendOnline && (
                   <span className="text-[10px] text-green-400">● Live from MongoDB</span>
@@ -318,20 +321,21 @@ export function TestnetLeaderboard() {
           {/* Header */}
           <div className="text-center mb-12">
             <div className="flex items-center gap-2 mb-2 text-xs text-[#8892a0] justify-center">
-              <Link /app className="hover:text-white transition-colors">Testnet Hub</Link>
+              <Link to="/app" className="hover:text-white transition-colors">
+               Launch App →</Link>
               <span>/</span>
               <span className="text-white">Leaderboard</span>
             </div>
             <div className="text-5xl mb-4">🏆</div>
-            <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-3">Testnet Leaderboard</h1>
+            <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-3"> Leaderboard</h1>
             <p className="text-[#8892a0] text-sm max-w-md mx-auto leading-relaxed">
-              Top participants on Arc Testnet — ranked by volume, transactions, and activity.
-              Every transfer is recorded to MongoDB using your wallet address.
+              Top participants on Arc — ranked by volume, transactions, and activity.
+              Every transfer is recorded using your wallet address.
             </p>
             {backendOnline && (
               <div className="flex items-center justify-center gap-2 mt-3">
                 <span className="text-[10px] text-green-400 border border-green-500/30 bg-green-900/10 px-3 py-1 rounded-full">
-                  ● Live data from MongoDB
+                  ● Live data
                 </span>
               </div>
             )}
@@ -342,7 +346,7 @@ export function TestnetLeaderboard() {
             <div className="bg-[#0a2030] border border-[#00D4FF]/40 rounded-2xl p-6 mb-8">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] mb-1">YOUR TESTNET PROFILE</p>
+                  <p className="text-[10px] tracking-[2px] text-[#00D4FF] font-['Space_Grotesk'] mb-1">YOUR PROFILE</p>
                   <p className="font-mono text-white text-sm break-all">{account}</p>
                   <p className="text-[10px] text-[#8892a0] mt-1">
                     Unique identifier in MongoDB — your stats are permanently saved
@@ -380,7 +384,7 @@ export function TestnetLeaderboard() {
           {/* Leaderboard table */}
           <Card className="overflow-hidden mb-8">
             <div className="px-5 py-4 border-b border-[#1e2530] flex justify-between items-center">
-              <p className="text-[10px] tracking-widest text-[#8892a0]">RANKED PARTICIPANTS — ARC TESTNET</p>
+              <p className="text-[10px] tracking-widest text-[#8892a0]">RANKED PARTICIPANTS — ARC</p>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-[#556]">Ranked by volume</span>
                 <button
@@ -459,7 +463,7 @@ export function TestnetLeaderboard() {
           {/* CTA */}
           <div className="text-center">
             <p className="text-[#8892a0] text-sm mb-4">
-              Build your testnet profile — every transaction is saved permanently to MongoDB
+              Build your profile — every transaction is saved permanently
             </p>
             <div className="flex gap-3 justify-center">
               <Link

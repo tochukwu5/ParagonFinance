@@ -1369,7 +1369,7 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
 
   const recordReceipt = await waitForReceipt(recordTxHash, 30, 1000)
   if (recordReceipt && recordReceipt.status === '0x0') {
-    throw new Error('SendArcRouter record failed. Check your wallet is connected to Arc Testnet.')
+    throw new Error('SendArcRouter record failed. Check your wallet is connected to Arc.')
   }
 
   const sendTxHash = await window.ethereum.request({
@@ -1659,7 +1659,7 @@ export async function payBridgeFeeToTreasury({ from }) {
     await switchToChain('arc')
     const after = await window.ethereum.request({ method: 'eth_chainId' })
     if (after?.toLowerCase() !== arcHex.toLowerCase()) {
-      throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee.')
+      throw new Error('Wallet must be on Arc to pay the ParagonFinance fee.')
     }
   }
 

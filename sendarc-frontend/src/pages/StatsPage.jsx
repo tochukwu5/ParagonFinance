@@ -82,10 +82,10 @@ export default function StatsPage() {
               <span className="text-[11px] tracking-widest text-[#00D4FF] font-semibold">LIVE NETWORK STATS</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold font-['Space_Grotesk'] mb-3">
-              Paragon Finance Testnet
+              Paragon Finance 
             </h1>
             <p className="text-[#8892a0] text-base max-w-xl">
-              Real-time on-chain activity from the Paragon Finance testnet — powered by Arc Network and Circle USDC.
+              Real-time on-chain activity from the Paragon Finance — powered by Arc Network and Circle USDC.
             </p>
             <div className="flex items-center gap-4 mt-5">
               <a
@@ -100,7 +100,7 @@ export default function StatsPage() {
                 to="/app"
                 className="text-xs text-[#8892a0] border border-[#1e2530] px-3 py-1.5 rounded-full hover:border-[#00D4FF] hover:text-white transition-all"
               >
-                Try the Testnet →
+                Launch App →
               </Link>
               {lastUpdated && (
                 <span className="text-[11px] text-[#556]">
@@ -122,12 +122,12 @@ export default function StatsPage() {
                 <StatCard
                   label="TOTAL WALLETS"
                   value={overview.totalWallets.toLocaleString()}
-                  sub="Unique testnet participants"
+                  sub="Unique participants"
                 />
                 <StatCard
                   label="TOTAL VOLUME"
                   value={parseFloat(overview.totalVolume).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' USDC'}
-                  sub="All-time testnet volume"
+                  sub="All-time volume"
                 />
                 <StatCard
                   label="TRANSACTIONS"
@@ -267,9 +267,9 @@ export default function StatsPage() {
                   <p className="text-sm font-semibold font-['Space_Grotesk'] text-white">Top Participants</p>
                   <p className="text-xs text-[#556] mt-0.5">Ranked by USDC volume</p>
                 </div>
-                <span className="text-[11px] text-[#556] border border-[#1e2530] px-3 py-1 rounded-full">
+                {/* <span className="text-[11px] text-[#556] border border-[#1e2530] px-3 py-1 rounded-full">
                   Testnet only
-                </span>
+                </span> */}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -332,7 +332,7 @@ export default function StatsPage() {
                to="/app"
                 className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-5 py-2.5 rounded-xl hover:opacity-90 transition-all"
               >
-                Try Testnet →
+                Launch App →
               </Link>
               <a
                 href="https://testnet.arcscan.app/address/0xd01Bbb99Ef57a82238591f3898D721fc2f7CDf50"

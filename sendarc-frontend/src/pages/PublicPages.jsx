@@ -228,16 +228,15 @@ export function HowItWorks() {
         <div className="max-w-6xl mx-auto px-6 py-16 text-center">
           <Reveal>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 font-['Space_Grotesk']">
-            Try it on testnet
+            Try it now — no signup, no bank account, no KYC
           </h2>
           <p className="text-[#8892a0] text-sm mb-8 max-w-lg mx-auto">
-            Send, bridge and swap on Arc Testnet with free USDC from Circle's faucet.
-            Everything works exactly as it will on mainnet.
+            Send, bridge and swap on Arc.
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             <Link to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">
-              Launch testnet →
+              Launch App →
             </Link>
             <Link to="/docs"
               className="border border-[#1e2530] text-[#8892a0] text-sm px-6 py-3 rounded-xl hover:border-[#00D4FF] hover:text-white transition-all">

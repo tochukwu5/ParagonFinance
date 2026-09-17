@@ -270,7 +270,7 @@ export default function Docs() {
 paragonfinance.transfer({
   to: "0x8f2a...4e91",
   amount: 100_000000,   // 100 USDC (6 decimals)
-  destinationChain: "arc-testnet",
+  destinationChain: "arc",
   currency: "NGN"
 })
 
@@ -433,8 +433,8 @@ paragonfinance.transfer({
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {[
-              { phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF', items: ['Frontend MVP — live at paragonfinance.xyz', 'Arc Testnet integration', 'Wallet connection (MetaMask, WalletConnect)', 'Live rate calculator and send flow', 'Transaction dashboard with history'] },
-              { phase: 'Phase 2', title: 'Payments Expansion', status: 'Upcoming', color: '#00FFCC', items: ['Backend API — Node.js + MongoDB', 'Real USDC transfers on Arc Testnet', 'Email receipts via Resend', 'Cashout partner integrations', 'Crosschain support via Circle CCTP'] },
+              { phase: 'Phase 1', title: 'Foundation', status: 'In Progress', color: '#00D4FF', items: ['Frontend MVP — live at paragonfinance.xyz', 'Arc integration', 'Wallet connection (MetaMask, WalletConnect)', 'Live rate calculator and send flow', 'Transaction dashboard with history'] },
+              { phase: 'Phase 2', title: 'Payments Expansion', status: 'Upcoming', color: '#00FFCC', items: ['Backend API — Node.js + MongoDB', 'Real USDC transfers on Arc', 'Email receipts via Resend', 'Cashout partner integrations', 'Crosschain support via Circle CCTP'] },
               { phase: 'Phase 3', title: 'Pan-Global Infrastructure', status: 'Planned', color: '#0080FF', items: ['Arc Mainnet launch', 'Merchant payment integration', 'Business settlement tooling', 'Embedded finance APIs', 'Expanded country coverage'] },
               { phase: 'Phase 4', title: 'Financial Ecosystem Layer', status: 'Future', color: '#8892a0', items: ['AI-powered financial tooling', 'Programmable payment automation', 'Developer APIs and SDK', 'Institutional integrations', 'Ecosystem expansion'] },
             ].map(p => (

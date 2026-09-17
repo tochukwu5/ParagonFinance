@@ -145,7 +145,7 @@ export default function AffiliatePage() {
                 { label: 'Approval bonus', standard: '—', affiliate: '1,000 $PARA' },
                 { label: 'Dashboard badge', standard: '—', affiliate: 'Yes' },
                 { label: 'Referral analytics', standard: 'Basic', affiliate: 'Full' },
-                { label: 'Testnet rewards', standard: 'Same', affiliate: 'Same' },
+                { label: ' rewards', standard: 'Same', affiliate: 'Same' },
               ].map(row => (
                 <div key={row.label} className="grid grid-cols-3 px-5 py-3.5 border-b border-[#1e2530] last:border-0 text-sm">
                   <span className="text-[#8892a0]">{row.label}</span>

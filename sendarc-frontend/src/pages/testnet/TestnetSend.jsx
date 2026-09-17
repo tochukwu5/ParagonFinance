@@ -675,7 +675,7 @@ export default function TestnetSend() {
                 {!tokenSupported && (
                   <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
                     <span className="text-sm">🚧</span>
-                    <p className="text-xs text-[#e8c374]">{selectedToken} isn't live on Arc Testnet yet — switch to USDC to send.</p>
+                    <p className="text-xs text-[#e8c374]">{selectedToken} isn't live on Arc yet — switch to USDC to send.</p>
                   </div>
                 )}
 

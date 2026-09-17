@@ -74,7 +74,7 @@ function Sidebar({ active }) {
               : 'text-[#8892a0] hover:text-white hover:bg-[#0f1822]'
           )}
         >
-          <span className="text-base">⚡</span>Testnet Hub
+          {/* <span className="text-base">⚡</span>Testnet Hub */}
         </Link>
 
         <p className="text-[10px] tracking-widests text-[#556] mb-2 px-2 mt-6">ACCOUNT</p>
@@ -151,7 +151,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk']">Dashboard</h1>
             <p className="text-[#8892a0] text-sm mt-1">
-              Welcome back here's your testnet activity
+              Welcome back here's your activity
       
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function Dashboard() {
               to="/app"
               className="border border-[#00D4FF] text-[#00D4FF] font-['Space_Grotesk'] font-bold px-4 py-2.5 rounded-xl hover:bg-[#0a2030] transition-all text-sm"
             >
-              ⚡ Testnet
+              ⚡ Launch App
             </Link>
             {/* Send Money button (mainnet) — disabled until Arc mainnet launches */}
             {/* <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all text-sm"> + Send Money </Link> */}
@@ -182,7 +182,7 @@ export default function Dashboard() {
             {
               label: 'Total Transactions',
               value: testnetStats.totalVolume.toFixed(2) + ' USDC',
-              sub: testnetStats.totalVolume > 0 ? '↑ Testnet volume' : 'No transactions yet',
+              sub: testnetStats.totalVolume > 0 ? '' : 'No transactions yet',
               subColor: testnetStats.totalVolume > 0 ? 'text-green-400' : 'text-[#556]',
             },
             {
@@ -374,17 +374,17 @@ export default function Dashboard() {
           <div className="mt-4 bg-[#0a2030] border border-[#00D4FF]/30 rounded-xl p-4 flex justify-between items-center">
             <div>
               <p className="text-sm font-semibold font-['Space_Grotesk'] text-white mb-1">
-                Start your testnet activity
+                Start your activity
               </p>
               <p className="text-xs text-[#8892a0]">
-                Send your first USDC on the testnet — stats and transaction history will appear here live from MongoDB.
+                Send your first USDC transaction and transaction history will appear here.
               </p>
             </div>
             <Link
               to="/app"
               className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-all flex-shrink-0 ml-4"
             >
-              Go to Testnet →
+              Launch App
             </Link>
           </div>
         )}

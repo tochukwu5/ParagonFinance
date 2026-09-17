@@ -95,12 +95,12 @@ export default function SendMoney() {
             <tr><td>Exchange Rate</td><td>1 USDC = ${selectedCountry.symbol}${selectedCountry.rate}</td></tr>
             <tr><td>Arc Network Fee</td><td>$0.003 USDC</td></tr>
             <tr><td>Settlement Time</td><td>&lt; 1 second</td></tr>
-            <tr><td>Network</td><td>Arc Testnet (Chain 5042002)</td></tr>
+            <tr><td>Network</td><td>Arc  (Chain 5042)</td></tr>
             <tr><td>Recipient</td><td class="hash">${recipientAddress || '0x0000...0000'}</td></tr>
             <tr><td>TX Hash</td><td class="hash">${MOCK_TX_HASH}</td></tr>
             <tr><td>Date</td><td>${date}</td></tr>
           </table>
-          <div class="footer">This is a testnet receipt · Paragon Finance · Powered by Arc Network · Circle USDC</div>
+          <div class="footer">The receipt · Paragon Finance · Powered by Arc Network · Circle USDC</div>
         </body>
       </html>
     `
@@ -340,7 +340,7 @@ export default function SendMoney() {
                   { l: 'They Received', v: `${selectedCountry.symbol}${received}`, a: true },
                   { l: 'Status', v: 'Confirmed · FINAL', a: true },
                   { l: 'Fee Paid', v: '$0.003 USDC', a: false },
-                  { l: 'Network', v: 'Arc Testnet', a: false },
+                  { l: 'Network', v: 'Arc ', a: false },
                 ].map(r => (
                   <div key={r.l} className="flex justify-between border-b border-[#1e2530] pb-2">
                     <span className="text-[#8892a0]">{r.l}</span>

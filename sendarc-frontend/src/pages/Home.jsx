@@ -259,7 +259,7 @@ export default function Home() {
 
           <div>
             <Link to="/app" className="inline-block mt-4 text-sm text-[#00D4FF] hover:underline">
-              Try the live testnet now →
+             Launch App →
             </Link>
           </div>
         </Reveal>

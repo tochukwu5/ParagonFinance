@@ -409,7 +409,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
           Swap <span className="text-green-400">confirmed</span>
         </h2>
         <p className="text-[#8892a0] text-xs mb-6">
-          via {result.source || 'UnitFlow'} on Arc Testnet · {(result.settlementTime / 1000).toFixed(1)}s
+          via {result.source || 'UnitFlow'} on Arc · {(result.settlementTime / 1000).toFixed(1)}s
         </p>
 
         <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-4 text-left mb-5 space-y-2.5">
@@ -580,7 +580,7 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
         <div className="mt-2.5 bg-[#1a1408] border border-[#3d2f10] rounded-lg px-3 py-2 flex items-start gap-2">
           <span className="text-sm">🚧</span>
           <p className="text-xs text-[#e8c374]">
-            {(!tokenIn.available ? tokenIn.symbol : tokenOut.symbol)} isn't live on Arc Testnet yet.
+            {(!tokenIn.available ? tokenIn.symbol : tokenOut.symbol)} isn't live on Arc yet.
             Arc currently supports USDC, EURC and cirBTC.
           </p>
         </div>

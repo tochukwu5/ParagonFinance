@@ -52,7 +52,7 @@ export function Transactions() {
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk']">Transactions</h1>
             <p className="text-[#8892a0] text-sm mt-1">
-              Full history of all your Arc Testnet USDC transfers
+              Full history of all your transfers
             </p>
             {account && (
               <div className="flex items-center gap-2 mt-1">
@@ -153,7 +153,7 @@ export function Transactions() {
             <div className="text-4xl mb-4">📭</div>
             <p className="font-semibold font-['Space_Grotesk'] mb-2">No transactions yet</p>
             <p className="text-[#8892a0] text-sm mb-6">
-              Send your first testnet USDC transaction to see it here.
+              Send your first transaction to see it here.
             </p>
             <Link
               to="/app"
@@ -167,7 +167,7 @@ export function Transactions() {
           <Card className="overflow-hidden">
             <div className="px-5 py-3 border-b border-[#1e2530] flex justify-between items-center">
               <p className="text-[10px] tracking-widest text-[#8892a0]">
-                {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''} — ARC TESTNET
+                {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''}
               </p>
               {backendOnline && (
                 <span className="text-[10px] text-green-400">● Live from MongoDB</span>
@@ -268,7 +268,7 @@ export function WalletPage() {
             </h2>
             <p className="text-sm text-[#8892a0] mb-6 max-w-sm mx-auto leading-relaxed">
               Connect a wallet to view your balance, copy your address, and send
-              or swap on Arc Testnet.
+              or swap on Arc.
             </p>
             <Link
               to="/connect"
@@ -301,7 +301,7 @@ export function WalletPage() {
             <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 text-center mb-5">
               <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">USDC BALANCE</p>
               <p className="text-4xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{balance}</p>
-              <p className="text-sm text-[#8892a0] mt-1">USDC · Arc Testnet</p>
+              <p className="text-sm text-[#8892a0] mt-1">USDC · Arc</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -353,7 +353,7 @@ export function WalletPage() {
               'text-xs font-semibold ' +
               (!isConnected ? 'text-[#556]' : isCorrectNetwork ? 'text-green-400' : 'text-amber-400')
             }>
-              {!isConnected ? 'Not connected' : isCorrectNetwork ? 'Arc Testnet' : 'Wrong Network'}
+              {!isConnected ? 'Not connected' : isCorrectNetwork ? 'Arc' : 'Wrong Network'}
             </span>
           </div>
           <div className="flex justify-between items-center mb-3">
