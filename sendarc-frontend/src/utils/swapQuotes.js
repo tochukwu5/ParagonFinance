@@ -211,7 +211,7 @@ async function executeSynthraSwap({
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
     network: 'Arc Testnet',
-    chainId: 5042002,
+    chainId: 5042,
     dex: 'Synthra',
     source: 'Synthra',
     routeString: res?.routeString || null,
@@ -358,7 +358,7 @@ async function executeTowerSwap({
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
     network: 'Arc Testnet',
-    chainId: 5042002,
+    chainId: 5042,
     dex: quote.dexName || 'Tower',
     source: 'Tower',
     swap: true,
@@ -480,7 +480,7 @@ async function executeXyloSwap({
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
     network: 'Arc Testnet',
-    chainId: 5042002,
+    chainId: 5042,
     dex: 'XyloNet',
     source: 'XyloNet',
     swap: true,
@@ -514,6 +514,8 @@ export async function executeSwapForQuote({
     result = await executeSynthraSwap(args)
   } else if (venue === 'tower') {
     result = await executeTowerSwap(args)
+      } else if (venue === 'lifi') {
+    result = await executeLifiSwap(args)
      } else if (venue === 'xylonet') {
     result = await executeXyloSwap(args)
   } else {
@@ -556,7 +558,8 @@ export const SWAP_FEE_USDC = 0.1
 const SYNTHRA_API = (import.meta.env.VITE_SYNTHRA_API || '').replace(/\/$/, '') || null
 const SYNTHRA_KEY = import.meta.env.VITE_SYNTHRA_KEY || null
 
-const ARC_CHAIN_ID = 5042002
+// Arc mainnet. Testnet was 5042002.
+const ARC_CHAIN_ID = 5042
 
 // Synthra prices tokens at their ERC-20 decimals and uses the native USDC
 // address directly — 5 USDC posts as "5000000", not "5e18". Arc's 18-decimal
@@ -756,8 +759,256 @@ export async function getSynthraSwapCalldata({
   return res.json()
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LI.FI ADAPTER
+//
+// Append to src/utils/swapQuotes.js, above the SOURCES array.
+// Then add the entry and the execute branch shown at the bottom.
+//
+// LI.FI is an aggregator that routes across many DEXes. XyloNet's own swap
+// is a LI.FI frontend, so integrating LI.FI covers XyloNet and whatever else
+// they aggregate on Arc, rather than three separate integrations.
+//
+// Simplest of the four: a public API with no key, and /v1/quote returns a
+// ready-made transactionRequest — no calldata to build, no encoding to get
+// wrong. What we lose is control over the route, which is the trade the
+// aggregator exists to make.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const LIFI_API = 'https://li.quest/v1'
+
+// Registered with LI.FI. Their fee-split machinery reads this, so a revenue
+// share can be switched on later without touching this code.
+const LIFI_INTEGRATOR = 'paragonfinance'
+
+// The LI.FI Diamond on Arc. Both the approval spender and the call target —
+// their response confirms this on every quote, but pinning it means a
+// malformed response can't redirect an approval somewhere else.
+const LIFI_DIAMOND = '0xA4072583658Fae592A3506A42431cb6316a8d40b'
+
+async function getLifiQuote({ tokenIn, tokenOut, amountIn, account, slippageBps = 50 }) {
+  if (!tokenIn.address || !tokenOut.address) return null
+
+  const inDecimals = synthraDecimals(tokenIn)
+  const outDecimals = synthraDecimals(tokenOut)
+  const amountRaw = parseUnits(amountIn, inDecimals)
+
+  // Quoting needs an address but not the user's — someone comparing rates
+  // shouldn't have to connect a wallet first.
+  const who = account || '0x0000000000000000000000000000000000000000'
+
+  try {
+    const url = new URL(LIFI_API + '/quote')
+    url.search = new URLSearchParams({
+      fromChain: '5042',
+      toChain: '5042',
+      fromToken: tokenIn.address,
+      toToken: tokenOut.address,
+      fromAmount: amountRaw.toString(),
+      fromAddress: who,
+      integrator: LIFI_INTEGRATOR,
+      // LI.FI takes a fraction, not basis points.
+      slippage: String(slippageBps / 10000),
+    }).toString()
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    if (!res.ok) return null
+
+    const data = await res.json()
+    const out = data?.estimate?.toAmount
+    if (!out) return null
+
+    const raw = BigInt(out)
+    if (raw === 0n) return null
+
+    return {
+      amountOut: formatUnits(raw, data.action?.toToken?.decimals ?? outDecimals),
+      amountOutRaw: raw,
+      amountInRaw: amountRaw,
+      inDecimals,
+      outDecimals,
+      minOut: data.estimate?.toAmountMin || null,
+      // The whole response — executeLifiSwap needs transactionRequest, and
+      // re-quoting at execution time would produce a different route than
+      // the one the user was shown.
+      lifiQuote: data,
+      // "Fly", "Aero", whichever DEX won. Shown in the quote row so people
+      // can see the route isn't a black box.
+      routedVia: data.toolDetails?.name || data.tool || 'LI.FI',
+      venue: 'lifi',
+      raw: data,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Execute a LI.FI swap.
+ *
+ * Their quote carries a complete transactionRequest, so this is mostly
+ * approval handling and sending what they built. The route was decided when
+ * the user saw the price, and re-quoting here would silently execute a
+ * different one.
+ *
+ * ERC-20 input needs an approval to the Diamond. Native USDC arrives as
+ * value and needs none — which is also why the ParagonFinance fee is a
+ * second transaction here rather than riding inside the swap: LI.FI's
+ * calldata is theirs, and wrapping it would break their fee accounting.
+ */
+async function executeLifiSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+
+  const tx = quote.lifiQuote?.transactionRequest
+  if (!tx?.to || !tx?.data) {
+    throw new Error('LI.FI returned a quote without an executable transaction.')
+  }
+
+  // Approval, when the input is an ERC-20. Their approvalAddress is the
+  // Diamond; we compare against our pinned value rather than trusting the
+  // response outright — an approval is the one thing worth being strict
+  // about.
+  const spender = quote.lifiQuote?.estimate?.approvalAddress || LIFI_DIAMOND
+  if (spender.toLowerCase() !== LIFI_DIAMOND.toLowerCase()) {
+    throw new Error('LI.FI returned an unexpected approval address. Not proceeding.')
+  }
+
+  if (!tokenIn.isNative) {
+    onStatus('Checking approval...')
+    let allowance = 0n
+    try {
+      const res = await arcCall(tokenIn.address,
+        '0xdd62ed3e' + encAddress(from) + encAddress(spender))
+      if (res && res !== '0x') allowance = BigInt(res)
+    } catch { /* treat as unapproved */ }
+
+    if (allowance < quote.amountInRaw) {
+      onStatus('Approve ' + tokenIn.symbol + '...')
+      const MAX = (1n << 256n) - 1n
+      await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: tokenIn.address,
+          data: '0x095ea7b3' + encAddress(spender) + encUint(MAX),
+          value: '0x0',
+          gas: '0x186A0',
+        }],
+      })
+    }
+  }
+
+  onStatus('Confirm the swap in your wallet...')
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value && tx.value !== '0x0' ? tx.value : '0x0',
+      // Their own estimate. They simulated the route; a fixed guess would
+      // underestimate a multi-hop path.
+      gas: tx.gasLimit || '0xC6BD3',
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+
+  let receipt = null
+  for (let i = 0; i < 40 && !receipt; i++) {
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt', params: [txHash],
+      })
+    } catch { /* keep polling */ }
+  }
+
+  if (receipt && receipt.status === '0x0') {
+    throw new Error(
+      'Swap reverted — the price moved beyond your ' +
+      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
+    )
+  }
+
+  // ParagonFinance fee, after the swap. A reverted swap should cost nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(tokenOut.address), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),           // 0.1 USDC, 18 dp
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
+
+  return {
+    hash: txHash,
+    feeHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(quote.amountOut),
+    paragonFee: feeHash ? 0.1 : 0,
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    status: 'confirmed',
+    network: 'Arc',
+    chainId: 5042,
+    dex: quote.routedVia || 'LI.FI',
+    source: 'LI.FI',
+    swap: true,
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TWO MORE EDITS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// 1. Add to the SOURCES array:
+//
+//      {
+//        id: 'lifi',
+//        name: 'LI.FI',
+//        logo: '/dex/lifi.png',
+//        color: '#3B82F6',
+//        getQuote: getLifiQuote,
+//      },
+//
+// 2. Add a branch in executeSwapForQuote, beside the others:
+//
+//      } else if (venue === 'lifi') {
+//        result = await executeLifiSwap(args)
+//      }
+//
+// And add a logo at public/dex/lifi.png.
+
+
 // ─── Sources ──────────────────────────────────────────────────────────────
 export const SOURCES = [
+    {
+    id: 'lifi',
+    name: 'LI.FI',
+    logo: '/dex/lifi.png',
+    color: '#3B82F6',
+    getQuote: getLifiQuote,
+  },
   {
     id: 'unitflow',
     name: 'UnitFlow',
@@ -848,7 +1099,7 @@ async function getTowerQuote({ tokenIn, tokenOut, amountIn }) {
         inputToken: tokenIn.address,
         outputToken: tokenOut.address,
         inputAmount: amountRaw.toString(),
-        chainId: 5042002,
+        chainId: 5042,
       }),
       signal: AbortSignal.timeout(8000),
     })
@@ -901,7 +1152,12 @@ async function getTowerQuote({ tokenIn, tokenOut, amountIn }) {
  *
  */
 
-
+// UnitFlowV3 on Arc mainnet.
+const UNITFLOW_MAINNET = {
+  router:  '0x6fD8351b9596C1F0b2f2479BfA6A171cb3d0f410',
+  quoter:  '0x5AF6E89F0960Ff375AF84d9911D8153ef6240E34',
+  factory: '0x5bfBCeb73d39F722B1cB83fD2F11736b28c1Be6d',
+}
 
 // ─── XyloNet ──────────────────────────────────────────────────────────────
 // A Curve-style StableSwap AMM, quoted entirely on-chain. No API, no key —
@@ -912,6 +1168,7 @@ async function getTowerQuote({ tokenIn, tokenOut, amountIn }) {
 // on USDC/EURC they often beat the constant-product venues at size. They
 // only have two pools though — USDC/EURC and USDC/USYC — so anything
 // involving cirBTC returns no route, correctly.
+
 const XYLONET_ROUTER = '0x73742278c31a76dBb0D2587d03ef92E6E2141023'
 
 // getAmountOut(address,address,uint256)

@@ -23,13 +23,16 @@ const transactionSchema = new mongoose.Schema({
   // Status
   status: { type: String, enum: ['confirmed', 'pending', 'failed'], default: 'confirmed' },
 
-  // Network
-  network: { type: String, default: 'Arc Testnet' },
-  chainId: { type: Number, default: 5042002 },
-    // Which network this settled on. Old testnet records have no value here,
-  // so filtering on 'mainnet' excludes them without deleting anything —
-  // the history stays available if it's ever needed.
+    // Network
+  //
+  // `network` was declared twice — once as a display label ('Arc Testnet')
+  // and once as a filter enum. The second overwrote the first, and the label
+  // the frontend sends failed its enum, so nothing saved.
+  //
+  // Split into two fields: one for filtering, one for display.
   network: { type: String, enum: ['mainnet', 'testnet'], default: 'mainnet', index: true },
+  networkLabel: { type: String, default: 'Arc' },
+  chainId: { type: Number, default: 5042 },
 
   // Optional
   memo: { type: String, default: '' },
