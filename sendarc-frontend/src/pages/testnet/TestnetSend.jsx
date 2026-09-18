@@ -112,8 +112,8 @@ export default function TestnetSend() {
   // no longer offered — the toggle and its network state are gone with them.
   const ALL_NETWORKS = networksFor(true)
 
-  const [sourceChainKey, setSourceChainKey] = useState('ethereum-mainnet')
-  const [bridgeToKey, setBridgeToKey] = useState('arc-mainnet')
+    const [sourceChainKey, setSourceChainKey] = useState('arc-mainnet')
+  const [bridgeToKey, setBridgeToKey] = useState('ethereum-mainnet')
   const [chainBalance, setChainBalance] = useState('0.000000')
   const [destBalance, setDestBalance] = useState('0.000000')
   const [arcUsdcBalance, setArcUsdcBalance] = useState('0.000000')
@@ -768,7 +768,7 @@ export default function TestnetSend() {
             {hasMetaMask && view === 'form' && activeTab === 'bridge' && (
               <div>
                 <div className="flex justify-end gap-2 mb-3">
-                  <Link to="/testnet/transactions" title="History"
+                  <Link to="/dashboard/transactions" title="History"
                     className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
                     🕓
                   </Link>
@@ -1146,7 +1146,7 @@ export default function TestnetSend() {
                     className="flex-1 bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold py-2.5 rounded-xl text-sm hover:opacity-90">
                     {txResult.cctpBridge ? 'Bridge Another →' : 'Send Another →'}
                   </button>
-                  <Link to="/testnet/transactions"
+                  <Link to="/dashboard/transactions"
                     className="flex-1 border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all text-center">
                     View History
                   </Link>
