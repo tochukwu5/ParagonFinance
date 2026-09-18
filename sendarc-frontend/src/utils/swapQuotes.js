@@ -970,7 +970,8 @@ async function executeLifiSwap({
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
-    network: 'Arc',
+      network: 'mainnet',
+    networkLabel: 'Arc',
     chainId: 5042,
     dex: quote.routedVia || 'LI.FI',
     source: 'LI.FI',
@@ -1107,6 +1108,7 @@ async function getUnitflowMainnetQuote({ tokenIn, tokenOut, amountIn }) {
  */
 async function executeUnitflowMainnetSwap({
   tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+  
 }) {
   const start = Date.now()
 
@@ -1187,6 +1189,7 @@ async function executeUnitflowMainnetSwap({
     )
   }
 
+    console.log('[paragon] router:', PARAGON_SWAP_ROUTER)
   // ParagonFinance fee, after the swap. A reverted swap costs nothing.
   let feeHash = null
   if (PARAGON_SWAP_ROUTER) {

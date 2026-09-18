@@ -124,7 +124,7 @@ export const ARC_TESTNET = {
   eurcDecimals: 6,
   usycAddress: '0x8a5D989Bbb96929F689B0200f435f53dA42bF490',
   // No cirBTC on Arc mainnet in Circle's contract list.
-  cirbtcAddress: null,
+    cirbtcAddress: '0x171A4217b86A807A64eB94757Db6849fb4bDbAA0',
 }
 
 // Each chain carries a LIST of RPC endpoints, not one.
