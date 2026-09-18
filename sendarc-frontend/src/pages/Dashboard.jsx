@@ -266,7 +266,7 @@ export default function Dashboard() {
             <p className="text-sm font-semibold font-['Space_Grotesk']">
               RECENT TRANSACTIONS
               {testnetTxs.length > 0 && backendOnline && (
-                <span className="ml-2 text-[10px] text-green-400 font-normal">from MongoDB</span>
+                <span className="ml-2 text-[10px] text-green-400 font-normal"></span>
               )}
             </p>
             <Link to="/dashboard/transactions" className="text-xs text-[#00D4FF] hover:underline">

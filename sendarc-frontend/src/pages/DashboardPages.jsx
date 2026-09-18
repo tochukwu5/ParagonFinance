@@ -170,7 +170,7 @@ export function Transactions() {
                 {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''}
               </p>
               {backendOnline && (
-                <span className="text-[10px] text-green-400">● Live from MongoDB</span>
+                <span className="text-[10px] text-green-400"></span>
               )}
             </div>
             <div className="overflow-x-auto">
