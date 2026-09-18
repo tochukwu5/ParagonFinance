@@ -104,9 +104,12 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
     if (!account) return
     let cancelled = false
     Promise.all([
-      getUsdcBalance('arc', account),
+           getUsdcBalance('arc', account),
       getEurcBalance(account),
-      getCirbtcBalance(account),
+      // cirBTC isn't on Arc mainnet, so cirbtcAddress is null and the call
+      // reverts. In a Promise.all that one rejection takes USDC and EURC
+      // down with it, which is why no balance showed at all.
+      ARC_TESTNET.cirbtcAddress ? getCirbtcBalance(account) : Promise.resolve(null),
     ]).then(([usdc, eurc, cirbtc]) => {
       if (!cancelled) setBalances({ USDC: usdc, EURC: eurc, cirBTC: cirbtc, USDT: null })
     })
