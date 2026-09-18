@@ -309,7 +309,14 @@ export default function TestnetSend() {
   useEffect(() => {
     if (!account) return
     getEurcBalance(account).then(v => applyBalance(setEurcBalance, v))
-    getCirbtcBalance(account).then(v => applyBalance(setCirbtcBalance, v))
+
+    // cirBTC isn't in Circle's mainnet contract list, so cirbtcAddress is
+    // null — calling decimals() on the zero address reverts with
+    // StackUnderflow, and the retries across four RPC endpoints are what
+    // triggered the 429s.
+    if (ARC_TESTNET.cirbtcAddress) {
+      getCirbtcBalance(account).then(v => applyBalance(setCirbtcBalance, v))
+    }
   }, [account, arcBalance])
 
   useEffect(() => {

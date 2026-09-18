@@ -159,7 +159,8 @@ export const SWAP_TOKENS = {
     address: ARC_TESTNET.cirbtcAddress,
     decimals: 8,
     isNative: false,
-    available: true,
+    available: false,
+    unavailableReason: 'Not available on Arc mainnet',
   },
   USDT: {
     symbol: 'USDT',

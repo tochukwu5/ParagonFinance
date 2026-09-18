@@ -210,7 +210,8 @@ async function executeSynthraSwap({
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
-    network: 'Arc Testnet',
+    network: 'mainnet',
+    networkLabel: 'Arc',
     chainId: 5042,
     dex: 'Synthra',
     source: 'Synthra',
@@ -357,7 +358,8 @@ async function executeTowerSwap({
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
-    network: 'Arc Testnet',
+    network: 'mainnet',
+    networkLabel: 'Arc',
     chainId: 5042,
     dex: quote.dexName || 'Tower',
     source: 'Tower',
@@ -479,7 +481,8 @@ async function executeXyloSwap({
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
-    network: 'Arc Testnet',
+    network: 'mainnet',
+    networkLabel: 'Arc',
     chainId: 5042,
     dex: 'XyloNet',
     source: 'XyloNet',
@@ -516,11 +519,10 @@ export async function executeSwapForQuote({
     result = await executeTowerSwap(args)
       } else if (venue === 'lifi') {
     result = await executeLifiSwap(args)
-     } else if (venue === 'xylonet') {
-    result = await executeXyloSwap(args)
   } else {
-    result = await executeUnitflowSwap(args)
-    result.source = 'UnitFlow'
+    // The mainnet V3 SwapRouter. executeUnitflowSwap built UniversalRouter
+    // calldata for a contract that has no mainnet deployment.
+    result = await executeUnitflowMainnetSwap(args)
   }
 
   // The backend's Transaction schema requires the same core fields for every
@@ -533,8 +535,8 @@ export async function executeSwapForQuote({
   result.amount = result.amountIn ?? parseFloat(amountIn)
   result.to = result.to || from
   result.gasCost = result.gasCost ?? '0'
-  result.sourceChain = result.sourceChain || 'Arc Testnet'
-  result.destinationChain = result.destinationChain || 'Arc Testnet'
+  result.sourceChain = result.sourceChain || 'Arc'
+  result.destinationChain = result.destinationChain || 'Arc'
   result.sourceChainKey = result.sourceChainKey || 'arc'
   result.destinationChainKey = result.destinationChainKey || 'arc'
   result.cctpBridge = false
@@ -876,7 +878,7 @@ async function executeLifiSwap({
     throw new Error('LI.FI returned an unexpected approval address. Not proceeding.')
   }
 
-  if (!tokenIn.isNative) {
+   {
     onStatus('Checking approval...')
     let allowance = 0n
     try {
@@ -977,27 +979,258 @@ async function executeLifiSwap({
 }
 
 
+// ─── On-chain reads ───────────────────────────────────────────────────────
+// Used by the UnitFlow quoter and every allowance check. It was called in
+// four places and defined in none — the resulting ReferenceError was caught
+// by each try/catch, so every quote returned null and looked like empty
+// liquidity rather than a missing function.
+const ARC_RPC_URL = 'https://rpc.mainnet.arc.io'
+
+async function arcCall(to, data) {
+  const res = await fetch(ARC_RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'eth_call',
+      params: [{ to, data }, 'latest'],
+    }),
+    signal: AbortSignal.timeout(8000),
+  })
+  const json = await res.json()
+  if (json.error) throw new Error(json.error.message || 'eth_call failed')
+  return json.result
+}
+
+const encAddress = (a) => String(a).replace(/^0x/, '').toLowerCase().padStart(64, '0')
+const encUint = (n) => BigInt(n).toString(16).padStart(64, '0')
+
+
+
 // ═══════════════════════════════════════════════════════════════════════════
-// TWO MORE EDITS
+// UNITFLOW V3 — ARC MAINNET
+//
+// Append to src/utils/swapQuotes.js, above the SOURCES array.
+// Then add the SOURCES entry and the execute branch at the bottom.
+//
+// Different from the testnet integration: that used a UniversalRouter with
+// Permit2 and command-encoded calldata. Mainnet uses a plain V3 SwapRouter —
+// ERC-20 approve, then exactInputSingle. Simpler, and confirmed against a
+// real mainnet transaction (0x746ba4f6…) that swapped 0.5 USDC for 0.435729
+// EURC through pool 0x99a0505D.
+//
+// Their quoter is QuoterV1, not V2. V2 takes a struct; V1 takes flat
+// arguments in a different order (fee before amount). Calling it with the V2
+// signature reverts, which is what made the pool look empty when it wasn't.
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// 1. Add to the SOURCES array:
-//
-//      {
-//        id: 'lifi',
-//        name: 'LI.FI',
-//        logo: '/dex/lifi.png',
-//        color: '#3B82F6',
-//        getQuote: getLifiQuote,
-//      },
-//
-// 2. Add a branch in executeSwapForQuote, beside the others:
-//
-//      } else if (venue === 'lifi') {
-//        result = await executeLifiSwap(args)
-//      }
-//
-// And add a logo at public/dex/lifi.png.
+
+const UNITFLOW_MAINNET = {
+  router:  '0x6fD8351b9596C1F0b2f2479BfA6A171cb3d0f410',
+  quoter:  '0x5AF6E89F0960Ff375AF84d9911D8153ef6240E34',
+  factory: '0x5bfBCeb73d39F722B1cB83fD2F11736b28c1Be6d',
+}
+
+// quoteExactInputSingle(address,address,uint24,uint256,uint160) — QuoterV1
+const UNITFLOW_QUOTE_SELECTOR = 'f7729d43'
+// exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))
+const UNITFLOW_SWAP_SELECTOR = '414bf389'
+
+// Their USDC/EURC pool runs at 100 (0.01%) — far tighter than the 3000 a
+// V3 integration usually defaults to. Ordered so the likeliest is tried
+// first; a pair on another tier still gets found.
+const UNITFLOW_FEE_TIERS = [100, 500, 3000, 10000]
+
+async function quoteUnitflowAtFee(inAddr, outAddr, fee, amountRaw) {
+  try {
+    const data = '0x' + UNITFLOW_QUOTE_SELECTOR
+      + encAddress(inAddr)
+      + encAddress(outAddr)
+      + encUint(fee)
+      + encUint(amountRaw)
+      + encUint(0)   // sqrtPriceLimitX96 — 0 means no limit
+
+    const result = await arcCall(UNITFLOW_MAINNET.quoter, data)
+    if (result && result !== '0x' && result.length >= 66) {
+      const out = BigInt(result.slice(0, 66))
+      if (out > 0n) return out
+    }
+  } catch (err) {
+    console.warn('[unitflow] tier', fee, 'failed:', err?.message)
+  }
+  return null
+}
+  
+async function getUnitflowMainnetQuote({ tokenIn, tokenOut, amountIn }) {
+  if (!tokenIn.address || !tokenOut.address) return null
+
+  const inDecimals = synthraDecimals(tokenIn)
+  const outDecimals = synthraDecimals(tokenOut)
+  const amountRaw = parseUnits(amountIn, inDecimals)
+
+  // Every tier in parallel — four eth_calls is cheaper than four round
+  // trips, and the pair could sit on any of them.
+  const results = await Promise.all(
+    UNITFLOW_FEE_TIERS.map(async fee => ({
+      fee,
+      out: await quoteUnitflowAtFee(tokenIn.address, tokenOut.address, fee, amountRaw),
+    }))
+  )
+
+    console.log('[unitflow] tiers:', results.map(r => r.fee + '=' + r.out))
+
+  const viable = results.filter(r => r.out !== null)
+  if (!viable.length) return null
+
+  const best = viable.reduce((a, b) => (b.out > a.out ? b : a))
+
+  return {
+    amountOut: formatUnits(best.out, outDecimals),
+    amountOutRaw: best.out,
+    amountInRaw: amountRaw,
+    inDecimals,
+    outDecimals,
+    fee: best.fee,
+    venue: 'unitflow',
+  }
+}
+
+/**
+ * Execute through UnitFlow's V3 SwapRouter.
+ *
+ * Eight static struct members, so exactInputSingle encodes inline with no
+ * offset word.
+ *
+ * Native USDC is passed as value; an ERC-20 input needs a prior approval to
+ * the router. That difference is also why the ParagonFinance fee is a second
+ * transaction rather than riding inside the swap — routing through our own
+ * contract would make msg.sender the router, and the pool would pull from a
+ * contract holding nothing.
+ */
+async function executeUnitflowMainnetSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+
+  // Approval, when the input isn't native.
+   {
+    onStatus('Checking approval...')
+    let allowance = 0n
+    try {
+      const res = await arcCall(tokenIn.address,
+        '0xdd62ed3e' + encAddress(from) + encAddress(UNITFLOW_MAINNET.router))
+      if (res && res !== '0x') allowance = BigInt(res)
+    } catch { /* treat as unapproved */ }
+
+    if (allowance < quote.amountInRaw) {
+      onStatus('Approve ' + tokenIn.symbol + ' for UnitFlow...')
+      const MAX = (1n << 256n) - 1n
+      await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: tokenIn.address,
+          data: '0x095ea7b3' + encAddress(UNITFLOW_MAINNET.router) + encUint(MAX),
+          value: '0x0',
+          gas: '0x186A0',
+        }],
+      })
+    }
+  }
+
+  // Slippage floor. Without it the swap accepts any fill, which on a thin
+  // pool means an arbitrarily bad price.
+  const minOut = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300)
+
+  const data = '0x' + UNITFLOW_SWAP_SELECTOR
+    + encAddress(tokenIn.address)
+    + encAddress(tokenOut.address)
+    + encUint(quote.fee)
+    + encAddress(from)          // recipient — the user, not the router
+    + encUint(deadline)
+    + encUint(quote.amountInRaw)
+    + encUint(minOut)
+    + encUint(0)                // sqrtPriceLimitX96
+
+  onStatus('Confirm the swap in your wallet...')
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: UNITFLOW_MAINNET.router,
+      data,
+      // Native input travels as value; an ERC-20 is pulled via the approval
+      // granted above.
+           // UnitFlow's V3 router pulls USDC through the ERC-20 interface, not as
+      // native value — their own mainnet transactions show Value: 0.
+      value: '0x0',
+      gas: '0x493E0',
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+
+  let receipt = null
+  for (let i = 0; i < 40 && !receipt; i++) {
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt', params: [txHash],
+      })
+    } catch { /* keep polling */ }
+  }
+
+  if (receipt && receipt.status === '0x0') {
+    throw new Error(
+      'Swap reverted — the price moved beyond your ' +
+      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
+    )
+  }
+
+  // ParagonFinance fee, after the swap. A reverted swap costs nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(tokenOut.address), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),           // 0.1 USDC, 18 dp
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
+
+  return {
+    hash: txHash,
+    feeHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(quote.amountOut),
+    paragonFee: feeHash ? 0.1 : 0,
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    status: 'confirmed',
+    network: 'mainnet',
+    networkLabel: 'Arc',
+    chainId: 5042,
+    dex: 'UnitFlow',
+    source: 'UnitFlow',
+    swap: true,
+  }
+}
+
+
+
 
 
 // ─── Sources ──────────────────────────────────────────────────────────────
@@ -1014,20 +1247,7 @@ export const SOURCES = [
     name: 'UnitFlow',
     logo: '/dex/unitflow.webp',
     color: '#00D4FF',
-    getQuote: async ({ tokenIn, tokenOut, amountIn }) => {
-      const q = await getUnitflowQuote({ tokenIn, tokenOut, amountIn })
-      if (!q) return null
-      return {
-        amountOut: q.amountOut,
-        amountOutRaw: q.amountOutRaw,
-        amountInRaw: q.amountInRaw,
-        fee: q.fee,
-        inDecimals: q.inDecimals,
-        outDecimals: q.outDecimals,
-        venue: 'unitflow',
-        raw: q,
-      }
-    },
+    getQuote: getUnitflowMainnetQuote,
   },
   {
     id: 'synthra',
@@ -1042,13 +1262,6 @@ export const SOURCES = [
     logo: '/dex/tower11.svg',
     color: '#5B8DEF',
     getQuote: getTowerQuote,
-  },
-    {
-    id: 'xylonet',
-    name: 'XyloNet',
-    logo: '/dex/xylonet.svg',
-    color: '#7C5CFF',
-    getQuote: getXyloQuote,
   },
 ]
 
@@ -1152,111 +1365,6 @@ async function getTowerQuote({ tokenIn, tokenOut, amountIn }) {
  *
  */
 
-// UnitFlowV3 on Arc mainnet.
-const UNITFLOW_MAINNET = {
-  router:  '0x6fD8351b9596C1F0b2f2479BfA6A171cb3d0f410',
-  quoter:  '0x5AF6E89F0960Ff375AF84d9911D8153ef6240E34',
-  factory: '0x5bfBCeb73d39F722B1cB83fD2F11736b28c1Be6d',
-}
-
-// ─── XyloNet ──────────────────────────────────────────────────────────────
-// A Curve-style StableSwap AMM, quoted entirely on-chain. No API, no key —
-// getAmountOut is a view function and the router resolves the pool via the
-// factory, so a quote is one eth_call.
-//
-// Their amplification factor of 100 means near-zero slippage at the peg, so
-// on USDC/EURC they often beat the constant-product venues at size. They
-// only have two pools though — USDC/EURC and USDC/USYC — so anything
-// involving cirBTC returns no route, correctly.
-
-const XYLONET_ROUTER = '0x73742278c31a76dBb0D2587d03ef92E6E2141023'
-
-// getAmountOut(address,address,uint256)
-const XYLO_QUOTE_SELECTOR = '4aa06652'
-// swapExactTokensForTokens(uint256,uint256,address[],address,uint256)
-const XYLO_SWAP_SELECTOR = '38ed1739'
-
-// Every XyloNet token is 6 decimals, including USDC — they address it as an
-// ERC-20 at 0x3600…, not as Arc's 18-decimal native value.
-const XYLO_TOKENS = {
-  USDC: '0x3600000000000000000000000000000000000000',
-  EURC: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
-  USYC: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C',
-}
-
-// ─── Minimal RPC and ABI encoding ─────────────────────────────────────────
-// XyloNet is quoted on-chain rather than through an API, so this file needs
-// its own eth_call and encoders — the ones in unitflowSwap.js aren't
-// exported, and importing them would couple two adapters that shouldn't
-// know about each other.
-async function arcCall(to, data) {
-  const res = await fetch('https://rpc.testnet.arc.network', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', id: 1, method: 'eth_call',
-      params: [{ to, data }, 'latest'],
-    }),
-  })
-  const json = await res.json()
-  if (json.error) throw new Error(json.error.message || 'eth_call failed')
-  return json.result
-}
-
-const encAddress = (a) => String(a).replace(/^0x/, '').toLowerCase().padStart(64, '0')
-const encUint = (n) => BigInt(n).toString(16).padStart(64, '0')
-
-
-async function getXyloQuote({ tokenIn, tokenOut, amountIn }) {
-  console.log('[xylonet] called', tokenIn.symbol, '->', tokenOut.symbol)
-  const inAddr = XYLO_TOKENS[tokenIn.symbol]
-  const outAddr = XYLO_TOKENS[tokenOut.symbol]
-
-  console.log('[xylonet] addresses:', inAddr, outAddr)
-
-  // Not "unconfigured" — XyloNet genuinely has no pool for these, and
-  // saying so is more honest than implying a setup gap.
-  if (!inAddr || !outAddr) return null
-
-  const amountRaw = parseUnits(amountIn, 6)
-
-  try {
-    const data = '0x' + XYLO_QUOTE_SELECTOR
-      + encAddress(inAddr)
-      + encAddress(outAddr)
-      + encUint(amountRaw)
-
-    const result = await arcCall(XYLONET_ROUTER, data)
-    console.log('[xylonet] raw result:', result)
-    if (!result || result === '0x') return null
-
-    const out = BigInt(result)
-    if (out === 0n) return null
-
-    return {
-      amountOut: formatUnits(out, 6),
-      amountOutRaw: out,
-      amountInRaw: amountRaw,
-      inDecimals: 6,
-      outDecimals: 6,
-      tokenInAddr: inAddr,
-      tokenOutAddr: outAddr,
-      venue: 'xylonet',
-    }
-  } catch (err) {
-    // A bare catch here hid a ReferenceError for twenty minutes. Log the
-    // reason — "no route" and "the code is broken" look identical otherwise.
-    console.warn('[xylonet] quote failed:', err?.message)
-    return null
-  }
-}
-
-
-
-// ================================================================================================================
-
-
-
 export async function getAllQuotes({ tokenIn, tokenOut, amountIn, account, onProgress = () => {} }) {
   if (!tokenIn?.available || !tokenOut?.available) return []
   if (!amountIn || parseFloat(amountIn) <= 0) return []
@@ -1274,6 +1382,8 @@ export async function getAllQuotes({ tokenIn, tokenOut, amountIn, account, onPro
         quote = null
       }
 
+      // "Never asked" and "asked, nothing there" are different facts, and
+      // the UI reports them differently.
       const unconfigured = quote?.unconfigured === true
 
       const entry = {
@@ -1306,12 +1416,6 @@ export async function getAllQuotes({ tokenIn, tokenOut, amountIn, account, onPro
   return sorted
 }
 
-/**
- * Percentage the best quote beats the second-best by.
- *
- * Worth showing only when there's a real spread — with one venue, or with
- * near-identical fills, the number is noise dressed up as insight.
- */
 export function bestPriceEdge(quotes) {
   const live = quotes.filter(q => q.available)
   if (live.length < 2) return null
