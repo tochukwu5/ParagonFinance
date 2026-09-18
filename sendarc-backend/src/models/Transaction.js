@@ -26,6 +26,10 @@ const transactionSchema = new mongoose.Schema({
   // Network
   network: { type: String, default: 'Arc Testnet' },
   chainId: { type: Number, default: 5042002 },
+    // Which network this settled on. Old testnet records have no value here,
+  // so filtering on 'mainnet' excludes them without deleting anything —
+  // the history stays available if it's ever needed.
+  network: { type: String, enum: ['mainnet', 'testnet'], default: 'mainnet', index: true },
 
   // Optional
   memo: { type: String, default: '' },

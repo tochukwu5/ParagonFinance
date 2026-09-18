@@ -226,7 +226,7 @@ router.get('/transactions/:walletAddress', async (req, res) => {
     const wallet = req.params.walletAddress.toLowerCase()
     const { page = 1, limit = 50, status } = req.query
 
-    const query = { walletAddress: wallet }
+   const query = { walletAddress: wallet, network: 'mainnet' }
     if (status && status !== 'all') query.status = status
 
     const [transactions, total, stats] = await Promise.all([

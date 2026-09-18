@@ -164,13 +164,7 @@ export default function Dashboard() {
             </Link>
             {/* Send Money button (mainnet) — disabled until Arc mainnet launches */}
             {/* <Link to="/send" className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all text-sm"> + Send Money </Link> */}
-            <button
-              disabled
-              title="Available at mainnet launch"
-              className="bg-[#1e2530] text-[#556] font-['Space_Grotesk'] font-bold px-5 py-2.5 rounded-xl cursor-not-allowed text-sm flex items-center gap-1.5"
-            >
-              Launch App
-            </button>
+          
           </div>
         </div>
 
@@ -275,7 +269,7 @@ export default function Dashboard() {
                 <span className="ml-2 text-[10px] text-green-400 font-normal">from MongoDB</span>
               )}
             </p>
-            <Link to="/testnet/transactions" className="text-xs text-[#00D4FF] hover:underline">
+            <Link to="/dashboard/transactions" className="text-xs text-[#00D4FF] hover:underline">
               View All →
             </Link>
           </div>
@@ -294,14 +288,14 @@ export default function Dashboard() {
                     <tr key={tx.id || tx._id} className="border-b border-[#0f1520] hover:bg-[#0f1822] transition-colors">
                       <td className="px-5 py-4">
                         <a
-                          href={'https://testnet.arcscan.app/tx/' + tx.hash}
+                          href={'https://explorer.arc.io/tx/' + tx.hash}
                           target="_blank"
                           rel="noreferrer"
                           className="font-mono text-xs text-[#00D4FF] hover:underline"
                         >
                           {tx.hash ? tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4) : '—'}
                         </a>
-                        <p className="text-[10px] text-[#556]">{tx.sourceChain || 'Arc Testnet'}</p>
+                        <p className="text-[10px] text-[#556]">{tx.sourceChain || 'Arc'}</p>
                       </td>
                       <td className="px-5 py-4 text-xs font-mono text-[#8892a0]">
                         {tx.to ? tx.to.slice(0, 6) + '...' + tx.to.slice(-4) : '—'}
@@ -336,35 +330,17 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#1e2530]">
-                    {['TRANSACTION', 'TO', 'AMOUNT SENT', 'THEY RECEIVED', 'FEE', 'STATUS', 'TIME'].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-[10px] tracking-widests text-[#8892a0] font-medium">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MOCK_TRANSACTIONS.map(tx => (
-                    <tr key={tx.id} className="border-b border-[#0f1520] hover:bg-[#0f1822] transition-colors">
-                      <td className="px-5 py-4">
-                        <p className="font-mono text-xs text-white">{tx.id}</p>
-                        <p className="text-[10px] text-[#556]">{tx.network}</p>
-                      </td>
-                      <td className="px-5 py-4 text-xs">
-                        <span className="mr-1">{tx.country.flag}</span>
-                        <span className="font-mono text-[#8892a0]">{tx.to}</span>
-                      </td>
-                      <td className="px-5 py-4 font-semibold text-white">{tx.sent} USDC</td>
-                      <td className="px-5 py-4 font-bold text-[#00D4FF]">{tx.received}</td>
-                      <td className="px-5 py-4 text-green-400">{tx.fee}</td>
-                      <td className="px-5 py-4"><StatusBadge status={tx.status} /></td>
-                      <td className="px-5 py-4 text-xs text-[#8892a0]">{tx.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      ) : (
+              // Mock rows used to render here when the list was empty. On a
+              // live product that's inventing transactions that never
+              // happened — including fake amounts and countries.
+              <div className="py-12 text-center">
+                <p className="text-sm text-[#8892a0] mb-2">No transactions yet</p>
+                <p className="text-xs text-[#4a5568] mb-5">
+                  Your transactions will appear here once you send, bridge or swap.
+                </p>
+               
+              </div>
             )}
           </div>
         </Card>
