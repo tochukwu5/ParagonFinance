@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ARC_TESTNET, switchToArcTestnet } from '../utils/arcTestnet'
-import { getProviderFor, WALLET_LABELS, WALLET_INSTALL_URLS } from '../utils/walletProviders'
+import { getProviderFor, WALLET_LABELS, WALLET_INSTALL_URLS, releaseProvider } from '../utils/walletProviders'
 
 // ─── Session policy ────────────────────────────────────────────────────────
 // Two independent limits, both enforced:
@@ -214,6 +214,10 @@ export function useArcTestnet() {
       if (savedId) {
         const provider = await getProviderFor(savedId)
         if (provider) {
+                // Bitget's docs are explicit: with several extensions installed, a
+      // listener left on the previous provider means clicking one wallet
+      // invokes another.
+      releaseProvider(providerRef.current)
           providerRef.current = provider
           setWalletId(savedId)
         }

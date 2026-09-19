@@ -30,6 +30,7 @@ function ensureListening() {
 // true for compatibility and which therefore cannot reliably tell them apart.
 export const WALLET_RDNS = {
   metamask: 'io.metamask',
+  bitget: 'com.bitget.web3',
   rabby: 'io.rabby',
   coinbase: 'com.coinbase.wallet',
 }
@@ -66,6 +67,9 @@ function looksLikeMetaMask(p) {
   if (p.isFrame) return false
   if (p.isTokenPocket) return false
   if (p.isZerion) return false
+  // Bitget sets isMetaMask too, and injects at window.bitkeep.ethereum
+  // rather than window.ethereum.
+  if (p.isBitKeep || p.isBitget) return false
   return true
 }
 
@@ -105,6 +109,17 @@ export async function getProviderFor(walletId) {
     return null
   }
 
+  if (walletId === 'bitget') {
+    // Their own docs name this path: window.bitkeep.ethereum, not
+    // window.ethereum. Checked before the providers list because with
+    // several extensions installed the global is whoever loaded last.
+    if (window.bitkeep?.ethereum) return window.bitkeep.ethereum
+    const fromList = list?.find(p => p.isBitKeep || p.isBitget)
+    if (fromList) return fromList
+    if (window.ethereum?.isBitKeep || window.ethereum?.isBitget) return window.ethereum
+    return null
+  }
+
   if (walletId === 'rabby') {
     const fromList = list?.find(p => p.isRabby)
     if (fromList) return fromList
@@ -123,6 +138,23 @@ export async function getProviderFor(walletId) {
   }
 
   return null
+}
+
+/**
+ * Detach listeners from a provider before switching to another.
+ *
+ * With several extensions installed, a listener left on the previous
+ * provider means clicking one wallet can invoke a different one. Bitget's
+ * integration docs call this out specifically, and it applies to every
+ * multi-wallet switch.
+ */
+export function releaseProvider(provider) {
+  if (!provider) return
+  try {
+    if (typeof provider.removeAllListeners === 'function') {
+      provider.removeAllListeners()
+    }
+  } catch { /* not every provider implements it */ }
 }
 
 export async function isWalletAvailable(walletId) {
@@ -147,12 +179,14 @@ export async function detectAvailableWallets() {
 
 export const WALLET_INSTALL_URLS = {
   metamask: 'https://metamask.io/download/',
+  bitget: 'https://web3.bitget.com/wallet-download?type=2',
   rabby: 'https://rabby.io/',
   coinbase: 'https://www.coinbase.com/wallet/downloads',
 }
 
 export const WALLET_LABELS = {
   metamask: 'MetaMask',
+  bitget: 'Bitget Wallet',
   rabby: 'Rabby Wallet',
   coinbase: 'Coinbase Wallet',
 }

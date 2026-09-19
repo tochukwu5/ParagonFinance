@@ -5,6 +5,7 @@ import { detectAvailableWallets, WALLET_INSTALL_URLS } from '../utils/walletProv
 import MetaMaskIcon from '../assets/wallets/metamask.svg'
 import RabbyIcon from '../assets/wallets/rabby.svg'
 import CoinbaseIcon from '../assets/wallets/coinbase.svg'
+import BitgetIcon from '../assets/wallets/bitget.png'
 import WalletConnectIcon from '../assets/wallets/walletconnect.svg'
 
 const WALLET_GROUPS = [
@@ -12,13 +13,14 @@ const WALLET_GROUPS = [
     label: 'Recommended',
     wallets: [
       { id: 'metamask', name: 'MetaMask', icon: MetaMaskIcon },
+      { id: 'bitget', name: 'Bitget Wallet', icon: BitgetIcon },
       { id: 'rabby', name: 'Rabby Wallet', icon: RabbyIcon },
-      { id: 'coinbase', name: 'Coinbase Wallet', icon: CoinbaseIcon },
     ],
   },
   {
     label: 'Other wallets',
     wallets: [
+      { id: 'coinbase', name: 'Coinbase Wallet', icon: CoinbaseIcon },
       // WalletConnect is a relay protocol rather than an injected provider —
       // QR pairing, a WebSocket session, an SDK dependency. Genuinely
       // different work from the extension wallets, so it stays marked as
@@ -74,7 +76,7 @@ export default function ConnectWallet() {
 
   const handleConnect = async (w) => {
     if (w.upcoming) {
-      setError('WalletConnect is coming soon. Please use MetaMask, Rabby, or Coinbase Wallet.')
+      setError('WalletConnect is coming soon. Please use MetaMask, Bitget, Rabby, or Coinbase Wallet.')
       setInstallUrl(null)
       return
     }
