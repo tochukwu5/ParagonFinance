@@ -573,7 +573,7 @@ const SYNTHRA_DECIMALS = {
   USDC: 6,
   EURC: 6,
   cirBTC: 8,
-  USDT: 6,
+  USDT: 18,
 }
 
 function synthraDecimals(token) {

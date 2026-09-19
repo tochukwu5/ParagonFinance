@@ -164,13 +164,13 @@ export const SWAP_TOKENS = {
   USDT: {
     symbol: 'USDT',
     name: 'Tether USD',
-    address: null,
-    decimals: 6,
+    address: 0xB4337b8D148Aa7a1F2124d9F6362234ffF0fBbBb,
+    decimals: 18,
     isNative: false,
     // Circle's docs list Arc Testnet swap support as USDC, EURC and cirBTC
     // only. Shown greyed rather than hidden so the roadmap stays visible.
-    available: false,
-    unavailableReason: 'Not deployed on Arc Testnet yet',
+    available: true,
+    // unavailableReason: 'Not deployed on Arc Testnet yet',
   },
 }
 
