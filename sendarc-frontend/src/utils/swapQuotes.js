@@ -517,6 +517,8 @@ export async function executeSwapForQuote({
     result = await executeSynthraSwap(args)
   } else if (venue === 'tower') {
     result = await executeTowerSwap(args)
+      } else if (venue === 'kyber') {
+    result = await executeKyberSwap(args)
       } else if (venue === 'lifi') {
     result = await executeLifiSwap(args)
   } else {
@@ -1234,6 +1236,276 @@ async function executeUnitflowMainnetSwap({
 
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// KYBERSWAP AGGREGATOR
+//
+// Append to src/utils/swapQuotes.js, above the SOURCES array.
+// Then add the SOURCES entry and the execute branch shown at the bottom.
+//
+// Arc is supported under the chain slug 'arc'. Confirmed against a live
+// route: 1 USDC → 0.870192 EURC via aero-cl.
+//
+// No API key. KyberSwap's docs are explicit that their APIs need no
+// authentication — x-client-id only identifies the caller for rate limiting.
+// Default is 3 requests/second; a whitelisted client id doubles that.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const KYBER_API = 'https://aggregator-api.kyberswap.com/arc/api/v1'
+
+// Swap this for the whitelisted value when it arrives. Until then the
+// default 3 rps applies, which the 450ms quote debounce stays inside.
+const KYBER_CLIENT_ID = import.meta.env.VITE_KYBER_CLIENT_ID || 'paragonfinance'
+
+// Same router on every chain KyberSwap supports. Pinned rather than read
+// from the response: it's both the approval spender and the call target, and
+// an approval is the one place worth being strict about.
+const KYBER_ROUTER = '0x6131B5fae19EA4f9D964eAc0408E4408b66337b5'
+
+function kyberHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-client-id': KYBER_CLIENT_ID,
+  }
+}
+
+async function getKyberQuote({ tokenIn, tokenOut, amountIn, account, slippageBps = 50 }) {
+  if (!tokenIn.address || !tokenOut.address) return null
+
+  const inDecimals = synthraDecimals(tokenIn)
+  const outDecimals = synthraDecimals(tokenOut)
+  const amountRaw = parseUnits(amountIn, inDecimals)
+
+  try {
+    const url = new URL(KYBER_API + '/routes')
+    url.search = new URLSearchParams({
+      tokenIn: tokenIn.address,
+      tokenOut: tokenOut.address,
+      amountIn: amountRaw.toString(),
+      // Their docs warn this defaults to 0 when omitted, which makes most
+      // trades revert — and it looks like thin liquidity rather than a
+      // missing parameter.
+      slippageTolerance: String(slippageBps),
+      ...(account ? { to: account } : {}),
+    }).toString()
+
+    const res = await fetch(url, {
+      headers: kyberHeaders(),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) {
+      if (res.status === 429) console.warn('[kyber] rate limited — 3 rps without a whitelisted client id')
+      return null
+    }
+
+    const json = await res.json()
+    const summary = json?.data?.routeSummary
+    if (!summary?.amountOut) return null
+
+    const raw = BigInt(summary.amountOut)
+    if (raw === 0n) return null
+
+    return {
+      amountOut: formatUnits(raw, outDecimals),
+      amountOutRaw: raw,
+      amountInRaw: amountRaw,
+      inDecimals,
+      outDecimals,
+      // Passed back to /route/build verbatim. Their docs are emphatic about
+      // this — it carries routing state and a checksum, and a modified
+      // summary is rejected.
+      routeSummary: summary,
+      routerAddress: json?.data?.routerAddress || KYBER_ROUTER,
+      // "aero-cl", whichever pool won. Shown in the row so the route isn't
+      // a black box.
+      routedVia: summary.route?.[0]?.[0]?.exchange || 'KyberSwap',
+      priceImpact: summary.amountInUsd && summary.amountOutUsd
+        ? ((parseFloat(summary.amountInUsd) - parseFloat(summary.amountOutUsd)) /
+           parseFloat(summary.amountInUsd)) * 100
+        : null,
+      venue: 'kyber',
+      raw: json.data,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Execute a KyberSwap route.
+ *
+ * Two calls: /routes produced the quote the user saw, and /route/build turns
+ * that exact summary into calldata. The summary goes back unmodified —
+ * rebuilding or re-quoting here would execute a different route than the one
+ * that was priced.
+ */
+async function executeKyberSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+
+  onStatus('Building route via KyberSwap...')
+
+  const buildRes = await fetch(KYBER_API + '/route/build', {
+    method: 'POST',
+    headers: kyberHeaders(),
+    body: JSON.stringify({
+      routeSummary: quote.routeSummary,
+      sender: from,
+      recipient: from,
+      slippageTolerance: slippageBps,
+      // Their docs suggest a short window; the route was priced seconds ago
+      // and a stale one reverts rather than filling badly.
+      deadline: Math.floor(Date.now() / 1000) + 1200,
+      source: KYBER_CLIENT_ID,
+    }),
+    signal: AbortSignal.timeout(12000),
+  })
+
+  if (!buildRes.ok) {
+    throw new Error('KyberSwap could not build this transaction. Try again.')
+  }
+
+  const buildJson = await buildRes.json()
+  const tx = buildJson?.data
+  if (!tx?.data) {
+    console.warn('[kyber] no calldata in build response:', buildJson)
+    throw new Error('KyberSwap returned a route but no executable transaction.')
+  }
+
+  const router = tx.routerAddress || quote.routerAddress || KYBER_ROUTER
+  if (router.toLowerCase() !== KYBER_ROUTER.toLowerCase()) {
+    throw new Error('KyberSwap returned an unexpected router address. Not proceeding.')
+  }
+
+  // Approval, when the input isn't native. The spender is the router, which
+  // is why it's pinned above rather than taken on trust from the response.
+  if (!tokenIn.isNative) {
+    onStatus('Checking approval...')
+    let allowance = 0n
+    try {
+      const res = await arcCall(tokenIn.address,
+        '0xdd62ed3e' + encAddress(from) + encAddress(router))
+      if (res && res !== '0x') allowance = BigInt(res)
+    } catch { /* treat as unapproved */ }
+
+    if (allowance < quote.amountInRaw) {
+      onStatus('Approve ' + tokenIn.symbol + ' for KyberSwap...')
+      const MAX = (1n << 256n) - 1n
+      await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: tokenIn.address,
+          data: '0x095ea7b3' + encAddress(router) + encUint(MAX),
+          value: '0x0',
+          gas: '0x186A0',
+        }],
+      })
+    }
+  }
+
+  onStatus('Confirm the swap in your wallet...')
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: router,
+      data: tx.data,
+      value: tx.value && tx.value !== '0' ? '0x' + BigInt(tx.value).toString(16) : '0x0',
+      // Their own estimate plus headroom — a split route across pools costs
+      // more than a fixed guess allows for.
+      gas: tx.gas
+        ? '0x' + Math.ceil(Number(tx.gas) * 1.2).toString(16)
+        : '0x7A120',
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+
+  let receipt = null
+  for (let i = 0; i < 40 && !receipt; i++) {
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt', params: [txHash],
+      })
+    } catch { /* keep polling */ }
+  }
+
+  if (receipt && receipt.status === '0x0') {
+    throw new Error(
+      'Swap reverted — the price moved beyond your ' +
+      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
+    )
+  }
+
+  // ParagonFinance fee, after the swap. A reverted swap costs nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(tokenOut.address), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),           // 0.1 USDC, 18 dp
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
+
+  return {
+    hash: txHash,
+    feeHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(quote.amountOut),
+    paragonFee: feeHash ? 0.1 : 0,
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
+    status: 'confirmed',
+    network: 'mainnet',
+    networkLabel: 'Arc',
+    chainId: 5042,
+    dex: quote.routedVia || 'KyberSwap',
+    source: 'KyberSwap',
+    swap: true,
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TWO MORE EDITS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// 1. Add to the SOURCES array:
+//
+//      {
+//        id: 'kyber',
+//        name: 'KyberSwap',
+//        logo: '/dex/kyberswap.png',
+//        color: '#31CB9E',
+//        getQuote: getKyberQuote,
+//      },
+//
+// 2. Add a branch in executeSwapForQuote, beside the others:
+//
+//      } else if (venue === 'kyber') {
+//        result = await executeKyberSwap(args)
+//      }
+//
+// And add a logo at public/dex/kyberswap.png.
+
+
 
 
 // ─── Sources ──────────────────────────────────────────────────────────────
@@ -1265,6 +1537,13 @@ export const SOURCES = [
     logo: '/dex/tower11.svg',
     color: '#5B8DEF',
     getQuote: getTowerQuote,
+  },
+    {
+    id: 'kyber',
+    name: 'KyberSwap',
+    logo: '/dex/kyberswap.svg',
+    color: '#31CB9E',
+    getQuote: getKyberQuote,
   },
 ]
 
