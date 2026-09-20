@@ -503,7 +503,7 @@ export default function TestnetSend() {
         <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
                <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
         <span className="text-[10px] text-[#8892a0]">
-          Balance: {chainBalance} {bridgeToken}
+          Bal: {parseFloat(chainBalance || 0).toFixed(2)} {bridgeToken}
           {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
             <>
               <button
@@ -557,17 +557,12 @@ export default function TestnetSend() {
   const toBox = (
     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE TO</span>
-          {/* Read-only. CCTP mints the same asset it burned, so the
-              destination token always follows the source — an editable one
-              here would imply a swap that doesn't happen. */}
-          <span className="flex items-center gap-1 bg-[#161d28] border border-[#1e2530] px-2 py-0.5 rounded-full text-[10px] font-semibold text-[#8892a0]">
-            <CoinIcon symbol={bridgeToken} size={12} />
-            {bridgeToken}
-          </span>
-        </div>
-        <span className="text-[10px] text-[#8892a0]">Balance: {destBalance} {bridgeToken}</span>
+              <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE TO</span>
+               {/* Six decimals overflow a 360px screen alongside the 50%/Max links.
+            Full precision returns at sm and above. */}
+        <span className="text-[10px] text-[#8892a0]">
+          Bal: {parseFloat(destBalance || 0).toFixed(2)} {bridgeToken}
+        </span>
       </div>
       <div className="flex items-center justify-between gap-3">
         <button
@@ -668,7 +663,7 @@ export default function TestnetSend() {
                       <ChevronDown className="w-4 h-4 text-[#8892a0]" />
                     </button>
                     <span className="text-[10px] text-[#8892a0]">
-                      Balance: {tokenSupported ? activeBalance : '0.000000'} {selectedToken}
+                      Bal: {parseFloat(tokenSupported ? activeBalance : 0).toFixed(2)} {selectedToken}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">

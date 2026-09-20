@@ -234,8 +234,8 @@ export default function SwapTab({ account, provider, onRecordTransaction }) {
     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
       <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
         <span className="text-[10px] tracking-widest text-[#8892a0]">{label}</span>
-        <span className="text-[10px] text-[#8892a0]">
-          {balance === null ? '—' : balance} {token.symbol}
+                <span className="text-[10px] text-[#8892a0]">
+          Bal: {balance === null ? '—' : parseFloat(balance).toFixed(2)} {token.symbol}
           {isInput && numericBalance > 0 && (
             <>
               <button onClick={() => setAmount((numericBalance * 0.5).toFixed(6))}
