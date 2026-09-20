@@ -200,6 +200,21 @@ export default function TestnetSend() {
 
   const applyBalance = (setter, value) => { if (value !== null && value !== undefined) setter(value) }
   
+  // getUsdcBalance always reads USDC, so selecting EURC showed the USDC
+  // balance beside it.
+  //
+  // getErc20Balance reads from Arc's RPC only, so EURC on Ethereum, Base or
+  // Avalanche can't be read that way — those show a dash rather than a
+  // wrong number. Bridging out of Arc is the common direction anyway.
+  const balanceFor = async (chainKey, addr, token) => {
+    if (!addr) return null
+    if (token !== 'EURC') return getUsdcBalance(chainKey, addr)
+
+    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
+      return getEurcBalance(addr)
+    }
+    return null
+  }
   // Solana balances must be read against the Solana address, not the EVM
   // one. Passing `account` to a Solana RPC queries an address that doesn't
   // exist there and always comes back empty.
@@ -238,7 +253,7 @@ export default function TestnetSend() {
         await switchToChain(chainKey)
       }
       setSourceChainKey(chainKey)
-      if (account) applyBalance(setChainBalance, await getUsdcBalance(chainKey, addressFor(chainKey)))
+      if (account) applyBalance(setChainBalance, await balanceFor(chainKey, addressFor(chainKey), bridgeToken))
     } catch (err) {
       setSwitchError(err.message || 'Could not switch network')
     } finally {
@@ -275,8 +290,8 @@ export default function TestnetSend() {
         await switchToChain(newSource)
       }
       if (account) {
-        applyBalance(setChainBalance, await getUsdcBalance(newSource, addressFor(newSource)))
-        applyBalance(setDestBalance, await getUsdcBalance(newDest, addressFor(newDest)))
+        applyBalance(setChainBalance, await balanceFor(newSource, addressFor(newSource), bridgeToken))
+        applyBalance(setDestBalance, await balanceFor(newDest, addressFor(newDest), bridgeToken))
       }
     } catch (err) {
       setSwitchError(err.message || 'Could not switch network')
@@ -310,12 +325,12 @@ export default function TestnetSend() {
 
   useEffect(() => {
     if (!account) return
-    getUsdcBalance(sourceChainKey, addressFor(sourceChainKey)).then(v => applyBalance(setChainBalance, v))
+    balanceFor(sourceChainKey, addressFor(sourceChainKey), bridgeToken).then(v => applyBalance(setChainBalance, v))
   }, [sourceChainKey, account, arcBalance])
 
   useEffect(() => {
     if (!account) return
-    getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)).then(v => applyBalance(setDestBalance, v))
+    balanceFor(bridgeToKey, addressFor(bridgeToKey), bridgeToken).then(v => applyBalance(setDestBalance, v))
   }, [bridgeToKey, account, arcBalance])
 
   useEffect(() => {
@@ -426,8 +441,8 @@ export default function TestnetSend() {
       } else if (selectedToken === 'cirBTC') {
         applyBalance(setCirbtcBalance, await getCirbtcBalance(account))
       } else if (activeTab === 'bridge') {
-        applyBalance(setChainBalance, await getUsdcBalance(sourceChainKey, addressFor(sourceChainKey)))
-        applyBalance(setDestBalance, await getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)))
+        applyBalance(setChainBalance, await balanceFor(sourceChainKey, addressFor(sourceChainKey), bridgeToken))
+        applyBalance(setDestBalance, await balanceFor(bridgeToKey, addressFor(bridgeToKey), bridgeToken))
         refreshBalance()
         applyBalance(setArcUsdcBalance, await getUsdcBalance('arc-mainnet', account))
       } else {
@@ -801,7 +816,7 @@ export default function TestnetSend() {
                     title="Refresh balances"
                     onClick={() => account && Promise.all([
                       getUsdcBalance(sourceChainKey, account).then(v => applyBalance(setChainBalance, v)),
-                      getUsdcBalance(bridgeToKey, addressFor(bridgeToKey)).then(v => applyBalance(setDestBalance, v)),
+                      balanceFor(bridgeToKey, addressFor(bridgeToKey), bridgeToken).then(v => applyBalance(setDestBalance, v)),
                       getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v)),
                     ])}
                     className="w-8 h-8 rounded-lg border border-[#1e2530] flex items-center justify-center text-[#8892a0] hover:text-white hover:border-[#00D4FF] transition-colors text-sm">
