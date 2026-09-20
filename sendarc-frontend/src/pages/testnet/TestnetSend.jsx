@@ -331,6 +331,16 @@ export default function TestnetSend() {
     }
   }, [account, arcBalance])
 
+    // recipient is shared across all three tabs, so an address auto-filled on
+  // the bridge tab carried over to Send — where the user almost never wants
+  // to send to themselves.
+  useEffect(() => {
+    if (activeTab === 'send') {
+      setRecipient('')
+      setUseOwnAddress(false)
+    }
+  }, [activeTab])
+
   useEffect(() => {
      if (activeTab === 'bridge' && !showWalletInput) {
       // Bridging to Solana means the recipient must be a Solana address.
@@ -711,21 +721,16 @@ export default function TestnetSend() {
                 </div>
 
                 <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
-                  <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+                     <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
                     <span className="text-[10px] tracking-widest text-[#8892a0]">SEND TO</span>
-                    <button onClick={() => { setRecipient(account || ''); setUseOwnAddress(true) }}
-                      className="text-[10px] text-[#00D4FF] hover:underline">
-                      Use my address
-                    </button>
                   </div>
                   <input
                     type="text"
                     placeholder="0x… wallet address"
                     value={recipient}
-                    onChange={e => { setRecipient(e.target.value); setUseOwnAddress(false) }}
+                    onChange={e => setRecipient(e.target.value)}
                     className="w-full bg-transparent text-white text-sm font-mono outline-none"
                   />
-                  {useOwnAddress && <p className="text-[10px] text-[#00D4FF] mt-1">✓ Sending to your own address</p>}
                   {recipient && !isValidAddress && (
                     <p className="text-[10px] text-red-400 mt-1">Must be a valid 0x address</p>
                   )}
