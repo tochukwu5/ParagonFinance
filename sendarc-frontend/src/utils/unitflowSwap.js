@@ -169,8 +169,8 @@ export const SWAP_TOKENS = {
     isNative: false,
     // Circle's docs list Arc Testnet swap support as USDC, EURC and cirBTC
     // only. Shown greyed rather than hidden so the roadmap stays visible.
-    available: true,
-    // unavailableReason: 'Not deployed on Arc Testnet yet',
+    available: false,
+    unavailableReason: 'Not deployed on Arc Testnet yet',
   },
 }
 

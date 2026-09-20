@@ -42,8 +42,11 @@ function NetworkIcon({ icon, name, size = 18, className = '' }) {
   )
 }
 
-// networks: [{ key, name, icon, enabled, usdcAddress }]
-export default function NetworkTokenModal({ open, onClose, title, networks, activeKey, onSelect }) {
+// networks: [{ key, name, icon, enabled, usdcAddress, eurcAddress, supportsEurc }]
+//
+// onSelect(chainKey, tokenSymbol) — the token is the second argument so
+// existing callers that ignore it keep working unchanged.
+export default function NetworkTokenModal({ open, onClose, title, networks, activeKey, onSelect, activeToken = 'USDC' }) {
   const [search, setSearch] = useState('')
   const [paneKey, setPaneKey] = useState(activeKey)
 
@@ -127,21 +130,36 @@ export default function NetworkTokenModal({ open, onClose, title, networks, acti
           </div>
           <div className="flex-1 overflow-y-auto px-2 min-h-0">
             {paneNetwork ? (
-              <button
-                onClick={() => { onSelect(paneNetwork.key); onClose() }}
-                className="w-full flex items-center justify-between gap-2 px-2 sm:px-3 py-3 rounded-xl hover:bg-[#1e2530] transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <CoinIcon symbol="USDC" size={32} />
-                  <div className="text-left min-w-0">
-                    <p className="text-white text-sm font-semibold">USDC</p>
-                    <p className="text-[#8892a0] text-xs">USD Coin</p>
+              // One row per token the chain actually carries. USDC is
+              // everywhere; Circle issues EURC on only a handful of chains,
+              // so listing them per chain makes that visible rather than
+              // having six chains silently vanish when EURC is picked.
+              [
+                { symbol: 'USDC', name: 'USD Coin', address: paneNetwork.usdcAddress, show: true },
+                { symbol: 'EURC', name: 'Euro Coin', address: paneNetwork.eurcAddress, show: !!paneNetwork.supportsEurc },
+              ].filter(t => t.show).map(t => (
+                <button
+                  key={t.symbol}
+                  onClick={() => { onSelect(paneNetwork.key, t.symbol); onClose() }}
+                  className={
+                    'w-full flex items-center justify-between gap-2 px-2 sm:px-3 py-3 rounded-xl transition-colors ' +
+                    (activeToken === t.symbol && paneNetwork.key === activeKey
+                      ? 'bg-[#101a26]'
+                      : 'hover:bg-[#1e2530]')
+                  }
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CoinIcon symbol={t.symbol} size={32} />
+                    <div className="text-left min-w-0">
+                      <p className="text-white text-sm font-semibold">{t.symbol}</p>
+                      <p className="text-[#8892a0] text-xs">{t.name}</p>
+                    </div>
                   </div>
-                </div>
-                <span className="text-[#8892a0] text-[10px] font-mono flex-shrink-0">
-                  {paneNetwork.usdcAddress ? paneNetwork.usdcAddress.slice(0, 6) + '…' + paneNetwork.usdcAddress.slice(-4) : ''}
-                </span>
-              </button>
+                  <span className="text-[#8892a0] text-[10px] font-mono flex-shrink-0">
+                    {t.address ? t.address.slice(0, 6) + '…' + t.address.slice(-4) : ''}
+                  </span>
+                </button>
+              ))
             ) : (
               <p className="text-center text-xs text-[#556] py-10">Select a network above</p>
             )}

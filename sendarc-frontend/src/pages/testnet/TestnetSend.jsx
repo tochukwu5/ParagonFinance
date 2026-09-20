@@ -76,18 +76,22 @@ const CCTP_STEPS = [
   { key: 'mint',     label: 'Mint' },
 ]
 
-// Built per network rather than once. Mixing testnet and mainnet chains in
-// one picker means someone can select Arc mainnet as source and Ethereum
-// Sepolia as destination — a bridge that burns real USDC into a testnet.
-const networksFor = (isMainnet) => Object.keys(EVM_CHAINS)
+
+// Circle issues EURC on five chains, not all eleven. Selecting EURC has to
+// hide the rest — burning EURC on Arc bound for a chain with no EURC leaves
+// it stranded behind an attestation that can never be minted.
+const networksFor = (isMainnet, token = 'USDC') => Object.keys(EVM_CHAINS)
   .filter(key => EVM_CHAINS[key].live !== false)
   .filter(key => !!EVM_CHAINS[key].isMainnet === isMainnet)
+  .filter(key => token !== 'EURC' || EVM_CHAINS[key].supportsEurc === true)
   .map(key => ({
   key,
   name: EVM_CHAINS[key].name,
   icon: EVM_CHAINS[key].icon,
   iconNode: <ChainIcon chain={EVM_CHAINS[key]} size={20} />,
   usdcAddress: EVM_CHAINS[key].usdcAddress,
+  eurcAddress: EVM_CHAINS[key].eurcAddress,
+  supportsEurc: EVM_CHAINS[key].supportsEurc === true,
   enabled: true,
 }))
 
@@ -108,9 +112,7 @@ export default function TestnetSend() {
   const [activeTab, setActiveTab] = useState('bridge') // 'bridge' | 'send' | 'swap'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
 
-  // Mainnet only. Arc went live on 16 September and the testnet chains are
-  // no longer offered — the toggle and its network state are gone with them.
-  const ALL_NETWORKS = networksFor(true)
+
 
     const [sourceChainKey, setSourceChainKey] = useState('arc-mainnet')
   const [bridgeToKey, setBridgeToKey] = useState('ethereum-mainnet')
@@ -123,6 +125,16 @@ export default function TestnetSend() {
   const [switchError, setSwitchError] = useState(null)
 
   const [selectedToken, setSelectedToken] = useState('USDC')
+   const bridgeToken = selectedToken === 'EURC' ? 'EURC' : 'USDC'
+    const ALL_NETWORKS = networksFor(true)
+      // Switching to EURC while a non-EURC chain is selected would leave an
+  // invalid pair on screen until the user noticed.
+  useEffect(() => {
+    if (activeTab !== 'bridge') return
+    const ok = (k) => bridgeToken !== 'EURC' || EVM_CHAINS[k]?.supportsEurc === true
+    if (!ok(sourceChainKey)) setSourceChainKey('arc')
+    if (!ok(bridgeToKey)) setBridgeToKey('ethereum-mainnet')
+  }, [bridgeToken, activeTab])
   const [showTokenModal, setShowTokenModal] = useState(false)
   const [showFromModal, setShowFromModal] = useState(false)
   const [showToModal, setShowToModal] = useState(false)
@@ -488,10 +500,23 @@ export default function TestnetSend() {
 
   const fromBox = (
     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
-      <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
-        <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
+        <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
+          {/* Token pill. Separate from the main control, which selects the
+              chain — conflating the two is what made this look like the
+              Send tab and removed chain selection entirely. */}
+          <button
+            onClick={() => setShowTokenModal(true)}
+            className="flex items-center gap-1 bg-[#161d28] border border-[#1e2530] px-2 py-0.5 rounded-full text-[10px] font-semibold text-white hover:border-[#00D4FF] transition-colors"
+          >
+            <CoinIcon symbol={bridgeToken} size={12} />
+            {bridgeToken}
+            <ChevronDown className="w-3 h-3 text-[#8892a0]" />
+          </button>
+        </div>
         <span className="text-[10px] text-[#8892a0]">
-          Balance: {chainBalance} USDC
+          Balance: {chainBalance} {bridgeToken}
           {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
             <>
               <button
@@ -510,8 +535,9 @@ export default function TestnetSend() {
           disabled={switchingChain}
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-60"
         >
-          <CoinIcon symbol="USDC" size={20} />
-          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
+          <ChainIcon chain={selectedChain} size={20} />
+          {selectedChain?.name || 'Select'}
+          <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
           type="number"
@@ -541,17 +567,27 @@ export default function TestnetSend() {
 
   const toBox = (
     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
-      <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
-        <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE TO</span>
-        <span className="text-[10px] text-[#8892a0]">Balance: {destBalance} USDC</span>
+          <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE TO</span>
+          {/* Read-only. CCTP mints the same asset it burned, so the
+              destination token always follows the source — an editable one
+              here would imply a swap that doesn't happen. */}
+          <span className="flex items-center gap-1 bg-[#161d28] border border-[#1e2530] px-2 py-0.5 rounded-full text-[10px] font-semibold text-[#8892a0]">
+            <CoinIcon symbol={bridgeToken} size={12} />
+            {bridgeToken}
+          </span>
+        </div>
+        <span className="text-[10px] text-[#8892a0]">Balance: {destBalance} {bridgeToken}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => setShowToModal(true)}
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
         >
-          <CoinIcon symbol="USDC" size={20} />
-          USDC <ChevronDown className="w-4 h-4 text-[#8892a0]" />
+          <ChainIcon chain={destChain} size={20} />
+          {destChain?.name || 'Select'}
+          <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
           type="number"
@@ -1166,13 +1202,17 @@ export default function TestnetSend() {
         selected={selectedToken}
         onSelect={setSelectedToken}
       />
-      <NetworkTokenModal
+           <NetworkTokenModal
         open={showFromModal}
         onClose={() => setShowFromModal(false)}
         title="Bridge from"
         networks={ALL_NETWORKS}
         activeKey={sourceChainKey}
-        onSelect={handleChainSelect}
+        activeToken={bridgeToken}
+        onSelect={(key, token) => {
+          handleChainSelect(key)
+          if (token) setSelectedToken(token)
+        }}
       />
       <NetworkTokenModal
         open={showToModal}
@@ -1180,7 +1220,13 @@ export default function TestnetSend() {
         title="Bridge to"
         networks={ALL_NETWORKS}
         activeKey={bridgeToKey}
-        onSelect={setBridgeToKey}
+        activeToken={bridgeToken}
+        onSelect={(key, token) => {
+          // Destination only — the wallet stays on the source chain, which
+          // is where the burn is signed.
+          setBridgeToKey(key)
+          if (token) setSelectedToken(token)
+        }}
       />
         <PartnerCards />
     </>

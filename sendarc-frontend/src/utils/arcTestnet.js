@@ -173,8 +173,9 @@ export const EVM_CHAINS = {
     nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 18 },
     cctpDomain: 26,
     icon: '/arc.svg',
-    isMainnet: true,
+     isMainnet: true,
     live: true,
+    supportsEurc: true,
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -216,6 +217,7 @@ export const EVM_CHAINS = {
     live: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
+    supportsEurc: true,
   },
 
   'base-mainnet': {
@@ -238,6 +240,7 @@ export const EVM_CHAINS = {
     cctpDomain: 6,
     isMainnet: true,
     live: true,
+    supportsEurc: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
   },
@@ -334,6 +337,7 @@ export const EVM_CHAINS = {
     cctpDomain: 1,
     isMainnet: true,
     live: true,
+    supportsEurc: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
   },
@@ -954,7 +958,7 @@ function readBridgeError(result) {
 
 // ─── Bridge via Circle App Kit ─────────────────────────────────────────────
 export async function bridgeUsdcViaAppKit(
-  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false, useForwarder = true },
+  { fromChainKey, toChainKey, from, to, amount, feeUsdc, feeRecipient, skipGasCheck = false, useForwarder = true, token = 'USDC' },
   onStatusUpdate = () => {}
 ) {
   const fromChain = EVM_CHAINS[fromChainKey]
@@ -1050,7 +1054,9 @@ export async function bridgeUsdcViaAppKit(
         // trade than telling someone to go acquire POL first.
          useForwarder: toChain.isSolana ? false : useForwarder,
       },
-      amount: grossAmount.toFixed(2),
+        amount: grossAmount.toFixed(2),
+      // 'USDC' or 'EURC'. App Kit defaults to USDC when omitted.
+      token,
     }
 
     if (collectFee) {
