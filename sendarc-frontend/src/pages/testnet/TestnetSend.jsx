@@ -323,15 +323,35 @@ export default function TestnetSend() {
     getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v))
   }, [account])
 
+  // bridgeToken was missing from the deps, so switching USDC<->EURC never
+  // refetched — and when it did, a slow response from the previous token
+  // could land after a fast one and overwrite it. That's the interchange.
+  //
+  // The cancelled flag drops stale responses; clearing first means a wrong
+  // number is never shown while the right one is in flight.
   useEffect(() => {
     if (!account) return
-    balanceFor(sourceChainKey, addressFor(sourceChainKey), bridgeToken).then(v => applyBalance(setChainBalance, v))
-  }, [sourceChainKey, account, arcBalance])
+    let cancelled = false
+    setChainBalance('-')
+
+    balanceFor(sourceChainKey, addressFor(sourceChainKey), bridgeToken)
+      .then(v => { if (!cancelled) applyBalance(setChainBalance, v) })
+      .catch(() => { if (!cancelled) setChainBalance('0.00') })
+
+    return () => { cancelled = true }
+  }, [sourceChainKey, account, arcBalance, bridgeToken])
 
   useEffect(() => {
     if (!account) return
-    balanceFor(bridgeToKey, addressFor(bridgeToKey), bridgeToken).then(v => applyBalance(setDestBalance, v))
-  }, [bridgeToKey, account, arcBalance])
+    let cancelled = false
+    setDestBalance('-')
+
+    balanceFor(bridgeToKey, addressFor(bridgeToKey), bridgeToken)
+      .then(v => { if (!cancelled) applyBalance(setDestBalance, v) })
+      .catch(() => { if (!cancelled) setDestBalance('0.00') })
+
+    return () => { cancelled = true }
+  }, [bridgeToKey, account, arcBalance, bridgeToken])
 
   useEffect(() => {
     if (!account) return
@@ -528,7 +548,7 @@ export default function TestnetSend() {
         <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
                <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
         <span className="text-[10px] text-[#8892a0]">
-          Bal: {parseFloat(chainBalance || 0).toFixed(2)} {bridgeToken}
+          Bal: {chainBalance === '-' ? '-' : parseFloat(chainBalance || 0).toFixed(2)} {bridgeToken}
           {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
             <>
               <button
@@ -586,7 +606,7 @@ export default function TestnetSend() {
                {/* Six decimals overflow a 360px screen alongside the 50%/Max links.
             Full precision returns at sm and above. */}
         <span className="text-[10px] text-[#8892a0]">
-          Bal: {parseFloat(destBalance || 0).toFixed(2)} {bridgeToken}
+          Bal: {destBalance === '-' ? '-' : parseFloat(destBalance || 0).toFixed(2)} {bridgeToken}
         </span>
       </div>
       <div className="flex items-center justify-between gap-3">
