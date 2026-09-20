@@ -501,20 +501,7 @@ export default function TestnetSend() {
   const fromBox = (
     <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-4 py-3">
         <div className="flex items-center justify-between flex-wrap gap-y-1 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
-          {/* Token pill. Separate from the main control, which selects the
-              chain — conflating the two is what made this look like the
-              Send tab and removed chain selection entirely. */}
-          <button
-            onClick={() => setShowTokenModal(true)}
-            className="flex items-center gap-1 bg-[#161d28] border border-[#1e2530] px-2 py-0.5 rounded-full text-[10px] font-semibold text-white hover:border-[#00D4FF] transition-colors"
-          >
-            <CoinIcon symbol={bridgeToken} size={12} />
-            {bridgeToken}
-            <ChevronDown className="w-3 h-3 text-[#8892a0]" />
-          </button>
-        </div>
+               <span className="text-[10px] tracking-widest text-[#8892a0]">BRIDGE FROM</span>
         <span className="text-[10px] text-[#8892a0]">
           Balance: {chainBalance} {bridgeToken}
           {parseFloat(chainBalance) > BRIDGE_FLAT_FEE_USDC && (
@@ -530,13 +517,15 @@ export default function TestnetSend() {
         </span>
       </div>
       <div className="flex items-center justify-between gap-2 sm:gap-3">
+           {/* Token on the button, chain underneath. Showing the chain in both
+            places read as a duplicate. */}
         <button
           onClick={() => setShowFromModal(true)}
           disabled={switchingChain}
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-60"
         >
-          <ChainIcon chain={selectedChain} size={20} />
-          {selectedChain?.name || 'Select'}
+          <CoinIcon symbol={bridgeToken} size={20} />
+          {bridgeToken}
           <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
@@ -585,8 +574,8 @@ export default function TestnetSend() {
           onClick={() => setShowToModal(true)}
           className="flex items-center gap-1.5 bg-[#1e2530] px-3 py-1.5 rounded-lg text-sm text-white font-semibold hover:opacity-80 transition-opacity flex-shrink-0"
         >
-          <ChainIcon chain={destChain} size={20} />
-          {destChain?.name || 'Select'}
+          <CoinIcon symbol={bridgeToken} size={20} />
+          {bridgeToken}
           <ChevronDown className="w-4 h-4 text-[#8892a0]" />
         </button>
         <input
