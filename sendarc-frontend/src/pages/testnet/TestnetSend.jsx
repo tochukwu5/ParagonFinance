@@ -510,8 +510,18 @@ export default function TestnetSend() {
 
   const validationBalance = activeTab === 'send' ? activeBalance : chainBalance
 
+  // The fee is charged in USDC via App Kit's customFee, whatever is being
+  // bridged. Adding 0.25 to a EURC amount treated two currencies as one
+  // unit and produced a "total debited" that didn't exist — EUR/USD is
+  // around 1.15, not 1.
+  //
+  // So the fee only joins the total when the bridged asset IS USDC. For
+  // EURC it's shown on its own line instead: two balances move, and the
+  // summary should say so rather than inventing a combined figure.
+  const feeInSameUnit = !isCCTP || bridgeToken === 'USDC'
+
   const totalDebit = amount
-    ? parseFloat(amount) + (isCCTP ? BRIDGE_FLAT_FEE_USDC : 0)
+    ? parseFloat(amount) + (isCCTP && feeInSameUnit ? BRIDGE_FLAT_FEE_USDC : 0)
     : null
 
   const afterSend = totalDebit !== null && parseFloat(validationBalance)
@@ -938,7 +948,7 @@ export default function TestnetSend() {
                       onClick={() => fillAmount(v)}
                       className="flex items-center gap-1 bg-[#0f1822] border border-[#1e2530] rounded-full px-3 py-1 text-[11px] text-white hover:border-[#00D4FF] transition-colors"
                     >
-                      <CoinIcon symbol="USDC" size={14} /> {v} USDC
+                      <CoinIcon symbol={bridgeToken} size={14} /> {v} {bridgeToken}
                     </button>
                   ))}
                 </div>
@@ -962,16 +972,22 @@ export default function TestnetSend() {
                   <div className="mt-3 space-y-1 text-xs">
                     <div className="flex justify-between text-[#8892a0]">
                       <span>Recipient receives</span>
-                      <span className="text-white font-semibold">{parseFloat(amount).toFixed(2)} USDC</span>
+                      <span className="text-white font-semibold">{parseFloat(amount).toFixed(2)} {bridgeToken}</span>
                     </div>
+                    {!feeInSameUnit && (
+                      <div className="flex justify-between text-[#8892a0]">
+                        <span>ParagonFinance fee</span>
+                        <span className="text-white font-semibold">{BRIDGE_FLAT_FEE_USDC.toFixed(2)} USDC</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-[#8892a0]">
                       <span>Total debited</span>
-                      <span className="text-white font-semibold">{totalDebit.toFixed(2)} USDC</span>
+                      <span className="text-white font-semibold">{totalDebit.toFixed(2)} {bridgeToken}</span>
                     </div>
                     {afterSend !== null && (
                       <div className="flex justify-between text-[#8892a0]">
                         <span>Balance after</span>
-                        <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>{afterSend} USDC</span>
+                        <span className={parseFloat(afterSend) < 0 ? 'text-red-400' : 'text-white'}>{afterSend} {bridgeToken}</span>
                       </div>
                     )}
                   </div>
@@ -1026,9 +1042,9 @@ export default function TestnetSend() {
                   {[
                     { l: 'From',    v: shortAddr(account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
-                    { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
+                                       { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : bridgeToken) },
                     ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
-                    ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' USDC' }] : []),
+                    ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' ' + bridgeToken }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
                     { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },
                   ].map(r => (
@@ -1093,7 +1109,7 @@ export default function TestnetSend() {
                       Your USDC is safe and recoverable
                     </p>
                     <p className="text-[11px] text-[#e8c374] leading-relaxed mb-2.5">
-                      {strandedBridge.amount} USDC was burned on{' '}
+                      {strandedBridge.amount} {bridgeToken} was burned on{' '}
                       {EVM_CHAINS[strandedBridge.sourceChainKey]?.name} but has not minted on{' '}
                       {EVM_CHAINS[strandedBridge.destinationChainKey]?.name} yet. Circle holds a
                       signed attestation authorising the mint and it does not expire. Fund your
@@ -1160,7 +1176,7 @@ export default function TestnetSend() {
                       ? [{ l: 'ParagonFinance Fee', v: txResult.bridgeFeePaid + ' USDC' }]
                       : []),
                     ...(txResult.grossAmount
-                      ? [{ l: 'Total debited', v: txResult.grossAmount.toFixed(2) + ' USDC' }]
+                      ? [{ l: 'Total debited', v: txResult.grossAmount.toFixed(2) + ' ' + (txResult.token || 'USDC') }]
                       : []),
                     ...(!txResult.cctpBridge
                       ? [{ l: 'Gas Paid', v: (txResult.gasCost || '0') + ' USDC' }]
