@@ -1059,11 +1059,15 @@ export async function bridgeUsdcViaAppKit(
       from: { adapter: fromAdapter, chain: fromChain.appKitChain },
       to: {
         adapter: toAdapter,
-        chain: toChain.appKitChain,
+             chain: toChain.appKitChain,
+        // Where the bridged tokens are minted. Without this App Kit mints to
+        // the signing wallet — so an address typed into "Add receiving
+        // wallet" was silently ignored and the funds went back to the sender.
+        ...(to ? { recipientAddress: to } : {}),
         // Circle fetches the attestation and submits the mint. Costs a
         // forwarding fee taken from the transfer, which is a far better
         // trade than telling someone to go acquire POL first.
-         useForwarder: toChain.isSolana ? false : useForwarder,
+        useForwarder: toChain.isSolana ? false : useForwarder,
       },
       amount: grossAmount.toFixed(2),
       // Without this App Kit defaults to USDC — which is what happened on
