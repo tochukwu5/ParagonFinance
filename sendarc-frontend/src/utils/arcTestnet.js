@@ -1165,13 +1165,25 @@ export async function bridgeUsdcViaAppKit(
     let feeHash = null
     if (separateFee) {
       try {
-        onStatusUpdate('Confirming ParagonFinance fee...')
+            onStatusUpdate('Confirming ParagonFinance fee...')
+
+        // App Kit tracks nonces itself, so a transaction sent straight after
+        // the bridge can reuse one the bridge just claimed — the wallet then
+        // refuses it with "invalid nonce". Reading the pending count from
+        // the chain and waiting a moment gives it the real next number.
+        await new Promise(r => setTimeout(r, 1500))
+        const nonce = await window.ethereum.request({
+          method: 'eth_getTransactionCount',
+          params: [from, 'pending'],
+        })
+
         feeHash = await window.ethereum.request({
           method: 'eth_sendTransaction',
           params: [{
             from,
             to: recipient,
             value: '0x' + BigInt(Math.round(fee * 1e6) * 1e12).toString(16),
+            nonce,
           }],
         })
       } catch (err) {
