@@ -126,7 +126,11 @@ export default function TestnetSend() {
 
   const [selectedToken, setSelectedToken] = useState('USDC')
    const bridgeToken = selectedToken === 'EURC' ? 'EURC' : 'USDC'
-    const ALL_NETWORKS = networksFor(true)
+    // Source: every chain, since the modal lists which tokens each carries.
+  // Destination: only chains holding the chosen token — offering Arbitrum
+  // for a EURC bridge would burn EURC with nothing to mint into.
+  const ALL_NETWORKS = networksFor(true)
+  const DEST_NETWORKS = networksFor(true, bridgeToken)
       // Switching to EURC while a non-EURC chain is selected would leave an
   // invalid pair on screen until the user noticed.
   useEffect(() => {
@@ -445,6 +449,9 @@ export default function TestnetSend() {
             amount,
             feeUsdc: BRIDGE_FLAT_FEE_USDC,
             feeRecipient: BRIDGE_FEE_RECIPIENT,
+            // The UI showed EURC while App Kit, receiving no token, fell
+            // back to USDC and burned that instead.
+            token: bridgeToken,
           },
           handleStatusUpdate
         )
@@ -1042,7 +1049,7 @@ export default function TestnetSend() {
                   {[
                     { l: 'From',    v: shortAddr(account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
-                                       { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : bridgeToken) },
+                    { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
                     ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
                     ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' ' + bridgeToken }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
@@ -1258,7 +1265,7 @@ export default function TestnetSend() {
         open={showToModal}
         onClose={() => setShowToModal(false)}
         title="Bridge to"
-        networks={ALL_NETWORKS}
+        networks={DEST_NETWORKS}
         activeKey={bridgeToKey}
         activeToken={bridgeToken}
         onSelect={(key, token) => {

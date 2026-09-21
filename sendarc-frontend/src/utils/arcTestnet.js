@@ -124,7 +124,7 @@ export const ARC_TESTNET = {
   eurcDecimals: 6,
   usycAddress: '0x8a5D989Bbb96929F689B0200f435f53dA42bF490',
   // No cirBTC on Arc mainnet in Circle's contract list.
-    cirbtcAddress: '0x171A4217b86A807A64eB94757Db6849fb4bDbAA0',
+  cirbtcAddress: null,
 }
 
 // Each chain carries a LIST of RPC endpoints, not one.
@@ -136,10 +136,10 @@ export const ARC_TESTNET = {
 // read is what made a funded chain display 0.000000 the moment it became the
 // destination. Ordering here puts the more reliable provider first.
 export const EVM_CHAINS = {
-  'arc-testnet': {
+  arc: {
     id: 5042002,
     chainIdHex: '0x4CEF52',
-    name: 'Arc',
+    name: 'Arc Testnet',
     appKitChain: 'Arc_Testnet',
     symbol: 'ARC',
     rpcUrl: 'https://rpc.testnet.arc.network',
@@ -154,7 +154,7 @@ export const EVM_CHAINS = {
     useCCTP: false,
     note: 'Native Arc — direct on-chain transfer',
   },
-     arc: {
+    'arc-mainnet': {
     id: 5042,
     chainIdHex: '0x13b2',
     name: 'Arc',
@@ -173,11 +173,9 @@ export const EVM_CHAINS = {
     nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 18 },
     cctpDomain: 26,
     icon: '/arc.svg',
-     isMainnet: true,
+    isMainnet: true,
     live: true,
-    supportsEurc: true,
   },
-
   // ═══════════════════════════════════════════════════════════════════════════
 // MAINNET CHAINS
 //
@@ -217,7 +215,6 @@ export const EVM_CHAINS = {
     live: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
-    supportsEurc: true,
   },
 
   'base-mainnet': {
@@ -240,7 +237,6 @@ export const EVM_CHAINS = {
     cctpDomain: 6,
     isMainnet: true,
     live: true,
-    supportsEurc: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
   },
@@ -337,7 +333,6 @@ export const EVM_CHAINS = {
     cctpDomain: 1,
     isMainnet: true,
     live: true,
-    supportsEurc: true,
     useCCTP: true,
     note: 'CCTP Bridge via Circle App Kit',
   },
@@ -617,9 +612,6 @@ export const EVM_CHAINS = {
   },
 }
 
-// Both keys resolve to Arc mainnet.
-EVM_CHAINS['arc-mainnet'] = EVM_CHAINS.arc
-
 // Accepts an explicit provider so a Rabby or Coinbase session prompts the
 // wallet the user actually connected with. Falling back to window.ethereum
 // meant the connect prompt came from one extension and the network prompt
@@ -770,10 +762,7 @@ export async function getUsdcBalance(chainKey, address) {
   }
 
   try {
-       // Both keys resolve to Arc mainnet. Checking only 'arc' meant a send
-    // passed 'arc-mainnet' fell through to the CCTP bridge path and failed
-    // with "Route from Arc to Arc is not supported".
-    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
+    if (chainKey === 'arc') {
       const raw = await readChain(chain, 'eth_getBalance', [address, 'latest'])
       if (!raw) return null
       return (Number(BigInt(raw)) / 1e18).toFixed(6)
@@ -962,6 +951,20 @@ export async function bridgeUsdcViaAppKit(
   onStatusUpdate = () => {}
 ) {
   const fromChain = EVM_CHAINS[fromChainKey]
+
+  // EURC exists on only a few chains. A route to one without it would burn
+  // on the source and leave nothing to mint into — checked here as well as
+  // in the UI, since this function is the last line before a signature.
+  if (token === 'EURC') {
+    const src = EVM_CHAINS[fromChainKey]
+    const dst = EVM_CHAINS[toChainKey]
+    if (!src?.supportsEurc || !dst?.supportsEurc) {
+      throw new Error(
+        'EURC can only be bridged between chains where Circle issues it: ' +
+        'Arc, Ethereum, Base and Avalanche.'
+      )
+    }
+  }
   const toChain = EVM_CHAINS[toChainKey]
   if (!fromChain) throw new Error('Unknown source chain: ' + fromChainKey)
   if (!toChain) throw new Error('Unknown destination chain: ' + toChainKey)
@@ -1054,8 +1057,9 @@ export async function bridgeUsdcViaAppKit(
         // trade than telling someone to go acquire POL first.
          useForwarder: toChain.isSolana ? false : useForwarder,
       },
-        amount: grossAmount.toFixed(2),
-      // 'USDC' or 'EURC'. App Kit defaults to USDC when omitted.
+      amount: grossAmount.toFixed(2),
+      // Without this App Kit defaults to USDC — which is what happened on
+      // the first EURC bridge: the UI said EURC and USDC was burned.
       token,
     }
 
@@ -1213,12 +1217,11 @@ export async function sendUsdcNativeArc({ from, to, amount }) {
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     status: 'confirmed',
-    sourceChain: 'Arc',
-    destinationChain: 'Arc',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'mainnet',
-    networkLabel: 'Arc',
+    network: 'Arc Testnet',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     simulated: false,
@@ -1275,12 +1278,11 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     status: 'confirmed',
-    sourceChain: 'Arc',
-    destinationChain: 'Arc',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'mainnet',
-    networkLabel: 'Arc (via ParagonFinance PaymentRouter)',
+    network: 'Arc Testnet (via ParagonFinance PaymentRouter)',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     routedThroughContract: true,
@@ -1296,7 +1298,7 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
 // Reference from a confirmed transaction: 146,859 gas at ~21 gwei ≈ 0.00308 USDC.
 export async function estimateSendPaymentGasCost({ from, to, amount }) {
   const ROUTER_GAS_BUDGET = 200000n
-  const FALLBACK_GAS_PRICE = 21000000000n // 21 gwei — observed on Arc
+  const FALLBACK_GAS_PRICE = 21000000000n // 21 gwei — observed on Arc Testnet
 
   const router = PARAGON_FINANCE_PAYMENT_ROUTER.address
 
@@ -1377,7 +1379,7 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
 
   const recordReceipt = await waitForReceipt(recordTxHash, 30, 1000)
   if (recordReceipt && recordReceipt.status === '0x0') {
-    throw new Error('SendArcRouter record failed. Check your wallet is connected to Arc.')
+    throw new Error('SendArcRouter record failed. Check your wallet is connected to Arc Testnet.')
   }
 
   const sendTxHash = await window.ethereum.request({
@@ -1406,12 +1408,11 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
     blockNumber: sendReceipt ? parseInt(sendReceipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     status: 'confirmed',
-    sourceChain: 'Arc',
-    destinationChain: 'Arc',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'mainnet',
-    networkLabel: 'Arc (via ParagonFinance PaymentRouter)',
+    network: 'Arc Testnet (via SendArcRouter)',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     routedThroughContract: true,
@@ -1533,12 +1534,11 @@ export async function sendEurcOnArc({ from, to, amount }) {
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     status: 'confirmed',
-    sourceChain: 'Arc',
-    destinationChain: 'Arc',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'mainnet',
-    networkLabel: 'Arc',
+    network: 'Arc Testnet',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     simulated: false,
@@ -1587,12 +1587,11 @@ export async function sendCirbtcOnArc({ from, to, amount }) {
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     settlementTime: Date.now() - start,
     status: 'confirmed',
-    sourceChain: 'Arc',
-    destinationChain: 'Arc',
+    sourceChain: 'Arc Testnet',
+    destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'mainnet',
-    networkLabel: 'Arc',
+    network: 'Arc Testnet',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     simulated: false,
@@ -1608,7 +1607,7 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   const from = accounts[0]
   if (!from) throw new Error('No account connected')
 
-    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
+  if (chainKey === 'arc') {
     onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
     return sendUsdcViaPaymentRouter({ from, to, amount })
   }
@@ -1670,7 +1669,7 @@ export async function payBridgeFeeToTreasury({ from }) {
     await switchToChain('arc')
     const after = await window.ethereum.request({ method: 'eth_chainId' })
     if (after?.toLowerCase() !== arcHex.toLowerCase()) {
-      throw new Error('Wallet must be on Arc to pay the ParagonFinance fee.')
+      throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee.')
     }
   }
 
