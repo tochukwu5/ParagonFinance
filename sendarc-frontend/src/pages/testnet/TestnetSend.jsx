@@ -525,7 +525,11 @@ export default function TestnetSend() {
   // So the fee only joins the total when the bridged asset IS USDC. For
   // EURC it's shown on its own line instead: two balances move, and the
   // summary should say so rather than inventing a combined figure.
-  const feeInSameUnit = !isCCTP || bridgeToken === 'USDC'
+   const feeInSameUnit = !isCCTP || bridgeToken === 'USDC'
+  // EURC bridges pay the fee separately, and only from Arc — where the
+  // Treasury lives. From other chains there's no Paragon fee to show.
+  const eurcFeeApplies = bridgeToken === 'EURC' &&
+    (sourceChainKey === 'arc' || sourceChainKey === 'arc-mainnet')
 
   const totalDebit = amount
     ? parseFloat(amount) + (isCCTP && feeInSameUnit ? BRIDGE_FLAT_FEE_USDC : 0)
@@ -981,7 +985,7 @@ export default function TestnetSend() {
                       <span>Recipient receives</span>
                       <span className="text-white font-semibold">{parseFloat(amount).toFixed(2)} {bridgeToken}</span>
                     </div>
-                    {!feeInSameUnit && (
+                       {!feeInSameUnit && eurcFeeApplies && (
                       <div className="flex justify-between text-[#8892a0]">
                         <span>ParagonFinance fee</span>
                         <span className="text-white font-semibold">{BRIDGE_FLAT_FEE_USDC.toFixed(2)} USDC</span>
@@ -1050,7 +1054,7 @@ export default function TestnetSend() {
                                        { l: 'From',    v: shortAddr(activeTab === 'bridge' ? addressFor(sourceChainKey) : account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
                                         { l: 'Recipient receives', v: parseFloat(amount || 0).toFixed(2) + ' ' + (activeTab === 'send' ? selectedToken : bridgeToken) },
-                    ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
+                                      ...(isCCTP && (bridgeToken === 'USDC' || eurcFeeApplies) ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
                     ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' ' + bridgeToken }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },
                     { l: 'Prompts', v: isCCTP ? '3 (approve, burn, mint)' : '1 (sign)' },

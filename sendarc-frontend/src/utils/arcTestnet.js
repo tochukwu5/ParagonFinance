@@ -981,11 +981,15 @@ export async function bridgeUsdcViaAppKit(
   if (fee > 0 && !recipient) {
     console.warn('[bridge] no fee recipient configured (VITE_TREASURY_ADDRESS / VITE_BRIDGE_FEE_RECIPIENT) — bridging without a ParagonFinance fee')
   }
+  // App Kit's customFee is USDC-only — it rejects EURC outright. So the
+  // inline fee applies to USDC bridges, and a EURC bridge pays its fee as a
+  // separate USDC transfer to the Treasury once the bridge has settled.
+  const inlineFee = collectFee && token === 'USDC'
+  const sourceIsArc = fromChainKey === 'arc' || fromChainKey === 'arc-mainnet'
+  const separateFee = collectFee && token === 'EURC' && sourceIsArc
 
-  // The fee is taken OUT of the bridged amount, so to have the recipient
-  // receive the full amount they asked for, the fee is added on top of it.
   const netAmount = parseFloat(amount)
-  const grossAmount = collectFee ? netAmount + fee : netAmount
+  const grossAmount = inlineFee ? netAmount + fee : netAmount
 
   // ── Pre-flight: destination gas ──────────────────────────────────────
   // Runs BEFORE kit.bridge, so a failure here costs nothing. Once the burn
@@ -1067,7 +1071,7 @@ export async function bridgeUsdcViaAppKit(
       token,
     }
 
-    if (collectFee) {
+    if (inlineFee) {
       bridgeParams.config = {
         customFee: {
           value: fee.toFixed(2),
@@ -1154,8 +1158,29 @@ export async function bridgeUsdcViaAppKit(
       throw err
     }
 
-    // sanitizeBigInts so this object survives the JSON.stringify inside
-    // recordTransaction's backend POST.
+  
+    // EURC fee, paid after the bridge so a failed bridge costs nothing.
+    // Native USDC to the Treasury — its receive() accepts plain transfers.
+    // Only from Arc: the Treasury lives here, and Arc's gas token is USDC.
+    let feeHash = null
+    if (separateFee) {
+      try {
+        onStatusUpdate('Confirming ParagonFinance fee...')
+        feeHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from,
+            to: recipient,
+            value: '0x' + BigInt(Math.round(fee * 1e6) * 1e12).toString(16),
+          }],
+        })
+      } catch (err) {
+        // The EURC has already arrived — failing here would tell the user
+        // their bridge failed when it didn't.
+        console.warn('[bridge] EURC fee not collected:', err?.message)
+      }
+    }
+
     return sanitizeBigInts({
       hash: burnHash,
       mintTxHash: mintHash,
@@ -1167,8 +1192,9 @@ export async function bridgeUsdcViaAppKit(
       // The success screen reads this. Without it, a EURC bridge's receipt
       // said USDC.
       token,
-      bridgeFeePaid: collectFee ? fee : null,
-      bridgeFeeRecipient: collectFee ? recipient : null,
+      bridgeFeePaid: (inlineFee || feeHash) ? fee : null,
+      bridgeFeeRecipient: (inlineFee || feeHash) ? recipient : null,
+      feeHash,
       gasCost: '0',
       gasUsed: 0,
       blockNumber: mintStep?.data?.blockNumber ? Number(mintStep.data.blockNumber) : 0,
