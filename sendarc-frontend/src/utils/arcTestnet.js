@@ -124,7 +124,7 @@ export const ARC_TESTNET = {
   eurcDecimals: 6,
   usycAddress: '0x8a5D989Bbb96929F689B0200f435f53dA42bF490',
   // No cirBTC on Arc mainnet in Circle's contract list.
-  cirbtcAddress: null,
+   cirbtcAddress: '0x171A4217b86A807A64eB94757Db6849fb4bDbAA0',
 }
 
 // Each chain carries a LIST of RPC endpoints, not one.
@@ -136,7 +136,7 @@ export const ARC_TESTNET = {
 // read is what made a funded chain display 0.000000 the moment it became the
 // destination. Ordering here puts the more reliable provider first.
 export const EVM_CHAINS = {
-  arc: {
+  'arc-testnet': {
     id: 5042002,
     chainIdHex: '0x4CEF52',
     name: 'Arc Testnet',
@@ -154,7 +154,7 @@ export const EVM_CHAINS = {
     useCCTP: false,
     note: 'Native Arc — direct on-chain transfer',
   },
-    'arc-mainnet': {
+     arc: {
     id: 5042,
     chainIdHex: '0x13b2',
     name: 'Arc',
@@ -611,7 +611,7 @@ export const EVM_CHAINS = {
     note: 'CCTP Bridge via Circle App Kit',
   },
 }
-
+EVM_CHAINS['arc-mainnet'] = EVM_CHAINS.arc
 // Accepts an explicit provider so a Rabby or Coinbase session prompts the
 // wallet the user actually connected with. Falling back to window.ethereum
 // meant the connect prompt came from one extension and the network prompt
