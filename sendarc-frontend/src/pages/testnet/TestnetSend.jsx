@@ -479,9 +479,16 @@ export default function TestnetSend() {
       setTxResult(result)
       setView('success')
      } catch (err) {
-      if (err.preflightBlocked) {
+      // Only the destination-gas check carries a token and chain — that one
+      // gets its dedicated panel. Every other pre-flight refusal (not enough
+      // EURC, not enough USDC for gas or fee) shows its own message. Routing
+      // all of them to the gas panel rendered it blank and hid the reason.
+      if (err.preflightBlocked && err.missingGasToken) {
         setMissingGas({ token: err.missingGasToken, chain: err.missingGasChain })
         setSendError(null)
+      } else if (err.preflightBlocked) {
+        setMissingGas(null)
+        setSendError(err.message)
       } else if (err.code === 4001) {
         setSendError('Transaction rejected in wallet.')
       } else {
@@ -549,7 +556,11 @@ export default function TestnetSend() {
 
   // Gating uses the RAW comparison, not the delayed warning state — an
   // invalid bridge must never be startable, not even for 300ms.
-  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked && (!needsSolana || !!solanaAddress)
+  // Blocks review when the amount exceeds the balance. Without this the
+  // button stayed live, and an unaffordable bridge reverted on-chain —
+  // spending the user's gas for nothing.
+  const overBalance = afterSend !== null && parseFloat(afterSend) < 0
+  const canReview = isValidAddress && isValidAmount && !switchingChain && tokenSupported && !sameChainPicked && (!needsSolana || !!solanaAddress) && !overBalance
 
   const explorerTxUrl = (hash, result) => {
     const key = result?.sourceChainKey || 'arc-mainnet'

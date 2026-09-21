@@ -1044,6 +1044,70 @@ export async function bridgeUsdcViaAppKit(
     }
   }
 
+  // ── Pre-flight: source funds and gas ─────────────────────────────────
+  // Runs before anything is signed. Once kit.bridge fires, the burn can't be
+  // undone, so every reason it might fail is checked here first. A refusal
+  // at this point moves nothing and costs nothing.
+  //
+  // A balance read that fails returns null and is skipped rather than
+  // blocking — an RPC hiccup shouldn't stop a bridge the user can afford.
+  {
+    onStatusUpdate('Checking balances...')
+    const onArc = fromChainKey === 'arc' || fromChainKey === 'arc-mainnet'
+    // Covers approve + burn, plus the separate fee transfer on a EURC
+    // bridge. Arc gas costs cents; the margin stops a near-empty wallet from
+    // passing the check and then failing halfway through.
+    const ARC_GAS_BUFFER = 0.05
+
+    const blocked = (message) => {
+      const err = new Error(message)
+      err.preflightBlocked = true
+      return err
+    }
+
+    // 1. Enough of the token being bridged.
+    const needToken = token === 'USDC' ? grossAmount : netAmount
+    const tokenBal = token === 'EURC'
+      ? await getEurcBalanceOnChain(fromChainKey, from)
+      : await getUsdcBalance(fromChainKey, from)
+    if (tokenBal !== null && parseFloat(tokenBal) < needToken) {
+      throw blocked(
+        'Not enough ' + token + ' on ' + fromChain.name + '. You need ' +
+        needToken.toFixed(2) + ' ' + token + ' and have ' +
+        parseFloat(tokenBal).toFixed(2) + '. Nothing has been sent.'
+      )
+    }
+
+    // 2. Gas on the source chain.
+    const nativeBal = await getNativeBalance(fromChainKey, from)
+    if (nativeBal !== null) {
+      const native = parseFloat(nativeBal)
+      if (onArc) {
+        // On Arc the gas token IS USDC, so it's spent more than once: a
+        // USDC bridge moves it and pays gas with it, and a EURC bridge pays
+        // its 0.25 fee in it too.
+        const needUsdc =
+          (token === 'USDC' ? grossAmount : 0) +
+          (separateFee ? fee : 0) +
+          ARC_GAS_BUFFER
+        if (native < needUsdc) {
+          throw blocked(
+            'Not enough USDC on Arc. This bridge needs about ' +
+            needUsdc.toFixed(2) + ' USDC' +
+            (token === 'EURC' ? ' to cover gas and the 0.25 USDC fee' : ' including gas') +
+            ', and you have ' + native.toFixed(2) + '. Nothing has been sent.'
+          )
+        }
+      } else if (native === 0) {
+        const sym = fromChain.nativeCurrency?.symbol || 'gas'
+        throw blocked(
+          'No ' + sym + ' on ' + fromChain.name + ' to pay for gas. Add a little ' +
+          sym + ' and try again. Nothing has been sent.'
+        )
+      }
+    }
+  }
+
   try {
     const { AppKit } = await import('@circle-fin/app-kit')
     const { createViemAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2')
