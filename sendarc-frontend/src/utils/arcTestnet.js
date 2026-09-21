@@ -208,6 +208,7 @@ export const EVM_CHAINS = {
     ],
     explorerUrl: 'https://etherscan.io',
     usdcAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    eurcAddress: '0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     icon: '/ethlogo.svg',
     color: '#627EEA',
@@ -233,6 +234,7 @@ export const EVM_CHAINS = {
     ],
     explorerUrl: 'https://basescan.org',
     usdcAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    eurcAddress: '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     icon: '/base.svg',
     color: '#0052FF',
@@ -330,6 +332,7 @@ export const EVM_CHAINS = {
     ],
     explorerUrl: 'https://snowtrace.io',
     usdcAddress: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+    eurcAddress: '0xC891EB4cbdEFf6e073e859e987815Ed1505c2ACD',
     nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
     icon: '/avalanche.svg',
     color: '#E84142',
@@ -748,6 +751,33 @@ async function readChain(chain, method, params) {
 // Returns a decimal string on success, or null when the balance genuinely
 // couldn't be read. Callers must distinguish the two — rendering null as
 // "0.000000" is what made a funded destination chain look empty.
+/**
+ * EURC balance on any chain that carries it.
+ *
+ * Mirrors getUsdcBalance, reading the chain's EURC contract instead. The
+ * bridge tab previously only read EURC on Arc — on Ethereum, Base and
+ * Avalanche it returned nothing, so the balance sat on "-" indefinitely.
+ *
+ * A chain without EURC returns 0 rather than null, so the display reads
+ * "0.00" instead of an unexplained dash.
+ */
+export async function getEurcBalanceOnChain(chainKey, address) {
+  const chain = EVM_CHAINS[chainKey]
+  if (!chain || !address) return null
+  if (!chain.eurcAddress) return '0.000000'
+
+  try {
+    const paddedAddr = address.slice(2).toLowerCase().padStart(64, '0')
+    const result = await readChain(chain, 'eth_call', [{ to: chain.eurcAddress, data: '0x70a08231' + paddedAddr }, 'latest'])
+    if (!result || result === '0x') return '0.000000'
+    // EURC uses 6 decimals on every chain Circle issues it.
+    return (Number(BigInt(result)) / 1_000_000).toFixed(6)
+  } catch (err) {
+    console.warn('[balance] EURC ' + chainKey + ' read failed:', err?.message)
+    return null
+  }
+}
+
 export async function getUsdcBalance(chainKey, address) {
   const chain = EVM_CHAINS[chainKey]
   if (!chain || !address) return null

@@ -5,7 +5,7 @@ import { useTestnet } from '../../context/TestnetContext'
 import {
   ARC_TESTNET, EVM_CHAINS, shortAddr, arcScanTx,
   switchToChain, sendUsdcOnChain, getUsdcBalance,
-  getEurcBalance, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
+  getEurcBalance, getEurcBalanceOnChain, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
   BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT
 } from '../../utils/arcTestnet'
@@ -214,10 +214,9 @@ export default function TestnetSend() {
     if (!addr) return null
     if (token !== 'EURC') return getUsdcBalance(chainKey, addr)
 
-    if (chainKey === 'arc' || chainKey === 'arc-mainnet') {
-      return getEurcBalance(addr)
-    }
-    return null
+    // Reads the chain's own EURC contract. Previously only Arc was read and
+    // every other chain returned null — which left the balance stuck on "-".
+    return getEurcBalanceOnChain(chainKey, addr)
   }
   // Solana balances must be read against the Solana address, not the EVM
   // one. Passing `account` to a Solana RPC queries an address that doesn't
