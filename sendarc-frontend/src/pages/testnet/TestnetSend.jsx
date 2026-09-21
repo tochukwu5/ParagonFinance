@@ -1047,9 +1047,9 @@ export default function TestnetSend() {
 
                 <div className="space-y-3 mb-5">
                   {[
-                    { l: 'From',    v: shortAddr(account), mono: true },
+                                       { l: 'From',    v: shortAddr(activeTab === 'bridge' ? addressFor(sourceChainKey) : account), mono: true },
                     { l: 'To',      v: shortAddr(recipient), mono: true },
-                    { l: 'Recipient receives', v: amount + ' ' + (activeTab === 'send' ? selectedToken : 'USDC') },
+                                        { l: 'Recipient receives', v: parseFloat(amount || 0).toFixed(2) + ' ' + (activeTab === 'send' ? selectedToken : bridgeToken) },
                     ...(isCCTP ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
                     ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' ' + bridgeToken }] : []),
                     { l: 'Est. Time', v: isCCTP ? '2–5 minutes' : '< 1 second', accent: true },

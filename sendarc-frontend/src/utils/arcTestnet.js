@@ -1163,7 +1163,10 @@ export async function bridgeUsdcViaAppKit(
       from,
       to,
       amount: netAmount,
-      grossAmount,
+           grossAmount,
+      // The success screen reads this. Without it, a EURC bridge's receipt
+      // said USDC.
+      token,
       bridgeFeePaid: collectFee ? fee : null,
       bridgeFeeRecipient: collectFee ? recipient : null,
       gasCost: '0',
