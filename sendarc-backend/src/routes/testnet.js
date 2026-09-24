@@ -167,7 +167,7 @@ router.post('/transactions', async (req, res) => {
       blockNumber,
       timestamp,
       status: status || 'confirmed',
-      network: network || 'Arc Testnet',
+      network: network || 'mainnet',
       chainId: chainId || 5042002,
       memo: memo || '',
       selfTransfer: from.toLowerCase() === to.toLowerCase(),

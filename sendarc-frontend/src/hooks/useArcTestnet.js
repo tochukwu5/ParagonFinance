@@ -414,7 +414,7 @@ export function useArcTestnet() {
         blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : null,
         status: receipt?.status === '0x1' ? 'confirmed' : 'failed',
         timestamp: new Date().toISOString(),
-        network: 'Arc Testnet',
+            network: 'mainnet',
         chainId: ARC_TESTNET.id,
       }
     } catch (err) {

@@ -666,7 +666,7 @@ export async function executeSwap({
     settlementTime: Date.now() - start,
     blockNumber: receipt ? parseInt(receipt.blockNumber, 16) : 0,
     status: 'confirmed',
-    network: 'Arc Testnet',
+    network: 'mainnet',
     chainId: ARC_TESTNET.id,
     dex: 'UnitFlow Finance',
     swap: true,

@@ -22,7 +22,7 @@ export function WalletProvider({ children }) {
         address: account,
         shortAddress: account.slice(0, 6) + '...' + account.slice(-4),
         balance: parseFloat(balance).toFixed(2),
-        network: 'Arc Testnet',
+        network: 'Arc',
         // Was hardcoded — so a Rabby user's wallet object claimed MetaMask.
         provider: walletId || 'metamask',
       }
