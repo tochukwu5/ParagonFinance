@@ -168,7 +168,7 @@ router.post('/transactions', async (req, res) => {
       timestamp,
       status: status || 'confirmed',
       network: network || 'mainnet',
-      chainId: chainId || 5042002,
+      chainId: chainId || 5042,
       memo: memo || '',
       selfTransfer: from.toLowerCase() === to.toLowerCase(),
       walletAddress: walletAddress.toLowerCase(),
