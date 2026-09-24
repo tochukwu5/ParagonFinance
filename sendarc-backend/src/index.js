@@ -94,7 +94,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'Paragon Finance API',
-    network: 'Arc Testnet · Chain 5042002',
+        network: 'Arc · Chain 5042',
     timestamp: new Date().toISOString(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   })
@@ -116,8 +116,8 @@ app.get('/', (req, res) => {
       networkStats: 'GET /api/testnet/network-stats',
     },
     arcTestnet: {
-      chainId: 5042002,
-      rpc: 'https://rpc.testnet.arc.network',
+           chainId: 5042,
+      rpc: process.env.QUICKNODE_ARC_RPC || 'https://rpc.mainnet.arc.io',
       explorer: 'https://testnet.arcscan.app',
     }
   })
@@ -152,9 +152,9 @@ connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`
 🚀 Paragon Finance Backend running on port ${PORT}
-🌐 Arc Testnet · Chain ID: 5042002
+🌐 Arc Mainnet · Chain ID: 5042
 📊 MongoDB: connected
-🔗 RPC: https://rpc.testnet.arc.network
+🔗 RPC: ${process.env.QUICKNODE_ARC_RPC ? 'QuickNode (Arc mainnet)' : 'https://rpc.mainnet.arc.io'}
     `)
   })
 })
