@@ -1839,7 +1839,7 @@ export async function payBridgeFeeToTreasury({ from }) {
     await switchToChain('arc')
     const after = await window.ethereum.request({ method: 'eth_chainId' })
     if (after?.toLowerCase() !== arcHex.toLowerCase()) {
-      throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee.')
+      throw new Error('Wallet must be on Arc Testnet to pay the ParagonFinance fee. ')
     }
   }
 
