@@ -743,8 +743,8 @@ export default function TestnetSend() {
 
             {!hasMetaMask && (
               <div className="text-center py-4">
-                <h3 className="font-bold font-['Space_Grotesk'] mb-1.5">MetaMask required</h3>
-                <p className="text-[#8892a0] text-sm mb-4">Install MetaMask to send or bridge USDC.</p>
+                <h3 className="font-bold font-['Space_Grotesk'] mb-1.5">Wallet required</h3>
+                <p className="text-[#8892a0] text-sm mb-4">Install wallet or MetaMask to send or bridge USDC.</p>
                 <a href="https://metamask.io" target="_blank" rel="noreferrer"
                   className="bg-[#e8821a] text-white font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl hover:opacity-90 inline-block">
                   Install MetaMask ↗
