@@ -512,6 +512,13 @@ export default function TestnetSend() {
         setSendError(err.message)
       } else if (err.code === 4001) {
         setSendError('Transaction rejected in wallet.')
+      } else if (/message channel|message port/i.test(err.message || '')) {
+        // Not our error — this is the wallet extension's own background
+        // script dropping the connection mid-request (common with MetaMask
+        // on Manifest V3, where its service worker can go idle between the
+        // request and the response). The raw text means nothing to a user,
+        // and retrying almost always works since nothing was signed yet.
+        setSendError('Lost connection to your wallet extension momentarily. Please try again.')
       } else {
         setSendError(err.message || 'Transaction failed. Please try again.')
       }
