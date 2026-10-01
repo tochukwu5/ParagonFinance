@@ -1158,9 +1158,7 @@ export async function bridgeUsdcViaAppKit(
         // the signing wallet — so an address typed into "Add receiving
         // wallet" was silently ignored and the funds went back to the sender.
         ...(to ? { recipientAddress: to } : {}),
-        // Circle fetches the attestation and submits the mint. Costs a
-        // forwarding fee taken from the transfer, which is a far better
-        // trade than telling someone to go acquire POL first.
+    
         useForwarder: toChain.isSolana ? false : useForwarder,
       },
       amount: grossAmount.toFixed(2),
@@ -1186,10 +1184,7 @@ export async function bridgeUsdcViaAppKit(
     }
 
     if (result.state === 'error') {
-      // safeStringify, not JSON.stringify — App Kit results carry BigInt
-      // values, and JSON.stringify throws on those. That meant this very
-      // line, whose whole job is to report the failure, threw its own
-      // "Do not know how to serialize a BigInt" over the real cause.
+  
       const detail = safeStringify(result)
 
       const steps = result.steps || []
@@ -1637,7 +1632,7 @@ async function collectTokenSendFee({ from, tokenAddress, amount, symbol }) {
 
 // Real EURC transfer — standard ERC-20 on Arc.
 export async function sendEurcOnArc({ from, to, amount }) {
-  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!window.ethereum) throw new Error('wallet not found')
   const start = Date.now()
   const rawAmount = BigInt(Math.round(parseFloat(amount) * Math.pow(10, ARC_TESTNET.eurcDecimals)))
 

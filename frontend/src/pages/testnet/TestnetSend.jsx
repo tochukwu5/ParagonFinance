@@ -434,6 +434,13 @@ export default function TestnetSend() {
         result = await sendCirbtcOnArc({ from: account, to: recipient, amount })
 
       } else if (activeTab === 'bridge') {
+        // Guard against bridging a chain to itself — Circle's bridge
+        // correctly rejects this, but catching it here gives a clear
+        // message instead of a confusing API error.
+        if (sourceChainKey === bridgeToKey) {
+          throw new Error('Source and destination can\'t be the same network. Please choose a different destination.')
+        }
+
         // The ParagonFinance fee rides inside the bridge via App Kit's
         // customFee — charged in USDC on the source chain, settled atomically.
         result = await bridgeUsdcViaAppKit(
