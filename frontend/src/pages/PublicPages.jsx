@@ -892,7 +892,7 @@ export function DocsPage() {
               {
                 phase: 'Phase 2',
                 title: 'Liquidity & Execution',
-                status: 'Upcoming',
+                status: 'In Progress',
                 color: '#00FFCC',
                 items: ['Multi-source liquidity routing', 'Swap aggregation', 'Cross-chain liquidity', 'Slippage optimisation', 'Expanded stablecoin support', 'Additional liquidity partners'],
               },
