@@ -1761,7 +1761,13 @@ export async function sendUsdcOnChain(chainKey, { to, amount }, onStatusUpdate =
   const from = accounts[0]
   if (!from) throw new Error('No account connected')
 
-  if (chainKey === 'arc') {
+  // Called with 'arc-mainnet' (see TestnetSend.jsx), but this chain only
+  // ever lives under the key 'arc' — see the alias a few hundred lines up.
+  // Comparing the raw string here meant this check never matched, so every
+  // plain Send silently fell through to sendUsdcViaCCTP below and tried to
+  // CCTP-bridge Arc to itself. That's the real source of "Route from Arc to
+  // Arc is not supported" — it wasn't only a Bridge-tab issue.
+  if (canonicalChainKey(chainKey) === 'arc') {
     onStatusUpdate('Routing through ParagonFinance PaymentRouter...')
     return sendUsdcViaPaymentRouter({ from, to, amount })
   }
