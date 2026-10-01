@@ -7,7 +7,7 @@ import {
   switchToChain, sendUsdcOnChain, getUsdcBalance,
   getEurcBalance, getEurcBalanceOnChain, sendEurcOnArc, getCirbtcBalance, sendCirbtcOnArc,
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
-  BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT
+  BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT, canonicalChainKey
 } from '../../utils/arcTestnet'
 import { Card, LoadingSpinner } from '../../components/UI'
 import Navbar from '../../components/Navbar'
@@ -80,10 +80,23 @@ const CCTP_STEPS = [
 // Circle issues EURC on five chains, not all eleven. Selecting EURC has to
 // hide the rest — burning EURC on Arc bound for a chain with no EURC leaves
 // it stranded behind an attestation that can never be minted.
-const networksFor = (isMainnet, token = 'USDC') => Object.keys(EVM_CHAINS)
+const networksFor = (isMainnet, token = 'USDC') => {
+  const seenChainIds = new Set()
+  return Object.keys(EVM_CHAINS)
   .filter(key => EVM_CHAINS[key].live !== false)
   .filter(key => !!EVM_CHAINS[key].isMainnet === isMainnet)
   .filter(key => token !== 'EURC' || EVM_CHAINS[key].supportsEurc === true)
+  // 'arc' and 'arc-mainnet' are two keys for the one Arc chain (see the
+  // alias in arcTestnet.js). Without this, Arc appeared twice in every
+  // picker as two identical-looking entries — pick one as source and the
+  // other as destination and every same-chain check missed it, which is
+  // what let a same-chain bridge reach Circle's SDK and fail.
+  .filter(key => {
+    const id = EVM_CHAINS[key].id
+    if (seenChainIds.has(id)) return false
+    seenChainIds.add(id)
+    return true
+  })
   .map(key => ({
   key,
   name: EVM_CHAINS[key].name,
@@ -94,6 +107,7 @@ const networksFor = (isMainnet, token = 'USDC') => Object.keys(EVM_CHAINS)
   supportsEurc: EVM_CHAINS[key].supportsEurc === true,
   enabled: true,
 }))
+}
 
 const AMOUNT_PRESETS = [1, 5, 10]
 
@@ -194,7 +208,7 @@ export default function TestnetSend() {
   const tokenSupported = selectedToken === 'USDC' || selectedToken === 'EURC' || selectedToken === 'cirBTC'
   const activeBalance = selectedToken === 'EURC' ? eurcBalance : selectedToken === 'cirBTC' ? cirbtcBalance : arcUsdcBalance
 
-  const sameChainPicked = activeTab === 'bridge' && sourceChainKey === bridgeToKey
+  const sameChainPicked = activeTab === 'bridge' && canonicalChainKey(sourceChainKey) === canonicalChainKey(bridgeToKey)
 
   const sendTokens = [
     { symbol: 'USDC',   name: 'USD Coin',       balance: arcUsdcBalance, enabled: true },
@@ -237,11 +251,11 @@ export default function TestnetSend() {
   }, [sameChainPicked])
 
   const handleChainSelect = async (chainKey) => {
-    if (chainKey === sourceChainKey) return
+    if (canonicalChainKey(chainKey) === canonicalChainKey(sourceChainKey)) return
 
     // If the user picks the chain already set as the destination, swap rather
     // than creating an invalid pair — that's what they almost certainly meant.
-    if (chainKey === bridgeToKey) {
+    if (canonicalChainKey(chainKey) === canonicalChainKey(bridgeToKey)) {
       handleSwapDirection()
       return
     }
@@ -309,8 +323,8 @@ export default function TestnetSend() {
       switchToChain('arc-mainnet').catch(() => {})
       if (account) getUsdcBalance('arc-mainnet', account).then(v => applyBalance(setArcUsdcBalance, v))
     }
-    if (activeTab === 'bridge' && sourceChainKey === bridgeToKey) {
-          setBridgeToKey(sourceChainKey === 'arc-mainnet' ? 'ethereum-mainnet' : 'arc-mainnet')
+    if (activeTab === 'bridge' && canonicalChainKey(sourceChainKey) === canonicalChainKey(bridgeToKey)) {
+          setBridgeToKey(canonicalChainKey(sourceChainKey) === 'arc' ? 'ethereum-mainnet' : 'arc-mainnet')
     }
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected])
@@ -437,7 +451,7 @@ export default function TestnetSend() {
         // Guard against bridging a chain to itself — Circle's bridge
         // correctly rejects this, but catching it here gives a clear
         // message instead of a confusing API error.
-        if (sourceChainKey === bridgeToKey) {
+        if (canonicalChainKey(sourceChainKey) === canonicalChainKey(bridgeToKey)) {
           throw new Error('Source and destination can\'t be the same network. Please choose a different destination.')
         }
 

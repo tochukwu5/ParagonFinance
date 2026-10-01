@@ -619,6 +619,20 @@ export const EVM_CHAINS = {
   },
 }
 EVM_CHAINS['arc-mainnet'] = EVM_CHAINS.arc
+
+// 'arc' and 'arc-mainnet' are two different keys pointing at the exact same
+// chain object (the alias above). That's convenient for lookups — either
+// name works — but it quietly broke every "is this the same chain" check in
+// the app: comparing the two strings with === says "different" even though
+// App Kit sees both as its one 'Arc' chain. Pick one side as 'arc' and the
+// other as 'arc-mainnet' and every same-chain guard (here and in
+// TestnetSend.jsx) waves it through, so the bridge call reaches Circle's SDK
+// with source and destination both resolving to 'Arc' — which is exactly
+// what throws "route from arc to arc is not supported for the token usdc".
+// Every chain-key comparison in the app should go through this first.
+export function canonicalChainKey(key) {
+  return key === 'arc-mainnet' ? 'arc' : key
+}
 // Accepts an explicit provider so a Rabby or Coinbase session prompts the
 // wallet the user actually connected with. Falling back to window.ethereum
 // meant the connect prompt came from one extension and the network prompt
@@ -1002,7 +1016,9 @@ export async function bridgeUsdcViaAppKit(
   const toChain = EVM_CHAINS[toChainKey]
   if (!fromChain) throw new Error('Unknown source chain: ' + fromChainKey)
   if (!toChain) throw new Error('Unknown destination chain: ' + toChainKey)
-  if (fromChainKey === toChainKey) throw new Error('Source and destination can\'t be the same chain.')
+  if (canonicalChainKey(fromChainKey) === canonicalChainKey(toChainKey)) {
+    throw new Error('Source and destination can\'t be the same chain.')
+  }
 
   const fee = feeUsdc !== undefined ? Number(feeUsdc) : BRIDGE_FLAT_FEE_USDC
   const recipient = feeRecipient || BRIDGE_FEE_RECIPIENT
