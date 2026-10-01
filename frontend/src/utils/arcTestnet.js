@@ -1325,7 +1325,12 @@ export async function bridgeUsdcViaAppKit(
       destinationChain: toChain.name,
       sourceChainKey: fromChainKey,
       destinationChainKey: toChainKey,
-      network: fromChain.name + ' → ' + toChain.name + ' (CCTP v2)',
+      // Backend's `network` column is a strict enum (['mainnet','testnet'])
+      // used for filtering — a descriptive string here fails that validation
+      // and the save 500s. The readable label goes in `networkLabel`, which
+      // the schema has specifically for this.
+      network: 'mainnet',
+      networkLabel: fromChain.name + ' → ' + toChain.name + ' (CCTP v2)',
       chainId: fromChain.id,
       cctpBridge: true,
       forwarded: useForwarder,
@@ -1436,7 +1441,10 @@ export async function sendUsdcViaPaymentRouter({ from, to, amount }) {
     destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'Arc Testnet (via ParagonFinance PaymentRouter)',
+    // Same fix as the bridge result above — `network` must stay an enum
+    // value the backend accepts; the readable text moves to networkLabel.
+    network: 'mainnet',
+    networkLabel: 'Arc Testnet (via ParagonFinance PaymentRouter)',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     routedThroughContract: true,
@@ -1566,7 +1574,9 @@ export async function sendUsdcViaSendArcRouter({ from, to, amount }) {
     destinationChain: 'Arc Testnet',
     sourceChainKey: 'arc',
     destinationChainKey: 'arc',
-    network: 'Arc Testnet (via SendArcRouter)',
+    // Same fix as the two result builders above.
+    network: 'mainnet',
+    networkLabel: 'Arc Testnet (via SendArcRouter)',
     chainId: ARC_TESTNET.id,
     cctpBridge: false,
     routedThroughContract: true,
