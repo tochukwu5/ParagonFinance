@@ -10,6 +10,7 @@ import testnetRoutes from './routes/testnet.js'
 import adminRoutes from './routes/admin.js'
 import statsRoutes from './routes/stats.js'
 import rewardRoutes from './routes/rewards.js'
+import usernameRoutes from './routes/username.js'
 
 dotenv.config()
 
@@ -74,6 +75,16 @@ app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Too many requests — please try again later' },
+  // Username lookups fire as someone types (availability) and whenever a
+  // @handle is entered in Send, so they get their own, higher limit below
+  // rather than eating this shared budget.
+  skip: (req) => req.path.startsWith('/username/'),
+}))
+
+app.use('/api/username', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { error: 'Too many requests — please try again later' },
 }))
 
 // ─── Routes ───────────────────────────────────────────────────────────
@@ -88,6 +99,7 @@ app.use('/api/admin', rateLimit({
 app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
 app.use('/api/rewards', rewardRoutes)
+app.use('/api/username', usernameRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
@@ -114,6 +126,9 @@ app.get('/', (req, res) => {
       getStats: 'GET /api/testnet/stats/:walletAddress',
       leaderboard: 'GET /api/testnet/leaderboard',
       networkStats: 'GET /api/testnet/network-stats',
+      checkUsername: 'GET /api/username/check/:name',
+      resolveUsername: 'GET /api/username/resolve/:name',
+      claimUsername: 'POST /api/username/claim',
     },
     arcTestnet: {
            chainId: 5042,

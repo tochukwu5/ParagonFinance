@@ -89,6 +89,12 @@ const Icon = {
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" />
     </svg>
   ),
+  link: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
+      <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+    </svg>
+  ),
   menu: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}>
       <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
@@ -113,6 +119,7 @@ const ACCOUNT = [
   { to: '/dashboard/transactions',  label: 'Transactions',  icon: 'transactions' },
   { to: '/dashboard/referrals',     label: 'Referrals',     icon: 'affiliate' },
   { to: '/dashboard/wallet',        label: 'Wallet',        icon: 'wallet' },
+  { to: '/dashboard/payment-link',  label: 'Pay Link',      icon: 'link' },
   { to: '/dashboard/notifications', label: 'Notifications', icon: 'bell' },
   { to: '/dashboard/settings',      label: 'Settings',      icon: 'settings' },
 ]

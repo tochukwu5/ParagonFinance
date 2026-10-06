@@ -18,6 +18,8 @@ import { HowItWorks, AboutPage, DocsPage } from './pages/PublicPages'
 import TestnetSend from './pages/testnet/TestnetSend'
 import AdminPage from './pages/AdminPage'
 import StatsPage from './pages/StatsPage'
+import UsernamePage from './pages/UsernamePage'
+import PayPage from './pages/PayPage'
 import { useReferralCapture } from './hooks/useReferralCapture'
 import AffiliatePage from './pages/AffiliatePage'
 import AffiliateDashboard from './pages/AffiliateDashboard'
@@ -135,6 +137,10 @@ export default function App() {
             <Route path="/dashboard/wallet" element={<AppLayout><WalletPage /></AppLayout>} />
             <Route path="/dashboard/notifications" element={<AppLayout><Notifications /></AppLayout>} />
             <Route path="/dashboard/settings" element={<AppLayout><Settings /></AppLayout>} />
+            <Route path="/dashboard/payment-link" element={<AppLayout><UsernamePage /></AppLayout>} />
+
+            {/* ── Public pay page — what a payment link / QR code opens ── */}
+            <Route path="/pay/:username" element={<AppLayout><PayPage /></AppLayout>} />
 
             {/* ── Internal ───────────────────────────────────────── */}
             <Route path="/admin" element={<BareLayout><AdminPage /></BareLayout>} />

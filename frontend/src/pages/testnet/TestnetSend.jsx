@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useArcTestnet } from '../../hooks/useArcTestnet'
 import { useTestnet } from '../../context/TestnetContext'
 import {
@@ -9,6 +9,7 @@ import {
   bridgeUsdcViaAppKit, estimateSendPaymentGasCost,
   BRIDGE_FLAT_FEE_USDC, BRIDGE_FEE_RECIPIENT, canonicalChainKey
 } from '../../utils/arcTestnet'
+import { readPayPrefill, looksLikeHandle, resolveUsername, normalizeHandle } from '../../utils/username'
 import { Card, LoadingSpinner } from '../../components/UI'
 import Navbar from '../../components/Navbar'
 import TokenSelectModal from '../../components/TokenSelectModal'
@@ -123,7 +124,12 @@ export default function TestnetSend() {
   } = useArcTestnet()
   const { recordTransaction, loadTransactions } = useTestnet()
 
-  const [activeTab, setActiveTab] = useState('bridge') // 'bridge' | 'send' | 'swap'
+  // Opened from a payment link / QR (/app?to=@alice&amount=5)? Read it once,
+  // up front, so the page can start on the Send tab instead of flashing
+  // Bridge first.
+  const location = useLocation()
+  const prefillRef = useRef(readPayPrefill(location.search))
+  const [activeTab, setActiveTab] = useState(prefillRef.current ? 'send' : 'bridge') // 'bridge' | 'send' | 'swap'
   const [view, setView] = useState('form')            // 'form' | 'confirm' | 'success'
 
 
@@ -158,6 +164,11 @@ export default function TestnetSend() {
   const [showToModal, setShowToModal] = useState(false)
 
   const [recipient, setRecipient] = useState('')
+  // @username -> address. Typing @alice swaps the field to alice's address and
+  // remembers who it resolved from, so everything downstream keeps working
+  // with a plain address and the name is only ever display.
+  const [resolvedHandle, setResolvedHandle] = useState(null) // { handle, address }
+  const [handleStatus, setHandleStatus] = useState(null)     // 'looking' | 'notfound' | 'error' | null
   const [useOwnAddress, setUseOwnAddress] = useState(false)
   const [showWalletInput, setShowWalletInput] = useState(false)
   const [amount, setAmount] = useState('')
@@ -388,10 +399,47 @@ export default function TestnetSend() {
   // to send to themselves.
   useEffect(() => {
     if (activeTab === 'send') {
+      // Arrived from a payment link: fill in who and how much instead of
+      // clearing. Released on a timeout rather than immediately because
+      // StrictMode runs effects twice in dev — consuming it on the first
+      // pass would let the second pass wipe the recipient.
+      const p = prefillRef.current
+      if (p) {
+        setRecipient(p.to)
+        if (p.amount) setAmount(p.amount)
+        setUseOwnAddress(false)
+        setTimeout(() => { prefillRef.current = null }, 0)
+        return
+      }
       setRecipient('')
       setUseOwnAddress(false)
     }
   }, [activeTab])
+
+  // Turn a typed @username into the wallet it belongs to.
+  useEffect(() => {
+    if (!looksLikeHandle(recipient)) { setHandleStatus(null); return }
+    // A @name maps to an EVM wallet, which means nothing on Solana.
+    if (activeTab === 'bridge' && bridgeToKey === 'solana') { setHandleStatus(null); return }
+    const name = normalizeHandle(recipient)
+    if (!/^[a-z][a-z0-9_]{2,19}$/.test(name)) { setHandleStatus(null); return }
+
+    let cancelled = false
+    setHandleStatus('looking')
+    const timer = setTimeout(async () => {
+      try {
+        const r = await resolveUsername(name)
+        if (cancelled) return
+        if (!r) { setHandleStatus('notfound'); return }
+        setResolvedHandle({ handle: '@' + r.username, address: r.walletAddress.toLowerCase() })
+        setHandleStatus(null)
+        setRecipient(r.walletAddress)
+      } catch {
+        if (!cancelled) setHandleStatus('error')
+      }
+    }, 350)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [recipient, activeTab, bridgeToKey])
 
   useEffect(() => {
      if (activeTab === 'bridge' && !showWalletInput) {
@@ -579,6 +627,28 @@ export default function TestnetSend() {
   const isValidAddress = bridgeToKey === 'solana'
     ? /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(recipient || '')
     : recipient && recipient.startsWith('0x') && recipient.length === 42
+
+  // The recipient box accepts a @username too. Once resolved, the box holds the
+  // address and this chip shows whose it is. It only shows while the box still
+  // matches what the server returned, so editing the address drops the name.
+  const resolvedChipVisible = !!resolvedHandle && !!recipient &&
+    recipient.toLowerCase() === resolvedHandle.address
+  const recipientNote = (() => {
+    if (resolvedChipVisible) return { text: '✓ ' + resolvedHandle.handle + ' · ' + shortAddr(recipient), cls: 'text-green-400' }
+    if (!recipient) return null
+    if (looksLikeHandle(recipient)) {
+      if (handleStatus === 'looking') return { text: 'Looking up ' + recipient + '…', cls: 'text-[#8892a0]' }
+      if (handleStatus === 'notfound') return { text: recipient + ' doesn\'t exist', cls: 'text-red-400' }
+      if (handleStatus === 'error') return { text: 'Couldn\'t look up username. Try again.', cls: 'text-amber-400' }
+      if (bridgeToKey === 'solana' && activeTab === 'bridge') return { text: 'Usernames only work for EVM wallets. Enter a Solana address.', cls: 'text-red-400' }
+      if (!/^@[a-zA-Z][a-zA-Z0-9_]{2,19}$/.test(recipient.trim())) return { text: 'Usernames are 3–20 letters, numbers or underscores.', cls: 'text-[#8892a0]' }
+      return null
+    }
+    if (!isValidAddress) {
+      return { text: bridgeToKey === 'solana' && activeTab === 'bridge' ? 'Must be a valid Solana address' : 'Must be a valid 0x address', cls: 'text-red-400' }
+    }
+    return null
+  })()
     
     const isValidAmount = amount && parseFloat(amount) > 0 && totalDebit <= parseFloat(validationBalance)
 
@@ -744,11 +814,11 @@ export default function TestnetSend() {
             {!hasMetaMask && (
               <div className="text-center py-4">
                 <h3 className="font-bold font-['Space_Grotesk'] mb-1.5">Wallet required</h3>
-                <p className="text-[#8892a0] text-sm mb-4">Install wallet or MetaMask to send or bridge USDC.</p>
-                <a href="https://metamask.io" target="_blank" rel="noreferrer"
+                <p className="text-[#8892a0] text-sm mb-4">Install a wallet to send or bridge USDC.</p>
+                {/* <a href="https://metamask.io" target="_blank" rel="noreferrer"
                   className="bg-[#e8821a] text-white font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl hover:opacity-90 inline-block">
                   Install MetaMask ↗
-                </a>
+                </a> */}
               </div>
             )}
 
@@ -820,13 +890,13 @@ export default function TestnetSend() {
                   </div>
                   <input
                     type="text"
-                    placeholder="0x… wallet address"
+                    placeholder="0x… address or @username"
                     value={recipient}
                     onChange={e => setRecipient(e.target.value)}
                     className="w-full bg-transparent text-white text-sm font-mono outline-none"
                   />
-                  {recipient && !isValidAddress && (
-                    <p className="text-[10px] text-red-400 mt-1">Must be a valid 0x address</p>
+                  {recipientNote && (
+                    <p className={'text-[10px] mt-1 ' + recipientNote.cls}>{recipientNote.text}</p>
                   )}
                 </div>
 
@@ -984,8 +1054,8 @@ export default function TestnetSend() {
                       className="w-full bg-transparent text-white text-sm font-mono outline-none"
                     />
                     {useOwnAddress && <p className="text-[10px] text-[#00D4FF] mt-1">✓ Sending to your own address</p>}
-                    {recipient && !isValidAddress && (
-                      <p className="text-[10px] text-red-400 mt-1">Must be a valid 0x address</p>
+                    {recipientNote && (
+                      <p className={'text-[10px] mt-1 ' + recipientNote.cls}>{recipientNote.text}</p>
                     )}
                   </div>
                 )}
@@ -1090,7 +1160,7 @@ export default function TestnetSend() {
                 <div className="space-y-3 mb-5">
                   {[
                                        { l: 'From',    v: shortAddr(activeTab === 'bridge' ? addressFor(sourceChainKey) : account), mono: true },
-                    { l: 'To',      v: shortAddr(recipient), mono: true },
+                    { l: 'To',      v: resolvedChipVisible ? resolvedHandle.handle + ' · ' + shortAddr(recipient) : shortAddr(recipient), mono: true },
                                         { l: 'Recipient receives', v: parseFloat(amount || 0).toFixed(2) + ' ' + (activeTab === 'send' ? selectedToken : bridgeToken) },
                                       ...(isCCTP && (bridgeToken === 'USDC' || eurcFeeApplies) ? [{ l: 'ParagonFinance Fee', v: BRIDGE_FLAT_FEE_USDC + ' USDC' }] : []),
                     ...(isCCTP && totalDebit ? [{ l: 'Total debited', v: totalDebit.toFixed(2) + ' ' + bridgeToken }] : []),

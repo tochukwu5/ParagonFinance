@@ -10,17 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@circle-fin/adapter-solana": "^1.0.0",
     "@circle-fin/adapter-viem-v2": "1.18.0",
     "@circle-fin/app-kit": "1.15.2",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-is": "18.3.1",
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
-    "viem": "^2.54.6",
-     "@circle-fin/adapter-solana": "^1.0.0",
-     "react-is": "18.3.1"
+    "viem": "^2.54.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
