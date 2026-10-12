@@ -1613,9 +1613,8 @@ async function executeKyberSwap({
 //
 // The browser never talks to AchSwap directly. The API key is a secret, so
 // requests go to our own backend (/api/achswap/quote and /swap), which adds
-// the key and the ParagonFinance fee. The fee is taken inside the swap from
-// the output token, so there is no separate flat-fee transaction for this
-// venue.
+// the key. ParagonFinance's flat 0.1 USDC fee is collected after the swap,
+// exactly as for the other venues.
 const ACHSWAP_BACKEND = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')
 // AchRouteExecutor on Arc. Quotes and transactions must point here; anything
 // else from the server is refused.
@@ -1791,19 +1790,38 @@ async function executeAchswapSwap({
     throw new Error(await explainRevert(txHash, slippageBps, 'AchSwap'))
   }
 
-  const partnerRaw = BigInt(swap.fees?.partnerAmount || '0')
   const finalOut = BigInt(swap.amountOut)
+
+  // ParagonFinance flat fee, after the swap — the same as every other venue.
+  // A reverted swap costs nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(tokenOut.address), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),           // 0.1 USDC, 18 dp
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
 
   return {
     hash: txHash,
-    feeHash: null,
+    feeHash,
     from,
     tokenIn: tokenIn.symbol,
     tokenOut: tokenOut.symbol,
     amountIn: parseFloat(amountIn),
     amountOut: parseFloat(formatUnits(finalOut, quote.outDecimals)),
-    // Fee is paid in the output token inside the swap.
-    paragonFee: parseFloat(formatUnits(partnerRaw, quote.outDecimals)),
+    paragonFee: feeHash ? 0.1 : 0,
     slippageBps,
     settlementTime: Date.now() - start,
     blockNumber: parseInt(receipt.blockNumber, 16),
@@ -1848,13 +1866,13 @@ export const SOURCES = [
     color: '#5B8DEF',
     getQuote: getTowerQuote,
   },
-  //   {
-  //   id: 'kyber',
-  //   name: 'KyberSwap',
-  //   logo: '/dex/kyberswap.svg',
-  //   color: '#31CB9E',
-  //   getQuote: getKyberQuote,
-  // },
+    {
+    id: 'kyber',
+    name: 'KyberSwap',
+    logo: '/dex/kyberswap.svg',
+    color: '#31CB9E',
+    getQuote: getKyberQuote,
+  },
   {
     id: 'achswap',
     name: 'AchSwap',

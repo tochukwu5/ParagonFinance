@@ -10,11 +10,11 @@ import rateLimit from 'express-rate-limit'
 //
 // Environment (set in Railway → Variables, never in a file or in Git):
 //   ACHSWAP_API_KEY        required
-//   ACHSWAP_FEE_RECIPIENT  required when the fee is above 0 — wallet that
-//                          receives ParagonFinance's fee, paid in the output
-//                          token inside the same transaction
-//   ACHSWAP_FEE_BPS        optional, default 10 (0.10%). AchSwap recommends
-//                          5–15; the contract allows up to 100 (1%)
+//   ACHSWAP_FEE_BPS        optional, default 0. ParagonFinance charges its
+//                          flat 0.1 USDC per swap on every venue (collected by
+//                          the frontend), so no in-swap fee is added here.
+//                          Leave it unset unless you want an extra percentage.
+//   ACHSWAP_FEE_RECIPIENT  only needed when ACHSWAP_FEE_BPS is above 0
 //   ACHSWAP_API_BASE       optional, defaults to AchSwap's production URL
 
 const router = express.Router()
@@ -83,8 +83,8 @@ const swapLimiter = rateLimit({
 })
 
 function feeSettings() {
-  const raw = parseInt(process.env.ACHSWAP_FEE_BPS ?? '10', 10)
-  const feeBps = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 10
+  const raw = parseInt(process.env.ACHSWAP_FEE_BPS ?? '0', 10)
+  const feeBps = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0
   const feeRecipient = process.env.ACHSWAP_FEE_RECIPIENT || ''
   if (feeBps > 0 && !ADDRESS_RE.test(feeRecipient)) return { error: true }
   return feeBps > 0 ? { feeBps, feeRecipient } : { feeBps: 0 }
