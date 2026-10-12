@@ -163,14 +163,7 @@ async function executeSynthraSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    // V3TooLittleReceived is the usual cause — the pool moved between quote
-    // and execution and the fill landed under minOut. Blaming approvals sent
-    // people to check something that wasn't the problem.
-    throw new Error(
-      'Swap reverted — the price moved beyond your ' +
-      (slippageBps / 100).toFixed(2) + '% slippage tolerance. ' +
-      'Try again, or raise the tolerance to 1%.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'Synthra'))
   }
  // ← NEW CODE STARTS HERE
   console.log('[paragon] router:', PARAGON_SWAP_ROUTER)
@@ -316,10 +309,7 @@ async function executeTowerSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    throw new Error(
-      'Swap reverted on Tower. If this is your first swap with them, the ' +
-      'approval may not have confirmed yet — wait a moment and try again.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'Tower'))
   }
 
   // Fee after the swap, same reasoning as Synthra: a reverted swap should
@@ -442,10 +432,7 @@ async function executeXyloSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    throw new Error(
-      'Swap reverted on XyloNet — the price moved beyond your ' +
-      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'XyloNet'))
   }
 
   // Fee after the swap, so a revert costs the user nothing.
@@ -521,6 +508,8 @@ export async function executeSwapForQuote({
     result = await executeKyberSwap(args)
       } else if (venue === 'lifi') {
     result = await executeLifiSwap(args)
+  } else if (venue === 'achswap') {
+    result = await executeAchswapSwap(args)
   } else {
     // The mainnet V3 SwapRouter. executeUnitflowSwap built UniversalRouter
     // calldata for a contract that has no mainnet deployment.
@@ -933,10 +922,7 @@ async function executeLifiSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    throw new Error(
-      'Swap reverted — the price moved beyond your ' +
-      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'LI.FI'))
   }
 
   // ParagonFinance fee, after the swap. A reverted swap should cost nothing.
@@ -1006,6 +992,84 @@ async function arcCall(to, data) {
 
 const encAddress = (a) => String(a).replace(/^0x/, '').toLowerCase().padStart(64, '0')
 const encUint = (n) => BigInt(n).toString(16).padStart(64, '0')
+
+// ─── Why did the swap revert? ─────────────────────────────────────────────
+// A failed receipt only says "status 0". Every venue used to answer that with
+// "the price moved beyond your tolerance", which is true for only one of
+// several causes — and was shown for all of them, so a different problem
+// (an expired route, a missing allowance, a router rejecting the call) looked
+// like market movement.
+//
+// This replays the failed transaction against the block before it and reads
+// the revert reason the node gives back.
+async function arcRpc(method, params) {
+  const res = await fetch(ARC_RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    signal: AbortSignal.timeout(8000),
+  })
+  return res.json()
+}
+
+// Error(string) is selector 0x08c379a0; anything else is a custom error whose
+// selector is still worth showing.
+function decodeRevertData(data) {
+  if (typeof data !== 'string' || !data.startsWith('0x') || data.length < 10) return null
+  if (data.startsWith('0x08c379a0') && data.length >= 138) {
+    try {
+      const hex = data.slice(10)
+      const len = parseInt(hex.slice(64, 128), 16)
+      const body = hex.slice(128, 128 + len * 2)
+      let text = ''
+      for (let i = 0; i < body.length; i += 2) text += String.fromCharCode(parseInt(body.slice(i, i + 2), 16))
+      return text.replace(/[^\x20-\x7E]/g, '').trim() || null
+    } catch { /* fall through to the selector */ }
+  }
+  return 'custom error ' + data.slice(0, 10)
+}
+
+async function explainRevert(txHash, slippageBps, venue) {
+  const short = txHash ? txHash.slice(0, 10) + '…' + txHash.slice(-6) : ''
+  let reason = null
+
+  try {
+    const { result: tx } = await arcRpc('eth_getTransactionByHash', [txHash])
+    if (tx?.blockNumber) {
+      const before = '0x' + (parseInt(tx.blockNumber, 16) - 1).toString(16)
+      const r = await arcRpc('eth_call', [
+        { from: tx.from, to: tx.to, data: tx.input || tx.data, value: tx.value || '0x0' },
+        before,
+      ])
+      if (r?.error) {
+        reason = decodeRevertData(r.error.data) || r.error.message || null
+      }
+    }
+  } catch { /* the explanation is best-effort */ }
+
+  // Full detail for debugging, off the user's screen.
+  console.warn('[swap] reverted on', venue, { txHash, reason })
+
+  const detail = reason ? reason.slice(0, 80) : ''
+
+  if (reason && /too little|insufficient output|min.*(out|return|amount)|slippage/i.test(reason)) {
+    return venue + ': price moved beyond your ' + (slippageBps / 100).toFixed(2) +
+      '% tolerance. Try again, or raise it.'
+  }
+  if (reason && /expired|deadline/i.test(reason)) {
+    return venue + ': the quote expired. Go back, review again and retry.'
+  }
+  if (reason && /balance/i.test(reason)) {
+    return venue + ': not enough balance for this swap (' + detail + '). Tx ' + short
+  }
+  if (reason && /allowance/i.test(reason)) {
+    return venue + ': token approval problem (' + detail + '). Tx ' + short
+  }
+  if (reason) {
+    return venue + ' rejected the swap: ' + detail + '. Tx ' + short
+  }
+  return venue + ' swap failed on-chain and gave no reason. Try another venue in the Quotes list. Tx ' + short
+}
 
 
 
@@ -1185,10 +1249,7 @@ async function executeUnitflowMainnetSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    throw new Error(
-      'Swap reverted — the price moved beyond your ' +
-      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'UnitFlow'))
   }
 
     console.log('[paragon] router:', PARAGON_SWAP_ROUTER)
@@ -1343,6 +1404,20 @@ async function executeKyberSwap({
 }) {
   const start = Date.now()
 
+  // The route was priced when the user typed the amount, which can be minutes
+  // ago by the time they've reviewed and confirmed. Kyber's build step turns
+  // a route summary into calldata with the minimum-received figure baked in,
+  // so a stale summary produces a floor from an old price. Price it again
+  // now, and refuse if it has dropped past the tolerance since the user saw it.
+  onStatus('Refreshing KyberSwap price...')
+  const fresh = await getKyberQuote({ tokenIn, tokenOut, amountIn, account: from, slippageBps })
+  if (!fresh) throw new Error('KyberSwap has no route right now. Try again.')
+  const shownFloor = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
+  if (fresh.amountOutRaw < shownFloor) {
+    throw new Error('The price changed since your quote. Go back and review again.')
+  }
+  quote = fresh
+
   onStatus('Building route via KyberSwap...')
 
   const buildRes = await fetch(KYBER_API + '/route/build', {
@@ -1391,7 +1466,7 @@ async function executeKyberSwap({
     if (allowance < quote.amountInRaw) {
       onStatus('Approve ' + tokenIn.symbol + ' for KyberSwap...')
       const MAX = (1n << 256n) - 1n
-      await provider.request({
+      const approveHash = await provider.request({
         method: 'eth_sendTransaction',
         params: [{
           from,
@@ -1401,7 +1476,35 @@ async function executeKyberSwap({
           gas: '0x186A0',
         }],
       })
+
+      // Wait for the approval to land before asking for the swap. Sending the
+      // swap straight after meant it could reach the router before the
+      // allowance existed, and revert on the token pull.
+      onStatus('Waiting for approval to confirm...')
+      let approveReceipt = null
+      for (let i = 0; i < 40 && !approveReceipt; i++) {
+        await new Promise(r => setTimeout(r, 500))
+        try {
+          approveReceipt = await provider.request({
+            method: 'eth_getTransactionReceipt', params: [approveHash],
+          })
+        } catch { /* keep polling */ }
+      }
+      if (!approveReceipt) throw new Error('The approval has not confirmed yet. Wait a moment and try again.')
+      if (approveReceipt.status === '0x0') throw new Error('The approval failed on-chain. Please try again.')
+
+      // Read it back: the swap should only be offered once the allowance is
+      // really there.
+      try {
+        const again = await arcCall(tokenIn.address,
+          '0xdd62ed3e' + encAddress(from) + encAddress(router))
+        allowance = again && again !== '0x' ? BigInt(again) : 0n
+      } catch { /* the swap itself will report if it is still missing */ }
+      if (allowance < quote.amountInRaw) {
+        throw new Error('The approval did not register for ' + tokenIn.symbol + '. Please try again.')
+      }
     }
+    console.log('[kyber] allowance ok:', allowance.toString(), 'needed:', quote.amountInRaw.toString(), 'spender:', router)
   }
 
   onStatus('Confirm the swap in your wallet...')
@@ -1434,10 +1537,7 @@ async function executeKyberSwap({
   }
 
   if (receipt && receipt.status === '0x0') {
-    throw new Error(
-      'Swap reverted — the price moved beyond your ' +
-      (slippageBps / 100).toFixed(2) + '% tolerance. Try again, or raise it.'
-    )
+    throw new Error(await explainRevert(txHash, slippageBps, 'KyberSwap'))
   }
 
   // ParagonFinance fee, after the swap. A reverted swap costs nothing.
@@ -1508,6 +1608,216 @@ async function executeKyberSwap({
 
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ACHSWAP — Arc DEX aggregator
+//
+// The browser never talks to AchSwap directly. The API key is a secret, so
+// requests go to our own backend (/api/achswap/quote and /swap), which adds
+// the key and the ParagonFinance fee. The fee is taken inside the swap from
+// the output token, so there is no separate flat-fee transaction for this
+// venue.
+const ACHSWAP_BACKEND = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')
+// AchRouteExecutor on Arc. Quotes and transactions must point here; anything
+// else from the server is refused.
+export const ACHSWAP_EXECUTOR = '0x1B844738455b8060D12839331b35893526E9d314'
+
+async function achswapPost(path, body, timeoutMs) {
+  const res = await fetch(ACHSWAP_BACKEND + '/achswap' + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const json = await res.json().catch(() => ({}))
+  return { ok: res.ok, status: res.status, json }
+}
+
+async function getAchswapQuote({ tokenIn, tokenOut, amountIn, slippageBps = 50 }) {
+  if (!tokenIn?.address || !tokenOut?.address) return null
+  try {
+    const inDecimals = synthraDecimals(tokenIn)
+    const outDecimals = synthraDecimals(tokenOut)
+    const amountRaw = parseUnits(amountIn, inDecimals)
+    if (amountRaw <= 0n) return null
+
+    const { ok, json } = await achswapPost('/quote', {
+      tokenIn: tokenIn.address,
+      tokenOut: tokenOut.address,
+      amountIn: amountRaw.toString(),
+      slippageBps,
+    }, 10000)
+    if (!ok || !json?.amountOut) return null
+
+    const raw = BigInt(json.amountOut)
+    if (raw === 0n) return null
+
+    const hops = (json.route || []).flatMap(r => r.hops || [])
+    return {
+      amountOut: formatUnits(raw, outDecimals),
+      amountOutRaw: raw,
+      amountInRaw: amountRaw,
+      inDecimals,
+      outDecimals,
+      minOutRaw: json.minAmountOut ? BigInt(json.minAmountOut) : null,
+      routedVia: hops[0]?.dex || 'AchSwap',
+      priceImpact: typeof json.priceImpactBps === 'number' ? json.priceImpactBps / 100 : null,
+      venue: 'achswap',
+      raw: json,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function executeAchswapSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+  const eq = (a, b) => String(a).toLowerCase() === String(b).toLowerCase()
+
+  const buildSwap = async () => {
+    const { ok, json } = await achswapPost('/swap', {
+      tokenIn: tokenIn.address,
+      tokenOut: tokenOut.address,
+      amountIn: quote.amountInRaw.toString(),
+      slippageBps,
+      sender: from,
+    }, 15000)
+    if (!ok) {
+      if (json?.code === 'SIMULATION_FAILED') {
+        throw new Error('AchSwap: this swap would fail right now' +
+          (json.reason ? ' (' + String(json.reason).slice(0, 80) + ')' : '') + '. Try another venue.')
+      }
+      if (json?.code === 'NO_ROUTE') throw new Error('AchSwap has no route for this pair right now.')
+      throw new Error('AchSwap could not build this swap. Try again or use another venue.')
+    }
+    const tx = json?.tx
+    if (!tx?.to || !tx?.data) throw new Error('AchSwap returned an incomplete transaction.')
+    // Only ever send to the known executor, whatever the server says.
+    if (!eq(tx.to, ACHSWAP_EXECUTOR)) throw new Error('AchSwap returned an unexpected contract. Swap cancelled.')
+    if (json.approval) {
+      if (!eq(json.approval.spender, ACHSWAP_EXECUTOR) || !eq(json.approval.token, tokenIn.address)) {
+        throw new Error('AchSwap returned an unexpected approval. Swap cancelled.')
+      }
+    }
+    return json
+  }
+
+  onStatus('Building route via AchSwap...')
+  let swap = await buildSwap()
+
+  // The price may have moved since the user looked. Refuse if the fresh
+  // output is below the floor they accepted.
+  const shownFloor = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
+  if (BigInt(swap.amountOut) < shownFloor) {
+    throw new Error('The price changed since your quote. Go back and review again.')
+  }
+
+  const waitReceipt = async (hash, tries) => {
+    for (let i = 0; i < tries; i++) {
+      await new Promise(r => setTimeout(r, 500))
+      try {
+        const r = await provider.request({ method: 'eth_getTransactionReceipt', params: [hash] })
+        if (r) return r
+      } catch { /* keep polling */ }
+    }
+    return null
+  }
+
+  if (swap.approval) {
+    const { spender, amount } = swap.approval
+    const need = BigInt(amount)
+    let allowance = 0n
+    try {
+      const out = await provider.request({
+        method: 'eth_call',
+        params: [{ to: tokenIn.address, data: '0xdd62ed3e' + encAddress(from) + encAddress(spender) }, 'latest'],
+      })
+      allowance = BigInt(out || '0x0')
+    } catch { /* treat as zero and approve */ }
+
+    if (allowance < need) {
+      onStatus('Approve ' + tokenIn.symbol + ' in your wallet...')
+      // Exactly the amount being swapped, not unlimited.
+      const approveHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: tokenIn.address,
+          data: '0x095ea7b3' + encAddress(spender) + encUint(need),
+          gas: '0x186A0',
+        }],
+      })
+      onStatus('Waiting for approval...')
+      const ar = await waitReceipt(approveHash, 60)
+      if (!ar) throw new Error('The approval has not confirmed yet. Wait a moment and try again.')
+      if (ar.status === '0x0') throw new Error('The approval failed on-chain. Please try again.')
+      // The docs: after an approval, build the swap again so it is
+      // simulated with the allowance in place.
+      onStatus('Refreshing AchSwap price...')
+      swap = await buildSwap()
+      if (BigInt(swap.amountOut) < shownFloor) {
+        throw new Error('The price changed since your quote. Go back and review again.')
+      }
+    }
+  }
+
+  // An ERC-20 input carries no native value; refuse anything else.
+  const value = BigInt(swap.tx.value || '0')
+  if (swap.approval && value !== 0n) {
+    throw new Error('AchSwap returned an unexpected payment amount. Swap cancelled.')
+  }
+
+  onStatus('Confirm the swap in your wallet...')
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: swap.tx.to,
+      data: swap.tx.data,
+      value: '0x' + value.toString(16),
+      // Their simulated figure, as returned. Null means let the wallet decide.
+      ...(swap.tx.gas ? { gas: '0x' + BigInt(swap.tx.gas).toString(16) } : {}),
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+  const receipt = await waitReceipt(txHash, 60)
+  if (!receipt) {
+    throw new Error('AchSwap: the swap was sent but has not confirmed yet. Check your wallet before retrying. Tx ' +
+      txHash.slice(0, 10) + '…' + txHash.slice(-6))
+  }
+  if (receipt.status === '0x0') {
+    throw new Error(await explainRevert(txHash, slippageBps, 'AchSwap'))
+  }
+
+  const partnerRaw = BigInt(swap.fees?.partnerAmount || '0')
+  const finalOut = BigInt(swap.amountOut)
+
+  return {
+    hash: txHash,
+    feeHash: null,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(formatUnits(finalOut, quote.outDecimals)),
+    // Fee is paid in the output token inside the swap.
+    paragonFee: parseFloat(formatUnits(partnerRaw, quote.outDecimals)),
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: parseInt(receipt.blockNumber, 16),
+    status: 'confirmed',
+    network: 'mainnet',
+    networkLabel: 'Arc',
+    chainId: 5042,
+    dex: quote.routedVia || 'AchSwap',
+    source: 'AchSwap',
+    swap: true,
+  }
+}
+
+
 // ─── Sources ──────────────────────────────────────────────────────────────
 export const SOURCES = [
     {
@@ -1538,12 +1848,19 @@ export const SOURCES = [
     color: '#5B8DEF',
     getQuote: getTowerQuote,
   },
-    {
-    id: 'kyber',
-    name: 'KyberSwap',
-    logo: '/dex/kyberswap.svg',
-    color: '#31CB9E',
-    getQuote: getKyberQuote,
+  //   {
+  //   id: 'kyber',
+  //   name: 'KyberSwap',
+  //   logo: '/dex/kyberswap.svg',
+  //   color: '#31CB9E',
+  //   getQuote: getKyberQuote,
+  // },
+  {
+    id: 'achswap',
+    name: 'AchSwap',
+    logo: '/dex/achswap.png',
+    color: '#F59E0B',
+    getQuote: getAchswapQuote,
   },
 ]
 

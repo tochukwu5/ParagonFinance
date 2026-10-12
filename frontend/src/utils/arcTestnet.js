@@ -1845,7 +1845,7 @@ export async function recordBridgeFeeOnArc({ from, bridgeAmount, destinationChai
 }
 
 export async function payBridgeFeeToTreasury({ from }) {
-  if (!window.ethereum) throw new Error('MetaMask not found')
+  if (!window.ethereum) throw new Error('wallet not found')
   if (!PARAGON_FINANCE_TREASURY_ADDRESS) {
     throw new Error('ParagonFinanceTreasury address is not configured (VITE_TREASURY_ADDRESS is empty)')
   }

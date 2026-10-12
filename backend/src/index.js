@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.js'
 import statsRoutes from './routes/stats.js'
 import rewardRoutes from './routes/rewards.js'
 import usernameRoutes from './routes/username.js'
+import achswapRoutes from './routes/achswap.js'
 
 dotenv.config()
 
@@ -78,7 +79,7 @@ app.use('/api', rateLimit({
   // Username lookups fire as someone types (availability) and whenever a
   // @handle is entered in Send, so they get their own, higher limit below
   // rather than eating this shared budget.
-  skip: (req) => req.path.startsWith('/username/'),
+  skip: (req) => req.path.startsWith('/username/') || req.path.startsWith('/achswap/'),
 }))
 
 app.use('/api/username', rateLimit({
@@ -100,6 +101,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
 app.use('/api/rewards', rewardRoutes)
 app.use('/api/username', usernameRoutes)
+app.use('/api/achswap', achswapRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
