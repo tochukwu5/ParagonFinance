@@ -1194,9 +1194,26 @@ export async function bridgeUsdcViaAppKit(
 
     let result = await kit.bridge(bridgeParams)
 
-    if (result.state === 'error') {
-      onStatusUpdate('Retrying bridge...')
-        result = await kit.retryBridge(result, { from: fromAdapter, to: toAdapter })
+    // Retrying only makes sense when something already happened on-chain.
+    // If the user cancelled in their wallet nothing was submitted, and App
+    // Kit's retryBridge throws a long "needs an outstanding transfer" error
+    // that hid the real reason. Skip the retry in that case, and if the
+    // retry itself throws, keep the original result so the normal error
+    // handling below reports what actually went wrong.
+    const rejectedByUser = result.state === 'error' &&
+      /user (rejected|denied)|rejected the request|user cancel|4001/i.test(safeStringify(result))
+    if (result.state === 'error' && !rejectedByUser) {
+      const startedOnChain =
+        !!observedBurnHash ||
+        (result.steps || []).some(s => s.txHash || s.data?.txHash)
+      if (startedOnChain) {
+        onStatusUpdate('Retrying bridge...')
+        try {
+          result = await kit.retryBridge(result, { from: fromAdapter, to: toAdapter })
+        } catch (retryErr) {
+          // Nothing to resume — fall through with the original error result.
+        }
+      }
     }
 
     if (result.state === 'error') {
@@ -1235,7 +1252,7 @@ export async function bridgeUsdcViaAppKit(
       }
 
       // Nothing burned — no funds moved, so this is a clean failure.
-      const readable = readBridgeError(result)
+      const readable = readBridgeError(result) || (rejectedByUser ? 'Rejected in your wallet.' : null)
       const err = new Error(
         readable || 'Bridge failed. No USDC left your wallet.'
       )

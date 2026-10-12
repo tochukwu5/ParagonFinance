@@ -567,6 +567,10 @@ export default function TestnetSend() {
         // request and the response). The raw text means nothing to a user,
         // and retrying almost always works since nothing was signed yet.
         setSendError('Lost connection to your wallet extension momentarily. Please try again.')
+      } else if (/outstanding transfer|nothing to resume/i.test(err.message || '')) {
+        // App Kit's own text when a bridge is cancelled before anything was
+        // submitted. No funds moved, so keep it short.
+        setSendError('Bridge cancelled. Nothing was sent.')
       } else {
         setSendError(err.message || 'Transaction failed. Please try again.')
       }
@@ -1366,7 +1370,7 @@ export default function TestnetSend() {
         onClose={() => setShowFromModal(false)}
         title="Bridge from"
         networks={ALL_NETWORKS}
-        activeKey={sourceChainKey}
+        activeKey={canonicalChainKey(sourceChainKey)}
         activeToken={bridgeToken}
         onSelect={(key, token) => {
           handleChainSelect(key)
@@ -1378,7 +1382,7 @@ export default function TestnetSend() {
         onClose={() => setShowToModal(false)}
         title="Bridge to"
         networks={DEST_NETWORKS}
-        activeKey={bridgeToKey}
+        activeKey={canonicalChainKey(bridgeToKey)}
         activeToken={bridgeToken}
         onSelect={(key, token) => {
           // Destination only — the wallet stays on the source chain, which
