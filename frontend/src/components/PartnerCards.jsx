@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 // short — this sits in peripheral vision next to a form someone is filling
 // in, so anything longer than a couple of lines goes unread.
 const CARDS = [
+
   {
     id: 'unitflow',
     accent: '#00D4FF',
@@ -24,6 +25,15 @@ const CARDS = [
       'Synthra brings chain-abstracted execution to Paragon. We now quote both venues on every ' +
       'swap and route to whichever returns more — you keep the difference.',
     cta: { label: 'See live quotes', to: '/app' },
+  },
+      {
+    id: 'circle-alliance',
+    accent: '#00D4FF',
+    image: '/dex/circle-alliance.jpeg',
+    title: 'Circle Alliance Program',
+    // Optional. Remove the line below if the image shouldn't link anywhere,
+    // or put your own link here.
+    href: 'https://www.circle.com/',
   },
     {
     id: 'tower',
@@ -146,33 +156,47 @@ export default function PartnerCards() {
           {/* Fixed height so the card doesn't resize as content changes —
               a box that jumps between heights every six seconds is worse
               than one that occasionally has whitespace. */}
-          <div className="min-h-[188px] flex flex-col">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 flex-shrink-0"
-              style={{ background: card.accent + '15', border: '1px solid ' + card.accent + '35' }}
-            >
-              {card.logo ? (
-                <img src={card.logo} alt="" className="w-6 h-6 object-contain" />
+          {card.image ? (
+            <div className="min-h-[188px] flex flex-col items-center justify-center">
+              {card.href ? (
+                <a href={card.href} target="_blank" rel="noopener noreferrer">
+                  <img src={card.image} alt={card.title} className="w-full rounded-xl object-contain" />
+                </a>
               ) : (
-                <span className="text-xl">{card.emoji}</span>
+                <img src={card.image} alt={card.title} className="w-full rounded-xl object-contain" />
               )}
             </div>
+          ) : (
+            <div className="min-h-[188px] flex flex-col">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 flex-shrink-0"
+                style={{ background: card.accent + '15', border: '1px solid ' + card.accent + '35' }}
+              >
+                {card.logo ? (
+                  <img src={card.logo} alt="" className="w-6 h-6 object-contain" />
+                ) : (
+                  <span className="text-xl">{card.emoji}</span>
+                )}
+              </div>
 
-            <h3 className="font-bold font-['Space_Grotesk'] text-white text-[15px] mb-2 leading-snug">
-              {card.title}
-            </h3>
-            <p className="text-xs text-[#8892a0] leading-relaxed flex-1">
-              {card.body}
-            </p>
+              <h3 className="font-bold font-['Space_Grotesk'] text-white text-[15px] mb-2 leading-snug">
+                {card.title}
+              </h3>
+              <p className="text-xs text-[#8892a0] leading-relaxed flex-1">
+                {card.body}
+              </p>
 
-            <Link
-              to={card.cta.to}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold mt-4 hover:gap-2.5 transition-all w-fit"
-              style={{ color: card.accent }}
-            >
-              {card.cta.label} →
-            </Link>
-          </div>
+              {card.cta && (
+                <Link
+                  to={card.cta.to}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold mt-4 hover:gap-2.5 transition-all w-fit"
+                  style={{ color: card.accent }}
+                >
+                  {card.cta.label} →
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Controls */}
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#1e2530]">
