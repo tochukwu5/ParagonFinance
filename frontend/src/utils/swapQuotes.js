@@ -2200,7 +2200,7 @@ export const SOURCES = [
     id: 'wheelx',
     name: 'WheelX',
     logo: '/dex/wheelx.png',
-    color: '#FF6B35',
+    color: '#FF6B35', 
     getQuote: getWheelxQuote,
   },
 ]
