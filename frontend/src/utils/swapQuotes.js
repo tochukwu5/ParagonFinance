@@ -510,6 +510,8 @@ export async function executeSwapForQuote({
     result = await executeLifiSwap(args)
   } else if (venue === 'achswap') {
     result = await executeAchswapSwap(args)
+  } else if (venue === 'wheelx') {
+    result = await executeWheelxSwap(args)
   } else {
     // The mainnet V3 SwapRouter. executeUnitflowSwap built UniversalRouter
     // calldata for a contract that has no mainnet deployment.
@@ -1836,6 +1838,320 @@ async function executeAchswapSwap({
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WHEELX — swap aggregator (public API, no key)
+//
+// https://docs.wheelx.fi/api-and-developer/getting-started
+//
+// WheelX is quoted straight from the visitor's browser, which spreads its
+// 20-requests-per-minute limit across visitors. If a browser can't reach it
+// directly, the calls switch to our backend (/api/wheelx/quote) for the rest
+// of the session.
+//
+// ParagonFinance's flat 0.1 USDC fee is collected after the swap, exactly as
+// for the other venues.
+const WHEELX_API = (import.meta.env.VITE_WHEELX_API || 'https://api.wheelx.fi/v1').replace(/\/$/, '')
+const WHEELX_PROXY = ACHSWAP_BACKEND + '/wheelx'
+
+// Contracts a WheelX transaction or approval may point at. These two come
+// from WheelX's published deployment addresses (ERC20 Approval Proxy and Dex
+// Router). If WheelX uses a different contract on Arc, the swap is refused
+// and the address is shown so it can be checked on the explorer and added
+// with VITE_WHEELX_ROUTER (comma-separated) rather than trusted blindly.
+const WHEELX_ALLOWED = [
+  '0x7eC9672678509a574F6305F112a7E3703845a98b',
+  '0x6222f99443A0d75bd96d40F2904606f60f37cdc2',
+  ...String(import.meta.env.VITE_WHEELX_ROUTER || '').split(',').map(s => s.trim()).filter(a => /^0x[a-fA-F0-9]{40}$/.test(a)),
+].map(a => a.toLowerCase())
+
+const WHEELX_CHAIN_ID = 5042
+const WHEELX_QUOTE_TTL_MS = 8000
+const WHEELX_MAX_PER_MIN = 14        // under WheelX's 20/min, leaving room
+const WHEELX_BACKOFF_MS = 30000
+
+let wheelxUseProxy = false
+let wheelxBlockedUntil = 0
+const wheelxStamps = []
+const wheelxCache = new Map()
+const wheelxInflight = new Map()
+
+function wheelxHasBudget() {
+  const now = Date.now()
+  while (wheelxStamps.length && now - wheelxStamps[0] > 60000) wheelxStamps.shift()
+  return wheelxStamps.length < WHEELX_MAX_PER_MIN
+}
+
+async function wheelxFetch(url, body, timeoutMs) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const json = await res.json().catch(() => ({}))
+  return { ok: res.ok, status: res.status, json }
+}
+
+// Direct first; a network/CORS failure (a TypeError from fetch) switches to
+// the backend proxy and retries once.
+async function wheelxQuoteRequest(body, timeoutMs) {
+  if (Date.now() < wheelxBlockedUntil) return { ok: false, status: 429, json: {} }
+  wheelxStamps.push(Date.now())
+
+  let out
+  if (!wheelxUseProxy) {
+    try {
+      out = await wheelxFetch(WHEELX_API + '/quote', body, timeoutMs)
+    } catch (err) {
+      if (err?.name === 'TypeError') wheelxUseProxy = true
+      else throw err
+    }
+  }
+  if (wheelxUseProxy) {
+    out = await wheelxFetch(WHEELX_PROXY + '/quote', body, timeoutMs)
+  }
+  if (out.status === 429) wheelxBlockedUntil = Date.now() + WHEELX_BACKOFF_MS
+  return out
+}
+
+function wheelxBody({ tokenIn, tokenOut, amountRaw, account, slippageBps, quoteOnly }) {
+  return {
+    from_chain: WHEELX_CHAIN_ID,
+    to_chain: WHEELX_CHAIN_ID,
+    from_token: tokenIn.address,
+    to_token: tokenOut.address,
+    from_address: account,
+    to_address: account,
+    amount: amountRaw.toString(),
+    slippage: slippageBps,
+    quote_only: quoteOnly,
+  }
+}
+
+async function getWheelxQuote({ tokenIn, tokenOut, amountIn, account, slippageBps = 50 }) {
+  if (!tokenIn?.address || !tokenOut?.address || !account) return null
+  try {
+    const inDecimals = synthraDecimals(tokenIn)
+    const outDecimals = synthraDecimals(tokenOut)
+    const amountRaw = parseUnits(amountIn, inDecimals)
+    if (amountRaw <= 0n) return null
+
+    const body = wheelxBody({ tokenIn, tokenOut, amountRaw, account, slippageBps, quoteOnly: true })
+    const key = JSON.stringify(body)
+
+    const hit = wheelxCache.get(key)
+    let json = hit && hit.expires > Date.now() ? hit.json : null
+
+    if (!json) {
+      // Identical requests made at the same moment share one call.
+      let pending = wheelxInflight.get(key)
+      if (!pending) {
+        if (!wheelxHasBudget()) return null
+        pending = wheelxQuoteRequest(body, 10000).finally(() => wheelxInflight.delete(key))
+        wheelxInflight.set(key, pending)
+      }
+      const out = await pending
+      if (!out.ok) return null
+      json = out.json
+      wheelxCache.set(key, { json, expires: Date.now() + WHEELX_QUOTE_TTL_MS })
+      if (wheelxCache.size > 100) wheelxCache.clear()
+    }
+
+    if (!json?.amount_out || !json?.tx) return null
+    const raw = BigInt(json.amount_out)
+    if (raw === 0n) return null
+
+    return {
+      amountOut: formatUnits(raw, outDecimals),
+      amountOutRaw: raw,
+      amountInRaw: amountRaw,
+      inDecimals,
+      outDecimals,
+      routedVia: (typeof json.router === 'string' && json.router) || 'WheelX',
+      priceImpact: null,
+      venue: 'wheelx',
+    }
+  } catch {
+    return null
+  }
+}
+
+async function executeWheelxSwap({
+  tokenIn, tokenOut, amountIn, quote, slippageBps, provider, from, onStatus,
+}) {
+  const start = Date.now()
+  const eq = (a, b) => String(a).toLowerCase() === String(b).toLowerCase()
+  const allowed = (a) => WHEELX_ALLOWED.includes(String(a).toLowerCase())
+  const shownFloor = (quote.amountOutRaw * BigInt(10000 - slippageBps)) / 10000n
+
+  // A fresh, executable quote — not the display quote the user saw.
+  const buildSwap = async () => {
+    const body = wheelxBody({
+      tokenIn, tokenOut, amountRaw: quote.amountInRaw, account: from, slippageBps, quoteOnly: false,
+    })
+    const { ok, status, json } = await wheelxQuoteRequest(body, 15000)
+    if (!ok) {
+      if (status === 429) throw new Error('WheelX is busy. Wait a few seconds and try again.')
+      throw new Error('WheelX could not build this swap. Try again or use another venue.')
+    }
+    const tx = json?.tx
+    if (!tx?.to || !tx?.data || !json?.amount_out || !json?.min_receive) {
+      throw new Error('WheelX returned an incomplete transaction. Try another venue.')
+    }
+
+    // Only known WheelX contracts.
+    if (!allowed(tx.to)) {
+      throw new Error('WheelX returned an unrecognised contract (' + String(tx.to).slice(0, 10) +
+        '…). Swap cancelled — try another venue.')
+    }
+    if (tx.chainId !== undefined && Number(tx.chainId) !== WHEELX_CHAIN_ID) {
+      throw new Error('WheelX returned a transaction for the wrong network. Swap cancelled.')
+    }
+    if (json.approve) {
+      if (!eq(json.approve.token, tokenIn.address) || !allowed(json.approve.spender)) {
+        throw new Error('WheelX returned an unexpected approval. Swap cancelled.')
+      }
+      // Exactly the amount being swapped, never more.
+      if (BigInt(json.approve.amount) !== quote.amountInRaw) {
+        throw new Error('WheelX asked for an unexpected approval amount. Swap cancelled.')
+      }
+    }
+
+    // Price: the output must clear the floor the user accepted, and
+    // WheelX's own minimum-received must not be looser than their tolerance.
+    const out = BigInt(json.amount_out)
+    const minReceive = BigInt(json.min_receive)
+    if (out < shownFloor) throw new Error('The price changed since your quote. Go back and review again.')
+    if (minReceive * 10000n < out * BigInt(10000 - slippageBps - 25)) {
+      throw new Error('WheelX protects this swap more loosely than your ' +
+        (slippageBps / 100).toFixed(2) + '% tolerance. Raise the tolerance or use another venue.')
+    }
+
+    // An ERC-20 input carries no native value. If WheelX treats the input as
+    // the chain's native USDC instead, the value must be exactly the amount.
+    const value = BigInt(tx.value || '0')
+    if (json.approve) {
+      if (value !== 0n) throw new Error('WheelX returned an unexpected payment amount. Swap cancelled.')
+    } else if (value !== 0n && value !== quote.amountInRaw * 10n ** 12n) {
+      throw new Error('WheelX returned an unexpected payment amount. Swap cancelled.')
+    }
+    return json
+  }
+
+  onStatus('Building route via WheelX...')
+  let swap = await buildSwap()
+
+  const waitReceipt = async (hash, tries) => {
+    for (let i = 0; i < tries; i++) {
+      await new Promise(r => setTimeout(r, 500))
+      try {
+        const r = await provider.request({ method: 'eth_getTransactionReceipt', params: [hash] })
+        if (r) return r
+      } catch { /* keep polling */ }
+    }
+    return null
+  }
+
+  if (swap.approve) {
+    const { spender, amount } = swap.approve
+    const need = BigInt(amount)
+    let allowance = 0n
+    try {
+      const outHex = await provider.request({
+        method: 'eth_call',
+        params: [{ to: tokenIn.address, data: '0xdd62ed3e' + encAddress(from) + encAddress(spender) }, 'latest'],
+      })
+      allowance = BigInt(outHex || '0x0')
+    } catch { /* treat as zero and approve */ }
+
+    if (allowance < need) {
+      onStatus('Approve ' + tokenIn.symbol + ' in your wallet...')
+      const approveHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: tokenIn.address,
+          data: '0x095ea7b3' + encAddress(spender) + encUint(need),
+          gas: '0x186A0',
+        }],
+      })
+      onStatus('Waiting for approval...')
+      const ar = await waitReceipt(approveHash, 60)
+      if (!ar) throw new Error('The approval has not confirmed yet. Wait a moment and try again.')
+      if (ar.status === '0x0') throw new Error('The approval failed on-chain. Please try again.')
+      // Build again so the transaction is fresh when it is signed.
+      onStatus('Refreshing WheelX price...')
+      swap = await buildSwap()
+    }
+  }
+
+  const tx = swap.tx
+  onStatus('Confirm the swap in your wallet...')
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: tx.to,
+      data: tx.data,
+      value: '0x' + BigInt(tx.value || '0').toString(16),
+      ...(tx.gas ? { gas: '0x' + Math.ceil(Number(tx.gas) * 1.2).toString(16) } : {}),
+    }],
+  })
+
+  onStatus('Waiting for confirmation...')
+  const receipt = await waitReceipt(txHash, 60)
+  if (!receipt) {
+    throw new Error('WheelX: the swap was sent but has not confirmed yet. Check your wallet before retrying. Tx ' +
+      txHash.slice(0, 10) + '…' + txHash.slice(-6))
+  }
+  if (receipt.status === '0x0') {
+    throw new Error(await explainRevert(txHash, slippageBps, 'WheelX'))
+  }
+
+  // ParagonFinance flat fee, after the swap — the same as every other venue.
+  // A reverted swap costs nothing.
+  let feeHash = null
+  if (PARAGON_SWAP_ROUTER) {
+    try {
+      onStatus('Confirming ParagonFinance fee...')
+      feeHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from,
+          to: PARAGON_SWAP_ROUTER,
+          data: '0xfe7edecc' + encAddress(tokenOut.address), // collectSwapFee(address)
+          value: '0x' + BigInt(1e17).toString(16),           // 0.1 USDC, 18 dp
+          gas: '0x186A0',
+        }],
+      })
+    } catch (err) {
+      console.warn('[paragon] swap fee not collected:', err?.message)
+    }
+  }
+
+  return {
+    hash: txHash,
+    feeHash,
+    from,
+    tokenIn: tokenIn.symbol,
+    tokenOut: tokenOut.symbol,
+    amountIn: parseFloat(amountIn),
+    amountOut: parseFloat(formatUnits(BigInt(swap.amount_out), quote.outDecimals)),
+    paragonFee: feeHash ? 0.1 : 0,
+    slippageBps,
+    settlementTime: Date.now() - start,
+    blockNumber: parseInt(receipt.blockNumber, 16),
+    status: 'confirmed',
+    network: 'mainnet',
+    networkLabel: 'Arc',
+    chainId: 5042,
+    dex: quote.routedVia || 'WheelX',
+    source: 'WheelX',
+    swap: true,
+  }
+}
+
+
 // ─── Sources ──────────────────────────────────────────────────────────────
 export const SOURCES = [
     {
@@ -1879,6 +2195,13 @@ export const SOURCES = [
     logo: '/dex/achswap.png',
     color: '#F59E0B',
     getQuote: getAchswapQuote,
+  },
+  {
+    id: 'wheelx',
+    name: 'WheelX',
+    logo: '/dex/wheelx.png',
+    color: '#FF6B35',
+    getQuote: getWheelxQuote,
   },
 ]
 

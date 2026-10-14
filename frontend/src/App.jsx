@@ -24,6 +24,7 @@ import { useReferralCapture } from './hooks/useReferralCapture'
 import AffiliatePage from './pages/AffiliatePage'
 import AffiliateDashboard from './pages/AffiliateDashboard'
 import { LegalIndex, PrivacyPolicy, TermsConditions, Imprint, RiskDisclosure } from './pages/LegalPages'
+import ChatWidget from './components/ChatWidget'
 
 
 
@@ -88,6 +89,9 @@ export default function App() {
           {/* Both must sit inside BrowserRouter — they read router state. */}
           <ScrollToTop />
           <WalletBridge />
+          {/* AI support chat — fixed bottom-right on every page, hides itself
+              when the backend has no chat bot configured. */}
+          <ChatWidget />
           <Routes>
 
             {/* ── Public ─────────────────────────────────────────── */}
