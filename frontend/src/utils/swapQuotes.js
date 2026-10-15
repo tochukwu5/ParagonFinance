@@ -1889,7 +1889,15 @@ async function wheelxFetch(url, body, timeoutMs) {
     signal: AbortSignal.timeout(timeoutMs),
   })
   const json = await res.json().catch(() => ({}))
-  return { ok: res.ok, status: res.status, json }
+  return { ok: res.ok, status: res.status, json, retryAfter: res.headers?.get?.('retry-after') || null }
+}
+
+// Short reason for the console, so a missing WheelX row can be diagnosed
+// without guessing.
+function wheelxReason(out) {
+  const j = out?.json || {}
+  const d = Array.isArray(j.detail) ? j.detail.map(x => x?.msg).filter(Boolean).join('; ') : ''
+  return String(j.error?.message || j.error || d || j.message || '').slice(0, 160)
 }
 
 // Direct first; a network/CORS failure (a TypeError from fetch) switches to
@@ -1910,7 +1918,15 @@ async function wheelxQuoteRequest(body, timeoutMs) {
   if (wheelxUseProxy) {
     out = await wheelxFetch(WHEELX_PROXY + '/quote', body, timeoutMs)
   }
-  if (out.status === 429) wheelxBlockedUntil = Date.now() + WHEELX_BACKOFF_MS
+  if (out.status === 429) {
+    // Honour Retry-After when WheelX sends one; otherwise wait a short while.
+    const asked = parseInt(out.retryAfter || '', 10)
+    const wait = Number.isFinite(asked) && asked > 0
+      ? Math.min(60000, Math.max(5000, asked * 1000))
+      : WHEELX_BACKOFF_MS
+    wheelxBlockedUntil = Date.now() + wait
+    console.warn('[wheelx] rate limited by WheelX — pausing WheelX quotes for', Math.round(wait / 1000) + 's')
+  }
   return out
 }
 
@@ -1946,18 +1962,27 @@ async function getWheelxQuote({ tokenIn, tokenOut, amountIn, account, slippageBp
       // Identical requests made at the same moment share one call.
       let pending = wheelxInflight.get(key)
       if (!pending) {
-        if (!wheelxHasBudget()) return null
+        if (!wheelxHasBudget()) {
+          console.warn('[wheelx] skipped: too many WheelX quotes in the last minute (limit ' + WHEELX_MAX_PER_MIN + ')')
+          return null
+        }
         pending = wheelxQuoteRequest(body, 10000).finally(() => wheelxInflight.delete(key))
         wheelxInflight.set(key, pending)
       }
       const out = await pending
-      if (!out.ok) return null
+      if (!out.ok) {
+        if (out.status !== 429) console.warn('[wheelx] no quote — HTTP', out.status, wheelxReason(out))
+        return null
+      }
       json = out.json
       wheelxCache.set(key, { json, expires: Date.now() + WHEELX_QUOTE_TTL_MS })
       if (wheelxCache.size > 100) wheelxCache.clear()
     }
 
-    if (!json?.amount_out || !json?.tx) return null
+    if (!json?.amount_out || !json?.tx) {
+      console.warn('[wheelx] answered but returned no route for this pair/amount')
+      return null
+    }
     const raw = BigInt(json.amount_out)
     if (raw === 0n) return null
 
@@ -1971,7 +1996,8 @@ async function getWheelxQuote({ tokenIn, tokenOut, amountIn, account, slippageBp
       priceImpact: null,
       venue: 'wheelx',
     }
-  } catch {
+  } catch (err) {
+    console.warn('[wheelx] quote request failed:', err?.message)
     return null
   }
 }
@@ -2200,7 +2226,7 @@ export const SOURCES = [
     id: 'wheelx',
     name: 'WheelX',
     logo: '/dex/wheelx.png',
-    color: '#FF6B35', 
+    color: '#FF6B35',
     getQuote: getWheelxQuote,
   },
 ]
