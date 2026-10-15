@@ -3,113 +3,157 @@ import { Link } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import { useArcTestnet } from '../hooks/useArcTestnet'
 import { useTestnet } from '../context/TestnetContext'
-import { Card, StatusBadge } from '../components/UI'
-import { Sidebar } from './Dashboard'
+import { Card } from '../components/UI'
+
+// ─── Shared bits ────────────────────────────────────────────────────
+
+// Change these two if the explorer or chain ever moves. They were hard-coded
+// further down before, which is how a stale URL ends up in three places.
+const EXPLORER = 'https://testnet.arcscan.app'
+const CHAIN_ID = '5042002'
+
+const short = (s) => (s ? s.slice(0, 6) + '…' + s.slice(-4) : '—')
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+const fmtTime = (d) =>
+  d ? new Date(d).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''
+
+const fmtNum = (n, max = 2) => {
+  const v = Number(n)
+  return Number.isFinite(v) ? v.toLocaleString(undefined, { maximumFractionDigits: max }) : '—'
+}
+
+const fmtSettle = (ms) => (ms ? (ms / 1000).toFixed(1) + 's' : '—')
+
+function ago(d) {
+  if (!d) return ''
+  const s = Math.max(0, (Date.now() - new Date(d).getTime()) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return Math.floor(s / 60) + 'm ago'
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago'
+  if (s < 86400 * 7) return Math.floor(s / 86400) + 'd ago'
+  return fmtDate(d)
+}
+
+const STATUS = {
+  confirmed: { label: 'Confirmed', dot: 'bg-green-400', text: 'text-green-400' },
+  failed: { label: 'Failed', dot: 'bg-red-400', text: 'text-red-400' },
+  pending: { label: 'Pending', dot: 'bg-amber-400', text: 'text-amber-400' },
+}
+
+function Status({ value }) {
+  const s = STATUS[value] || STATUS.pending
+  return (
+    <span className={'text-xs ' + s.text}>{s.label}</span>
+  )
+}
+
+const primaryBtn =
+  "inline-block bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-6 py-2.5 rounded-xl hover:opacity-90 transition-all"
+
+const quietBtn =
+  'border border-[#1e2530] text-[#8892a0] text-xs px-3.5 py-2 rounded-lg hover:border-[#00D4FF] hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed'
+
+// CSV cells: quote anything with commas/quotes/newlines, and defuse cells that
+// a spreadsheet would read as a formula.
+function csvCell(v) {
+  let s = v == null ? '' : String(v)
+  if (/^[=+\-@]/.test(s)) s = "'" + s
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+}
 
 // ─── TRANSACTIONS PAGE ─────────────────────────────────────────────
 export function Transactions() {
-  const { account, isConnected, connect, isLoading } = useArcTestnet()
-  const { transactions, stats, loadTransactions, isSyncing, backendOnline } = useTestnet()
+  const { account, isConnected, isLoading } = useArcTestnet()
+  const { transactions, stats, loadTransactions, isSyncing } = useTestnet()
   const [filter, setFilter] = useState('all')
   const [sort, setSort] = useState('newest')
 
   useEffect(() => {
-    if (account) {
-      loadTransactions(account)
-    }
+    if (account) loadTransactions(account)
   }, [account])
 
   const filtered = transactions
-    .filter(tx => filter === 'all' || tx.status === filter)
-    .sort((a, b) => sort === 'newest'
-      ? new Date(b.createdAt) - new Date(a.createdAt)
-      : new Date(a.createdAt) - new Date(b.createdAt)
+    .filter((tx) => filter === 'all' || tx.status === filter)
+    .sort((a, b) =>
+      sort === 'newest'
+        ? new Date(b.createdAt) - new Date(a.createdAt)
+        : new Date(a.createdAt) - new Date(b.createdAt)
     )
 
   const exportCsv = () => {
     if (!transactions.length) return
     const rows = [
       ['ID', 'Hash', 'To', 'Amount (USDC)', 'Gas (USDC)', 'Settlement (ms)', 'Status', 'Date'],
-      ...transactions.map(tx => [
-        tx.id, tx.hash, tx.to, tx.amount,
-        tx.gasCost, tx.settlementTime, tx.status,
-        tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : ''
-      ])
+      ...transactions.map((tx) => [
+        tx.id, tx.hash, tx.to, tx.amount, tx.gasCost, tx.settlementTime, tx.status,
+        tx.createdAt ? new Date(tx.createdAt).toISOString() : '',
+      ]),
     ]
-    const csv = rows.map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
+    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     const a = document.createElement('a')
     a.href = url
     a.download = 'paragonfinance-transactions.csv'
     a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
+
+  const summary = [
+    { l: 'Transactions', v: fmtNum(stats.totalTransactions, 0) },
+    { l: 'Volume', v: fmtNum(stats.totalVolume) + ' USDC' },
+    { l: 'Gas paid', v: fmtNum(stats.totalGasPaid, 6) + ' USDC' },
+    { l: 'Avg. settlement', v: fmtSettle(stats.avgSettlementTime) },
+  ]
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <main className="flex-1 p-8">
-        <div className="flex justify-between items-start mb-8">
+      <main className="flex-1 p-5 sm:p-8">
+        <div className="flex justify-between items-start gap-4 flex-wrap mb-7">
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk']">Transactions</h1>
             <p className="text-[#8892a0] text-sm mt-1">
-              Full history of all your transfers
+              {account ? (
+                <>
+                  Activity for <span className="font-mono text-xs" title={account}>{short(account)}</span>
+                  {isSyncing && <span className="ml-2 text-xs animate-pulse">Updating…</span>}
+                </>
+              ) : (
+                'Everything you send from your wallet shows up here'
+              )}
             </p>
-            {account && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] font-mono text-[#556]">{account}</span>
-                {backendOnline && (
-                  <span className="text-[10px] text-green-400"></span>
-                )}
-                {isSyncing && (
-                  <span className="text-[10px] text-[#8892a0] animate-pulse">Syncing...</span>
-                )}
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-2">
             {account && (
-              <button
-                onClick={() => loadTransactions(account)}
-                disabled={isSyncing}
-                className="border border-[#1e2530] text-[#8892a0] text-xs px-3 py-2 rounded-lg hover:border-[#00D4FF] hover:text-white transition-all disabled:opacity-40"
-              >
-                {isSyncing ? 'Syncing...' : '↻ Refresh'}
+              <button onClick={() => loadTransactions(account)} disabled={isSyncing} className={quietBtn}>
+                {isSyncing ? 'Refreshing…' : 'Refresh'}
               </button>
             )}
-            <button
-              onClick={exportCsv}
-              disabled={!transactions.length}
-              className="border border-[#1e2530] text-[#8892a0] text-xs px-4 py-2 rounded-lg hover:border-[#00D4FF] transition-all disabled:opacity-40"
-            >
-              ↓ Export CSV
+            <button onClick={exportCsv} disabled={!transactions.length} className={quietBtn}>
+              Export CSV
             </button>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          {[
-            { l: 'TOTAL TXS', v: stats.totalTransactions },
-            { l: 'TOTAL VOLUME', v: stats.totalVolume.toFixed(2) + ' USDC' },
-            { l: 'GAS PAID', v: stats.totalGasPaid.toFixed(6) + ' USDC' },
-            { l: 'AVG SETTLEMENT', v: stats.avgSettlementTime ? (stats.avgSettlementTime / 1000).toFixed(2) + 's' : '—' },
-          ].map(s => (
-            <Card key={s.l} className="p-4 text-center">
-              <p className="text-[10px] tracking-widest text-[#8892a0] mb-1">{s.l}</p>
-              <p className="text-lg font-bold text-[#00D4FF] font-['Space_Grotesk']">{s.v}</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-7">
+          {summary.map((s) => (
+            <Card key={s.l} className="px-4 py-3.5">
+              <p className="text-xs text-[#8892a0]">{s.l}</p>
+              <p className="text-lg font-semibold text-white font-['Space_Grotesk'] mt-1 tabular-nums">{s.v}</p>
             </Card>
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-          <div className="flex gap-2">
-            {['all', 'confirmed', 'failed'].map(f => (
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+          <div className="flex gap-1.5">
+            {['all', 'confirmed', 'failed'].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={
-                  'text-xs px-4 py-2 rounded-lg border font-semibold capitalize transition-all ' +
+                  'text-xs px-3.5 py-1.5 rounded-lg border capitalize transition-all ' +
                   (filter === f
                     ? 'bg-[#0a2030] border-[#00D4FF] text-[#00D4FF]'
                     : 'border-[#1e2530] text-[#8892a0] hover:border-[#00D4FF]')
@@ -121,7 +165,7 @@ export function Transactions() {
           </div>
           <select
             value={sort}
-            onChange={e => setSort(e.target.value)}
+            onChange={(e) => setSort(e.target.value)}
             className="bg-[#0f1822] border border-[#1e2530] text-[#8892a0] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#00D4FF]"
           >
             <option value="newest">Newest first</option>
@@ -129,96 +173,92 @@ export function Transactions() {
           </select>
         </div>
 
-        {/* Not connected */}
         {!isConnected ? (
           <Card className="p-12 text-center">
-            {/* <div className="text-4xl mb-4">🦊</div> */}
-            <p className="font-semibold font-['Space_Grotesk'] mb-2">Connect your wallet to view transactions</p>
-             <Link
-            to="/connect"
-            className="inline-block bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-8 py-3 rounded-xl hover:opacity-90 transition-all"
-          >
-            {isLoading ? 'Connecting...' : 'Connect wallet →'}
-          </Link>
-          </Card>
-
-        ) : isSyncing && transactions.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="text-4xl mb-4 animate-pulse">⏳</div>
-            <p className="text-[#8892a0] text-sm">Fetching your transaction history</p>
-          </Card>
-
-        ) : filtered.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="text-4xl mb-4">📭</div>
-            <p className="font-semibold font-['Space_Grotesk'] mb-2">No transactions yet</p>
-            <p className="text-[#8892a0] text-sm mb-6">
-              Send your first transaction to see it here.
-            </p>
-            <Link
-              to="/app"
-              className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm"
-            >
-              Send USDC →
+            <p className="font-semibold font-['Space_Grotesk'] mb-1">Connect a wallet to see your transactions</p>
+            <p className="text-[#8892a0] text-sm mb-6">We read your history straight from your address.</p>
+            <Link to="/connect" className={primaryBtn}>
+              {isLoading ? 'Connecting…' : 'Connect wallet'}
             </Link>
           </Card>
-
+        ) : isSyncing && transactions.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-[#8892a0] text-sm animate-pulse">Loading your history…</p>
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="font-semibold font-['Space_Grotesk'] mb-1">
+              {transactions.length === 0 ? 'Nothing here yet' : 'No ' + filter + ' transactions'}
+            </p>
+            <p className="text-[#8892a0] text-sm mb-6">
+              {transactions.length === 0
+                ? 'Your first transfer will appear here as soon as it confirms.'
+                : 'Try a different filter.'}
+            </p>
+            {transactions.length === 0 && (
+              <Link to="/app" className={primaryBtn}>
+                Send USDC
+              </Link>
+            )}
+          </Card>
         ) : (
           <Card className="overflow-hidden">
-            <div className="px-5 py-3 border-b border-[#1e2530] flex justify-between items-center">
-              <p className="text-[10px] tracking-widest text-[#8892a0]">
-                {filtered.length} TRANSACTION{filtered.length !== 1 ? 'S' : ''}
-              </p>
-              {backendOnline && (
-                <span className="text-[10px] text-green-400"></span>
-              )}
-            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#1e2530]">
-                    {['TX HASH', 'TO', 'AMOUNT', 'GAS PAID', 'SETTLEMENT', 'STATUS', 'DATE'].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-[10px] tracking-widest text-[#8892a0] font-medium">{h}</th>
-                    ))}
+                  <tr className="border-b border-[#1e2530] text-xs text-[#8892a0]">
+                    <th className="px-5 py-3 text-left font-medium">Transaction</th>
+                    <th className="px-5 py-3 text-left font-medium">To</th>
+                    <th className="px-5 py-3 text-right font-medium">Amount</th>
+                    <th className="px-5 py-3 text-right font-medium">Network fee</th>
+                    <th className="px-5 py-3 text-right font-medium">Settled in</th>
+                    <th className="px-5 py-3 text-left font-medium">Status</th>
+                    <th className="px-5 py-3 text-right font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(tx => (
-                    <tr key={tx.id || tx._id} className="border-b border-[#0f1520] hover:bg-[#0f1822] transition-colors">
-                      <td className="px-5 py-4">
-                        <a
-                          href={tx.hash ? 'https://testnet.arcscan.app/tx/' + tx.hash : '#'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono text-xs text-[#00D4FF] hover:underline"
-                        >
-                          {tx.hash ? tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4) : '—'}
-                        </a>
-                        <p className="text-[10px] text-[#556] mt-0.5">{tx.id}</p>
-                      </td>
-                      <td className="px-5 py-4 text-xs font-mono text-[#8892a0]">
-                        {tx.to ? tx.to.slice(0, 6) + '...' + tx.to.slice(-4) : '—'}
-                        {tx.selfTransfer && (
-                          <span className="ml-1 text-[10px] text-[#00D4FF]">(self)</span>
+                  {filtered.map((tx) => (
+                    <tr
+                      key={tx.id || tx._id || tx.hash}
+                      className="border-b border-[#0f1520] last:border-0 hover:bg-[#0f1822] transition-colors"
+                    >
+                      <td className="px-5 py-3.5">
+                        {tx.hash ? (
+                          <a
+                            href={EXPLORER + '/tx/' + tx.hash}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={tx.hash}
+                            className="font-mono text-xs text-[#00D4FF] hover:underline"
+                          >
+                            {short(tx.hash)}
+                          </a>
+                        ) : (
+                          <span className="text-[#556]">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-4 font-semibold text-white">{tx.amount} USDC</td>
-                      <td className="px-5 py-4 text-green-400 text-xs">{tx.gasCost} USDC</td>
-                      <td className="px-5 py-4 text-[#00D4FF] text-xs">
-                        {tx.settlementTime ? (tx.settlementTime / 1000).toFixed(2) + 's' : '—'}
+                      <td className="px-5 py-3.5 text-xs text-[#8892a0]">
+                        {tx.selfTransfer ? (
+                          <span className="text-white">Your wallet</span>
+                        ) : (
+                          <span className="font-mono" title={tx.to}>{short(tx.to)}</span>
+                        )}
                       </td>
-                      <td className="px-5 py-4">
-                        <span className={
-                          'text-[10px] px-2 py-0.5 rounded-full border font-bold ' +
-                          (tx.status === 'confirmed'
-                            ? 'bg-green-900/20 border-green-500 text-green-400'
-                            : 'bg-red-900/20 border-red-500 text-red-400')
-                        }>
-                          {tx.status}
-                        </span>
+                      <td className="px-5 py-3.5 text-right text-white font-medium tabular-nums">
+                        {fmtNum(tx.amount, 6)} <span className="text-[#8892a0] font-normal">USDC</span>
                       </td>
-                      <td className="px-5 py-4 text-xs text-[#8892a0]">
-                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '—'}
+                      <td className="px-5 py-3.5 text-right text-xs text-[#8892a0] tabular-nums">
+                        {fmtNum(tx.gasCost, 6)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right text-xs text-[#8892a0] tabular-nums">
+                        {fmtSettle(tx.settlementTime)}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Status value={tx.status} />
+                      </td>
+                      <td className="px-5 py-3.5 text-right text-xs text-[#8892a0] whitespace-nowrap">
+                        {fmtDate(tx.createdAt)}
+                        <span className="block text-[11px] text-[#556]">{fmtTime(tx.createdAt)}</span>
                       </td>
                     </tr>
                   ))}
@@ -235,10 +275,8 @@ export function Transactions() {
 // ─── WALLET PAGE ────────────────────────────────────────────────────
 export function WalletPage() {
   const { wallet } = useWallet()
-  const {
-    account, balance, isConnected, isCorrectNetwork,
-    refreshBalance, disconnect, walletId,
-  } = useArcTestnet()
+  const { account, balance, isConnected, isCorrectNetwork, refreshBalance, disconnect, walletId } = useArcTestnet()
+  const [copied, setCopied] = useState(false)
 
   const address = account || wallet?.address || null
 
@@ -248,125 +286,112 @@ export function WalletPage() {
     coinbase: 'Coinbase Wallet',
   }
 
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address || '')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard blocked — nothing useful to do */
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <main className="flex-1 p-8 max-w-2xl">
+      <main className="flex-1 p-5 sm:p-8 max-w-2xl">
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Wallet</h1>
-        <p className="text-[#8892a0] text-sm mb-8">Your connected wallet and USDC balance</p>
+        <p className="text-[#8892a0] text-sm mb-7">Your connected wallet and USDC balance</p>
 
         {!isConnected ? (
-          /* Disconnected state gets its own card rather than a greyed copy of
-             the connected one — showing a 0.00 balance with dead buttons reads
-             as "your wallet is empty", not "connect a wallet".
-
-             Links to /connect rather than calling connect('metamask') directly.
-             Hard-coding one wallet throws for anyone who doesn't have it
-             installed, which is exactly what was failing here. */
+          // Links to /connect instead of calling connect('metamask'): hard-coding
+          // one wallet throws for anyone who doesn't have it installed.
           <Card glow className="p-8 text-center mb-5">
-            <h2 className="font-bold font-['Space_Grotesk'] text-white mb-2">
-              No wallet connected
-            </h2>
+            <h2 className="font-bold font-['Space_Grotesk'] text-white mb-2">No wallet connected</h2>
             <p className="text-sm text-[#8892a0] mb-6 max-w-sm mx-auto leading-relaxed">
-              Connect a wallet to view your balance, copy your address, and send
-              or swap on Arc.
+              Connect a wallet to see your balance and to send or swap on Arc.
             </p>
-            <Link
-              to="/connect"
-              className="inline-block bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold text-sm px-8 py-3 rounded-xl hover:opacity-90 transition-all"
-            >
-              Connect Wallet
+            <Link to="/connect" className={primaryBtn}>
+              Connect wallet
             </Link>
           </Card>
         ) : (
           <Card glow className="p-6 mb-5">
-            <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">CONNECTED WALLET</p>
-
-            <div className="flex items-center gap-4 mb-5 flex-wrap">
-              <div className="w-12 h-12 rounded-xl bg-[#0a2030] border border-[#00D4FF]/40 flex items-center justify-center text-[#00D4FF] font-bold text-sm font-['Space_Grotesk'] flex-shrink-0">
+            <div className="flex items-center gap-4 mb-6 flex-wrap">
+              <div className="w-11 h-11 rounded-xl bg-[#0a2030] border border-[#00D4FF]/40 flex items-center justify-center text-[#00D4FF] font-bold text-sm font-['Space_Grotesk'] flex-shrink-0">
                 {(WALLET_LABEL[walletId] || 'Wallet').slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold font-['Space_Grotesk']">
                   {WALLET_LABEL[walletId] || 'Connected wallet'}
                 </p>
-                <p className="text-xs text-[#8892a0] font-mono mt-0.5 break-all">
-                  {address}
-                </p>
+                <p className="text-xs text-[#8892a0] font-mono mt-0.5 break-all">{address}</p>
               </div>
-              <span className="text-xs border border-green-500 text-green-400 bg-green-900/20 px-2 py-0.5 rounded-full flex-shrink-0">
-                Connected
-              </span>
             </div>
 
-            <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl p-5 text-center mb-5">
-              <p className="text-[10px] tracking-widest text-[#8892a0] mb-2">USDC BALANCE</p>
-              <p className="text-4xl font-bold text-[#00D4FF] font-['Space_Grotesk']">{balance}</p>
-              <p className="text-sm text-[#8892a0] mt-1">USDC · Arc</p>
+            <div className="bg-[#0D1117] border border-[#1e2530] rounded-xl px-5 py-6 mb-5">
+              <p className="text-xs text-[#8892a0] mb-1.5">Balance</p>
+              <p className="text-3xl font-bold text-white font-['Space_Grotesk'] tabular-nums">
+                {balance} <span className="text-base font-medium text-[#8892a0]">USDC</span>
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               <button
-                onClick={() => navigator.clipboard.writeText(address || '')}
-                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk']"
+                onClick={copyAddress}
+                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all"
               >
-                Copy Address
+                {copied ? 'Copied' : 'Copy address'}
               </button>
               <a
-                href={'https://testnet.arcscan.app/address/' + address}
+                href={EXPLORER + '/address/' + address}
                 target="_blank"
                 rel="noreferrer"
-                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all font-['Space_Grotesk'] text-center block"
+                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all text-center"
               >
-                View on ArcScan
+                View on explorer
               </a>
+              <button
+                onClick={refreshBalance}
+                className="border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-[#00D4FF] hover:text-white transition-all"
+              >
+                Refresh
+              </button>
             </div>
 
-            <button
-              onClick={refreshBalance}
-              className="w-full mt-3 border border-[#1e2530] text-[#8892a0] py-2 rounded-xl text-xs hover:border-[#00D4FF] hover:text-white transition-all"
-            >
-              Refresh Balance
-            </button>
-
-            {/* Below a rule, away from Copy and Refresh. Disconnect is the one
-                destructive action here and shouldn't sit in the same visual
-                group as two harmless ones. */}
-            <div className="mt-5 pt-4 border-t border-[#1e2530]">
+            {/* Kept apart from the harmless buttons: it's the one action that
+                changes state. */}
+            <div className="mt-6 pt-4 border-t border-[#1e2530]">
               <button
                 onClick={disconnect}
-                className="w-full border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-red-500/50 hover:text-red-400 hover:bg-red-900/10 transition-all font-['Space_Grotesk']"
+                className="w-full border border-[#1e2530] text-[#8892a0] py-2.5 rounded-xl text-sm hover:border-red-500/50 hover:text-red-400 hover:bg-red-900/10 transition-all"
               >
-                Disconnect Wallet
+                Disconnect wallet
               </button>
               <p className="text-[11px] text-[#556] text-center mt-2">
-                This revokes the site's permission. You'll pick an account again next time.
+                This removes the site's permission. You'll choose an account again next time.
               </p>
             </div>
           </Card>
         )}
 
         <Card className="p-5">
-          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">NETWORK</p>
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm text-[#8892a0]">Current Network</span>
-            <span className={
-              'text-xs font-semibold ' +
-              (!isConnected ? 'text-[#556]' : isCorrectNetwork ? 'text-green-400' : 'text-amber-400')
-            }>
-              {!isConnected ? 'Not connected' : isCorrectNetwork ? 'Arc' : 'Wrong Network'}
-            </span>
-          </div>
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm text-[#8892a0]">Chain ID</span>
-            <span className="text-sm text-white font-mono">5042002</span>
-          </div>
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm text-[#8892a0]">Chain Type</span>
-            <span className="text-xs border border-[#00D4FF] text-[#00D4FF] px-2 py-0.5 rounded-full">EVM Compatible</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-[#8892a0]">Gas Token</span>
-            <span className="text-sm text-white">USDC (native)</span>
+          <p className="text-sm font-semibold font-['Space_Grotesk'] mb-4">Network</p>
+          <div className="space-y-3 text-sm">
+            {[
+              {
+                l: 'Connection',
+                v: !isConnected ? 'Not connected' : isCorrectNetwork ? 'Arc' : 'Wrong network',
+                c: !isConnected ? 'text-[#556]' : isCorrectNetwork ? 'text-green-400' : 'text-amber-400',
+              },
+              { l: 'Chain ID', v: CHAIN_ID, c: 'text-white font-mono' },
+              { l: 'Type', v: 'EVM compatible', c: 'text-white' },
+              { l: 'Gas token', v: 'USDC (native)', c: 'text-white' },
+            ].map((r) => (
+              <div key={r.l} className="flex justify-between items-center">
+                <span className="text-[#8892a0]">{r.l}</span>
+                <span className={r.c}>{r.v}</span>
+              </div>
+            ))}
           </div>
         </Card>
       </main>
@@ -378,69 +403,57 @@ export function WalletPage() {
 export function Notifications() {
   const { account } = useArcTestnet()
   const { transactions, loadTransactions } = useTestnet()
-  const [notes, setNotes] = useState([])
 
   useEffect(() => {
     if (account) loadTransactions(account)
   }, [account])
 
-  useEffect(() => {
-    if (transactions.length > 0) {
-      const txNotes = transactions.slice(0, 5).map((tx, i) => ({
-        id: tx.id || i,
-        type: tx.status === 'confirmed' ? 'success' : 'warning',
-        title: tx.status === 'confirmed' ? 'Transaction Confirmed' : 'Transaction Pending',
-        desc: (tx.id || 'TXN') + ' — ' + tx.amount + ' USDC sent · Gas: ' + tx.gasCost + ' USDC',
-        time: tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '—',
-        read: true,
-      }))
-      setNotes(txNotes)
-    }
-  }, [transactions])
-
-  const icons = { success: '✅', info: 'ℹ️', warning: '⚠️' }
+  const notes = [...transactions]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 8)
+    .map((tx, i) => {
+      const amount = fmtNum(tx.amount, 6) + ' USDC'
+      const to = tx.selfTransfer ? 'your own wallet' : short(tx.to)
+      if (tx.status === 'confirmed')
+        return { id: tx.id || tx.hash || i, status: 'confirmed', title: 'Transfer confirmed', desc: amount + ' to ' + to, at: tx.createdAt }
+      if (tx.status === 'failed')
+        return { id: tx.id || tx.hash || i, status: 'failed', title: 'Transfer failed', desc: amount + ' to ' + to + ' did not go through', at: tx.createdAt }
+      return { id: tx.id || tx.hash || i, status: 'pending', title: 'Transfer pending', desc: amount + ' to ' + to, at: tx.createdAt }
+    })
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      <main className="flex-1 p-8 max-w-2xl">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold font-['Space_Grotesk']">Notifications</h1>
-            <p className="text-[#8892a0] text-sm mt-1">
-              {notes.length > 0 ? notes.length + ' recent transactions' : 'No activity yet'}
-            </p>
-          </div>
+      <main className="flex-1 p-5 sm:p-8 max-w-2xl">
+        <div className="mb-7">
+          <h1 className="text-2xl font-bold font-['Space_Grotesk']">Notifications</h1>
+          <p className="text-[#8892a0] text-sm mt-1">
+            {notes.length > 0 ? 'Your latest transfers' : 'Nothing new'}
+          </p>
         </div>
 
         {notes.length === 0 ? (
           <Card className="p-12 text-center">
-            <div className="text-4xl mb-4">🔔</div>
-            <p className="font-semibold font-['Space_Grotesk'] mb-2">No notifications yet</p>
-            <p className="text-[#8892a0] text-sm mb-6">
-              Your transaction confirmations will appear here.
-            </p>
-            <Link
-              to="/app"
-              className="bg-[#00D4FF] text-[#0D1117] font-['Space_Grotesk'] font-bold px-6 py-2.5 rounded-xl text-sm"
-            >
-              Send USDC →
+            <p className="font-semibold font-['Space_Grotesk'] mb-1">You're all caught up</p>
+            <p className="text-[#8892a0] text-sm mb-6">Confirmations for your transfers will show up here.</p>
+            <Link to="/app" className={primaryBtn}>
+              Send USDC
             </Link>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {notes.map(n => (
-              <Card key={n.id} className="p-4 flex gap-4 items-start hover:border-[#00D4FF] transition-all cursor-pointer">
-                <div className="text-xl flex-shrink-0">{icons[n.type]}</div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <p className="text-sm font-semibold font-['Space_Grotesk'] text-white">{n.title}</p>
-                    <span className="text-[10px] text-[#556]">{n.time}</span>
+          <Card className="overflow-hidden">
+            {notes.map((n) => (
+              <div key={n.id} className="flex gap-3.5 items-start px-5 py-4 border-b border-[#0f1520] last:border-0">
+                <span className={'w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ' + STATUS[n.status].dot} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline gap-3">
+                    <p className="text-sm font-medium text-white">{n.title}</p>
+                    <span className="text-[11px] text-[#556] whitespace-nowrap">{ago(n.at)}</span>
                   </div>
-                  <p className="text-xs text-[#8892a0] mt-1">{n.desc}</p>
+                  <p className="text-xs text-[#8892a0] mt-0.5">{n.desc}</p>
                 </div>
-              </Card>
+              </div>
             ))}
-          </div>
+          </Card>
         )}
       </main>
     </div>
@@ -448,61 +461,69 @@ export function Notifications() {
 }
 
 // ─── SETTINGS PAGE ───────────────────────────────────────────────────
+function Toggle({ on, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={'w-11 h-6 rounded-full transition-all flex-shrink-0 ' + (on ? 'bg-[#00D4FF]' : 'bg-[#1e2530]')}
+    >
+      <span className={'block w-4 h-4 bg-white rounded-full mx-1 transition-all ' + (on ? 'translate-x-5' : 'translate-x-0')} />
+    </button>
+  )
+}
+
 export function Settings() {
-  const [defaultCountry, setDefaultCountry] = useState('NG')
   const [emailNotifs, setEmailNotifs] = useState(true)
   const [pushNotifs, setPushNotifs] = useState(false)
 
   return (
     <div className="flex min-h-screen bg-[#0D1117]">
-      {/* <Sidebar active="settings" /> */}
-      <main className="flex-1 p-8 max-w-2xl">
+      <main className="flex-1 p-5 sm:p-8 max-w-2xl">
         <h1 className="text-2xl font-bold font-['Space_Grotesk'] mb-1">Settings</h1>
-        <p className="text-[#8892a0] text-sm mb-8">Manage your Paragon Finance preferences</p>
-
-      
+        <p className="text-[#8892a0] text-sm mb-7">Manage your Paragon Finance preferences</p>
 
         <Card className="p-5 mb-4">
-          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">NOTIFICATIONS</p>
-          <div className="space-y-4">
+          <p className="text-sm font-semibold font-['Space_Grotesk'] mb-4">Notifications</p>
+          <div className="space-y-5">
             {[
-              { label: 'Email notifications', sub: 'Receive transaction confirmations via email', val: emailNotifs, set: setEmailNotifs },
-              { label: 'Browser push notifications', sub: 'Get notified instantly in browser', val: pushNotifs, set: setPushNotifs },
-            ].map(s => (
-              <div key={s.label} className="flex justify-between items-center">
+              { label: 'Email', sub: 'Get a confirmation email for each transfer', val: emailNotifs, set: setEmailNotifs },
+              { label: 'Browser alerts', sub: 'Get notified in your browser as soon as a transfer settles', val: pushNotifs, set: setPushNotifs },
+            ].map((s) => (
+              <div key={s.label} className="flex justify-between items-center gap-4">
                 <div>
-                  <p className="text-sm font-semibold">{s.label}</p>
-                  <p className="text-xs text-[#8892a0]">{s.sub}</p>
+                  <p className="text-sm font-medium">{s.label}</p>
+                  <p className="text-xs text-[#8892a0] mt-0.5">{s.sub}</p>
                 </div>
-                <button
-                  onClick={() => s.set(!s.val)}
-                  className={'w-11 h-6 rounded-full transition-all ' + (s.val ? 'bg-[#00D4FF]' : 'bg-[#1e2530]')}
-                >
-                  <span className={'block w-4 h-4 bg-white rounded-full mx-1 transition-all ' + (s.val ? 'translate-x-5' : 'translate-x-0')} />
-                </button>
+                <Toggle on={s.val} onChange={s.set} label={s.label} />
               </div>
             ))}
           </div>
         </Card>
 
         <Card className="p-5">
-          <p className="text-[10px] tracking-widest text-[#8892a0] mb-4">ABOUT ParagonFinance</p>
-          <div className="space-y-2 text-sm">
+          <p className="text-sm font-semibold font-['Space_Grotesk'] mb-4">About Paragon Finance</p>
+          <div className="space-y-3 text-sm">
             {[
               { l: 'Version', v: '1.0.0-beta' },
               { l: 'Built on', v: 'Arc Network by Circle' },
-              { l: 'Arc Network Status', v: '● Operational', vc: 'text-green-400' },
-              { l: 'USDC Contract', v: 'Circle · 100% backed' },
-            ].map(r => (
-              <div key={r.l} className="flex justify-between border-b border-[#1e2530] pb-2">
+            ].map((r) => (
+              <div key={r.l} className="flex justify-between">
                 <span className="text-[#8892a0]">{r.l}</span>
-                <span className={r.vc || 'text-white'}>{r.v}</span>
+                <span className="text-white">{r.v}</span>
               </div>
             ))}
           </div>
-          <div className="flex gap-3 mt-4">
-            <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="text-xs text-[#00D4FF] hover:underline">Arc Docs →</a>
-            <a href="https://testnet.arcscan.app" target="_blank" rel="noreferrer" className="text-xs text-[#00D4FF] hover:underline">ArcScan →</a>
+          <div className="flex gap-4 mt-5 pt-4 border-t border-[#1e2530]">
+            <a href="https://docs.arc.network" target="_blank" rel="noreferrer" className="text-xs text-[#00D4FF] hover:underline">
+              Arc docs
+            </a>
+            <a href={EXPLORER} target="_blank" rel="noreferrer" className="text-xs text-[#00D4FF] hover:underline">
+              Explorer
+            </a>
           </div>
         </Card>
       </main>
