@@ -4,8 +4,8 @@
   "description": "SendArc Backend \u2014 Node.js + MongoDB API for testnet transaction recording",
   "main": "src/index.js",
   "scripts": {
-    "start": "node init && node src/index.js",
-    "dev": "node init && nodemon src/index.js",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
